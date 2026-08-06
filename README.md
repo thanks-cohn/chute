@@ -106,7 +106,8 @@ After editing extension files, open `chrome://extensions` and click the reload b
 ## Security model
 
 - The bridge listens on loopback only by default.
-- CORS responses are limited to Chrome-extension origins and the local service origin.
+- Queue listings and destructive operations allow only Chrome-extension or local-service origins.
+- Individual file reads use an unguessable queue ID and allow cross-origin GET so the injected **Attach** fallback can fetch the selected file.
 - Chute copies files into its private queue rather than exposing arbitrary filesystem paths.
 - Nothing is uploaded by the Python service.
 - Removing an item deletes Chute's copy, never the original file.
