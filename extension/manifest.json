@@ -1,0 +1,22 @@
+{
+  "manifest_version": 3,
+  "name": "Chute",
+  "version": "0.1.0",
+  "description": "Pick up files sent from your terminal and drop them into the current webpage.",
+  "minimum_chrome_version": "114",
+  "permissions": ["activeTab", "scripting", "sidePanel", "storage"],
+  "host_permissions": [
+    "http://127.0.0.1:17891/*",
+    "http://localhost:17891/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "action": {
+    "default_title": "Chute",
+    "default_popup": "popup.html"
+  },
+  "side_panel": {
+    "default_path": "shelf.html"
+  }
+}
