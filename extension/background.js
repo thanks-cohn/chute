@@ -21,14 +21,31 @@ async function updateBadge() {
 
 chrome.runtime.onInstalled.addListener(async () => {
   await chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: false });
+  const existing = await chrome.storage.sync.get(["chuteDisplayLimit", "chuteBinVisible"]);
+  const defaults = {};
+  if (existing.chuteDisplayLimit === undefined) defaults.chuteDisplayLimit = 20;
+  if (existing.chuteBinVisible === undefined) defaults.chuteBinVisible = true;
+  if (Object.keys(defaults).length) await chrome.storage.sync.set(defaults);
   await updateBadge();
 });
 
 chrome.runtime.onStartup.addListener(updateBadge);
 
-chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
+chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message?.type === "badge-refresh") {
     updateBadge().then(() => sendResponse({ ok: true }));
+    return true;
+  }
+
+  if (message?.type === "open-side-panel") {
+    const windowId = sender.tab?.windowId;
+    if (!windowId) {
+      sendResponse({ ok: false, error: "No browser window found." });
+      return false;
+    }
+    chrome.sidePanel.open({ windowId })
+      .then(() => sendResponse({ ok: true }))
+      .catch((error) => sendResponse({ ok: false, error: error.message }));
     return true;
   }
 
