@@ -11,7 +11,7 @@ import zipfile
 from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Callable, Iterable
+from typing import BinaryIO, Callable, Iterable
 
 _LOCK = threading.RLock()
 
@@ -77,6 +77,12 @@ class Store:
             if os.path.exists(temp_name):
                 os.unlink(temp_name)
 
+    def _append_item(self, item: QueueItem) -> None:
+        with _LOCK:
+            rows = self._read()
+            rows.append(asdict(item))
+            self._write(rows)
+
     def list(self) -> list[QueueItem]:
         with _LOCK:
             valid: list[dict] = []
@@ -116,13 +122,54 @@ class Store:
                 created_at=datetime.now(timezone.utc).isoformat(),
                 source_path=str(source),
             )
-            with _LOCK:
-                rows = self._read()
-                rows.append(asdict(item))
-                self._write(rows)
+            self._append_item(item)
             return item
         finally:
             cleanup()
+
+    def add_stream(
+        self,
+        name: str,
+        stream: BinaryIO,
+        size: int,
+        mime: str | None = None,
+        source_path: str = "browser-drop",
+    ) -> QueueItem:
+        if size < 0:
+            raise ValueError("Upload size cannot be negative")
+
+        display_name = Path(name).name.strip() or "browser-file"
+        item_id = uuid.uuid4().hex
+        stored_name = f"{item_id}-{display_name}"
+        destination = self.files_dir / stored_name
+        partial = self.files_dir / f".{stored_name}.part"
+        remaining = size
+
+        try:
+            with partial.open("wb") as handle:
+                while remaining:
+                    chunk = stream.read(min(1024 * 1024, remaining))
+                    if not chunk:
+                        raise ValueError("Upload ended before the declared size")
+                    handle.write(chunk)
+                    remaining -= len(chunk)
+            os.replace(partial, destination)
+
+            item = QueueItem(
+                id=item_id,
+                name=display_name,
+                stored_name=stored_name,
+                size=destination.stat().st_size,
+                mime=mime or mimetypes.guess_type(display_name)[0] or "application/octet-stream",
+                created_at=datetime.now(timezone.utc).isoformat(),
+                source_path=source_path,
+            )
+            self._append_item(item)
+            return item
+        except Exception:
+            partial.unlink(missing_ok=True)
+            destination.unlink(missing_ok=True)
+            raise
 
     def _prepare(self, source: Path) -> tuple[Path, str, Callable[[], None]]:
         if source.is_file():
