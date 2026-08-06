@@ -1,6 +1,8 @@
 const BASE_URL = "http://127.0.0.1:17891";
 const AUTO_PREPARE_LIMIT = 24 * 1024 * 1024;
+const AUTO_PREPARE_ROWS = 20;
 const prepared = new Map();
+let displayLimit = 20;
 
 const listElement = document.querySelector("#files");
 const statusElement = document.querySelector("#status");
@@ -23,6 +25,7 @@ function iconFor(file) {
   if (file.mime?.startsWith("image/")) return "🖼️";
   if (file.mime === "application/pdf") return "📕";
   if (file.name?.endsWith(".zip")) return "📦";
+  if (file.name?.endsWith(".url")) return "🔗";
   if (file.mime?.startsWith("text/")) return "📝";
   return "📄";
 }
@@ -69,14 +72,15 @@ async function prepare(file, row) {
   }
 }
 
-function createRow(file) {
+function createRow(file, index) {
+  const autoPrepare = index < AUTO_PREPARE_ROWS && file.size <= AUTO_PREPARE_LIMIT;
   const row = document.createElement("article");
   row.className = "file-row";
   row.innerHTML = `
     <div class="file-icon">${iconFor(file)}</div>
     <div class="file-info">
       <div class="file-name" title="${escapeHtml(file.name)}">${escapeHtml(file.name)}</div>
-      <div class="file-meta">${formatSize(file.size)} · <span class="file-state">${file.size <= AUTO_PREPARE_LIMIT ? "Loading" : "Click prepare"}</span></div>
+      <div class="file-meta">${formatSize(file.size)} · <span class="file-state">${autoPrepare ? "Loading" : "Hover to prepare"}</span></div>
     </div>
     <div class="file-tools">
       <button class="secondary-button attach" title="Attach to the active tab">Attach</button>
@@ -84,7 +88,7 @@ function createRow(file) {
     </div>`;
 
   row.addEventListener("pointerenter", () => {
-    if (file.size <= AUTO_PREPARE_LIMIT) prepare(file, row).catch(() => {});
+    prepare(file, row).catch(() => {});
   }, { once: true });
 
   row.addEventListener("click", (event) => {
@@ -96,27 +100,15 @@ function createRow(file) {
     const localFile = prepared.get(file.id);
     if (!localFile) {
       event.preventDefault();
-      setStatus("Click the file once to prepare it, then drag.", true);
+      setStatus("Hover over the file or click it once, then drag.", true);
       return;
     }
 
     const transfer = event.dataTransfer;
     const mime = file.mime || localFile.type || "application/octet-stream";
     transfer.effectAllowed = "copy";
-
-    // Keep a real File item for same-document and permissive drop targets.
     transfer.items.add(localFile);
-
-    // Chrome strips script-created File items when a drag crosses out of an
-    // extension page. DownloadURL is Chrome's virtual-file drag format and
-    // tells the browser to expose the localhost resource as an actual file.
-    transfer.setData(
-      "DownloadURL",
-      `${mime}:${dragFilename(file.name)}:${fileUrl(file)}`
-    );
-
-    // Deliberately do not add text/plain. When a target rejects the file,
-    // inserting the filename into the chat box is worse than doing nothing.
+    transfer.setData("DownloadURL", `${mime}:${dragFilename(file.name)}:${fileUrl(file)}`);
     setStatus(`Dragging ${file.name}`);
   });
 
@@ -131,7 +123,7 @@ function createRow(file) {
     await refresh();
   });
 
-  if (file.size <= AUTO_PREPARE_LIMIT) prepare(file, row).catch(() => {});
+  if (autoPrepare) prepare(file, row).catch(() => {});
   return row;
 }
 
@@ -146,6 +138,12 @@ function setStatus(message, error = false) {
   statusElement.classList.toggle("error", error);
 }
 
+async function loadSettings() {
+  const settings = await chrome.storage.sync.get({ chuteDisplayLimit: 20 });
+  const next = Number(settings.chuteDisplayLimit);
+  displayLimit = Number.isFinite(next) && next >= 0 ? next : 20;
+}
+
 async function refresh() {
   try {
     const response = await api("/api/files");
@@ -154,13 +152,16 @@ async function refresh() {
     for (const id of prepared.keys()) {
       if (!currentIds.has(id)) prepared.delete(id);
     }
+
+    const visibleFiles = displayLimit === 0 ? files : files.slice(0, displayLimit);
     listElement.replaceChildren();
     if (!files.length) {
-      listElement.innerHTML = `<div class="empty"><strong>Nothing in the chute.</strong>Run <code>chute ./some-file</code></div>`;
+      listElement.innerHTML = `<div class="empty"><strong>Nothing in the chute.</strong>Run <code>chute ./some-file</code> or drop something into the sticky bin.</div>`;
       setStatus("Local bridge connected");
     } else {
-      files.forEach((file) => listElement.append(createRow(file)));
-      setStatus(`${files.length} file${files.length === 1 ? "" : "s"} ready from the terminal`);
+      visibleFiles.forEach((file, index) => listElement.append(createRow(file, index)));
+      const shown = visibleFiles.length === files.length ? String(files.length) : `${visibleFiles.length} of ${files.length}`;
+      setStatus(`${shown} file${files.length === 1 ? "" : "s"} ready`);
     }
     chrome.runtime.sendMessage({ type: "badge-refresh" });
   } catch {
@@ -176,5 +177,13 @@ clearButton?.addEventListener("click", async () => {
 });
 refreshButton?.addEventListener("click", refresh);
 
-refresh();
+chrome.storage.onChanged.addListener((changes, area) => {
+  if (area === "sync" && changes.chuteDisplayLimit) {
+    const next = Number(changes.chuteDisplayLimit.newValue);
+    displayLimit = Number.isFinite(next) && next >= 0 ? next : 20;
+    refresh();
+  }
+});
+
+loadSettings().then(refresh);
 setInterval(refresh, 2500);
