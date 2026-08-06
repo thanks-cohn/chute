@@ -61,6 +61,12 @@
     setActive(false);
   }, true);
 
+  window.addEventListener("message", (event) => {
+    if (event.source === frame.contentWindow && event.data?.type === "chute-open-side-panel") {
+      chrome.runtime.sendMessage({ type: "open-side-panel" });
+    }
+  });
+
   chrome.storage.sync.get({ chuteBinVisible: true }, ({ chuteBinVisible }) => {
     host.style.display = chuteBinVisible ? "block" : "none";
   });
