@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Chute</title>
+  <link rel="stylesheet" href="shared.css">
+  <style>
+    body { width: 390px; max-height: 560px; overflow: auto; }
+    .popup-note { padding: 0 13px 11px; color: #8f9882; font-size: 10px; }
+  </style>
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <div class="logo">↓</div>
+      <div><div class="title">Chute</div><div class="subtitle">Your terminal files</div></div>
+    </div>
+    <div class="actions">
+      <button id="open-shelf" class="primary-button">Open shelf</button>
+    </div>
+  </header>
+  <div id="status" class="status">Connecting…</div>
+  <main id="files" class="file-list"></main>
+  <div class="popup-note">Drag directly from here. If Chrome closes the popup, use the persistent side shelf.</div>
+  <script src="shelf.js"></script>
+  <script src="popup.js"></script>
+</body>
+</html>
