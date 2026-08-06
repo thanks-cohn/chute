@@ -77,5 +77,7 @@
   }
 
   mount();
-  new MutationObserver(mount).observe(document, { childList: true, subtree: true });
+  if (document.documentElement) {
+    new MutationObserver(mount).observe(document.documentElement, { childList: true });
+  }
 })();
