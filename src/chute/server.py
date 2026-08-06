@@ -12,6 +12,7 @@ from .store import Store
 
 DEFAULT_HOST = "127.0.0.1"
 DEFAULT_PORT = 17891
+DEFAULT_MAX_UPLOAD_BYTES = 8 * 1024 * 1024 * 1024
 
 
 def allowed_origin(origin: str | None) -> str | None:
@@ -27,8 +28,15 @@ def allowed_origin(origin: str | None) -> str | None:
     return None
 
 
+def max_upload_bytes() -> int:
+    try:
+        return int(os.environ.get("CHUTE_MAX_UPLOAD_BYTES", DEFAULT_MAX_UPLOAD_BYTES))
+    except ValueError:
+        return DEFAULT_MAX_UPLOAD_BYTES
+
+
 class ChuteHandler(BaseHTTPRequestHandler):
-    server_version = "Chute/0.1"
+    server_version = "Chute/0.2"
 
     @property
     def store(self) -> Store:
@@ -47,7 +55,10 @@ class ChuteHandler(BaseHTTPRequestHandler):
                 self.send_header("Access-Control-Allow-Origin", origin)
                 self.send_header("Vary", "Origin")
         self.send_header("Access-Control-Allow-Methods", "GET, DELETE, POST, OPTIONS")
-        self.send_header("Access-Control-Allow-Headers", "Content-Type")
+        self.send_header(
+            "Access-Control-Allow-Headers",
+            "Content-Type, X-Chute-Filename, X-Chute-Mime, X-Chute-Source",
+        )
 
     def _json(self, payload: object, status: HTTPStatus = HTTPStatus.OK) -> None:
         body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
@@ -106,7 +117,39 @@ class ChuteHandler(BaseHTTPRequestHandler):
         if path == "/api/clear":
             self._json({"removed": self.store.clear()})
             return
+        if path == "/api/upload":
+            self._receive_upload()
+            return
         self._json({"error": "not found"}, HTTPStatus.NOT_FOUND)
+
+    def _receive_upload(self) -> None:
+        origin = allowed_origin(self.headers.get("Origin"))
+        if not origin:
+            self._json({"error": "extension origin required"}, HTTPStatus.FORBIDDEN)
+            return
+
+        length_header = self.headers.get("Content-Length")
+        if length_header is None:
+            self._json({"error": "Content-Length required"}, HTTPStatus.LENGTH_REQUIRED)
+            return
+        try:
+            size = int(length_header)
+        except ValueError:
+            self._json({"error": "invalid Content-Length"}, HTTPStatus.BAD_REQUEST)
+            return
+        if size < 0 or size > max_upload_bytes():
+            self._json({"error": "upload too large"}, HTTPStatus.REQUEST_ENTITY_TOO_LARGE)
+            return
+
+        name = unquote(self.headers.get("X-Chute-Filename", "browser-file"))
+        mime = self.headers.get("X-Chute-Mime") or self.headers.get("Content-Type")
+        source = unquote(self.headers.get("X-Chute-Source", "browser-drop"))
+        try:
+            item = self.store.add_stream(name, self.rfile, size, mime=mime, source_path=source)
+        except (OSError, ValueError) as exc:
+            self._json({"error": str(exc)}, HTTPStatus.BAD_REQUEST)
+            return
+        self._json({"file": public_item(item)}, HTTPStatus.CREATED)
 
 
 def public_item(item: object) -> dict[str, object]:
