@@ -34,8 +34,13 @@ async function api(path, options = {}) {
 }
 
 async function prepare(file, row) {
-  if (prepared.has(file.id)) return prepared.get(file.id);
   const state = row.querySelector(".file-state");
+  if (prepared.has(file.id)) {
+    state.textContent = "Drag me";
+    row.draggable = true;
+    row.classList.add("ready");
+    return prepared.get(file.id);
+  }
   state.textContent = "Preparing";
   row.draggable = false;
   try {
@@ -122,6 +127,10 @@ async function refresh() {
   try {
     const response = await api("/api/files");
     const { files } = await response.json();
+    const currentIds = new Set(files.map((file) => file.id));
+    for (const id of prepared.keys()) {
+      if (!currentIds.has(id)) prepared.delete(id);
+    }
     listElement.replaceChildren();
     if (!files.length) {
       listElement.innerHTML = `<div class="empty"><strong>Nothing in the chute.</strong>Run <code>chute ./some-file</code></div>`;
