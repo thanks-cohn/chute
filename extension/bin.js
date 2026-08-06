@@ -153,7 +153,7 @@ bin.addEventListener("drop", async (event) => {
 });
 
 bin.addEventListener("click", () => {
-  chrome.runtime.sendMessage({ type: "open-side-panel" });
+  window.parent.postMessage({ type: "chute-open-side-panel" }, "*");
 });
 
 window.addEventListener("message", (event) => {
