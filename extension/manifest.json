@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "Chute",
-  "version": "0.1.0",
-  "description": "Pick up files sent from your terminal and drop them into the current webpage.",
+  "version": "0.2.0",
+  "description": "A persistent browser bin for files sent from the terminal or dropped from the web.",
   "minimum_chrome_version": "114",
   "permissions": ["activeTab", "scripting", "sidePanel", "storage"],
   "host_permissions": [
@@ -18,5 +18,19 @@
   },
   "side_panel": {
     "default_path": "shelf.html"
-  }
+  },
+  "content_scripts": [
+    {
+      "matches": ["http://*/*", "https://*/*"],
+      "js": ["content.js"],
+      "run_at": "document_idle",
+      "all_frames": false
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": ["bin.html", "bin.css", "bin.js"],
+      "matches": ["http://*/*", "https://*/*"]
+    }
+  ]
 }
