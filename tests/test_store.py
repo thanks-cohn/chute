@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import io
 import tempfile
 import unittest
 import zipfile
@@ -44,6 +45,31 @@ class StoreTests(unittest.TestCase):
             _, archive = found
             with zipfile.ZipFile(archive) as zf:
                 self.assertEqual(zf.read("project/a.txt"), b"a")
+
+    def test_browser_stream_becomes_queue_item(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            store = Store(Path(temp) / "state")
+            body = b"dropped from chrome"
+            item = store.add_stream(
+                "browser-note.txt",
+                io.BytesIO(body),
+                len(body),
+                mime="text/plain",
+                source_path="browser-drop",
+            )
+
+            self.assertEqual(item.name, "browser-note.txt")
+            self.assertEqual(item.mime, "text/plain")
+            found = store.get(item.id)
+            self.assertIsNotNone(found)
+            self.assertEqual(found[1].read_bytes(), body)
+
+    def test_short_browser_stream_is_rejected(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            store = Store(Path(temp) / "state")
+            with self.assertRaises(ValueError):
+                store.add_stream("broken.bin", io.BytesIO(b"12"), 10)
+            self.assertEqual(store.list(), [])
 
 
 if __name__ == "__main__":
