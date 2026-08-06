@@ -27,6 +27,14 @@ function iconFor(file) {
   return "📄";
 }
 
+function fileUrl(file) {
+  return `${BASE_URL}/api/files/${encodeURIComponent(file.id)}`;
+}
+
+function dragFilename(name) {
+  return name.replace(/[:\r\n]/g, "_");
+}
+
 async function api(path, options = {}) {
   const response = await fetch(`${BASE_URL}${path}`, { cache: "no-store", ...options });
   if (!response.ok) throw new Error(`Local bridge returned ${response.status}`);
@@ -44,7 +52,7 @@ async function prepare(file, row) {
   state.textContent = "Preparing";
   row.draggable = false;
   try {
-    const response = await api(`/api/files/${file.id}`);
+    const response = await api(`/api/files/${encodeURIComponent(file.id)}`);
     const blob = await response.blob();
     const localFile = new File([blob], file.name, {
       type: file.mime || blob.type || "application/octet-stream",
@@ -91,9 +99,24 @@ function createRow(file) {
       setStatus("Click the file once to prepare it, then drag.", true);
       return;
     }
-    event.dataTransfer.effectAllowed = "copy";
-    event.dataTransfer.items.add(localFile);
-    event.dataTransfer.setData("text/plain", file.name);
+
+    const transfer = event.dataTransfer;
+    const mime = file.mime || localFile.type || "application/octet-stream";
+    transfer.effectAllowed = "copy";
+
+    // Keep a real File item for same-document and permissive drop targets.
+    transfer.items.add(localFile);
+
+    // Chrome strips script-created File items when a drag crosses out of an
+    // extension page. DownloadURL is Chrome's virtual-file drag format and
+    // tells the browser to expose the localhost resource as an actual file.
+    transfer.setData(
+      "DownloadURL",
+      `${mime}:${dragFilename(file.name)}:${fileUrl(file)}`
+    );
+
+    // Deliberately do not add text/plain. When a target rejects the file,
+    // inserting the filename into the chat box is worse than doing nothing.
     setStatus(`Dragging ${file.name}`);
   });
 
@@ -103,7 +126,7 @@ function createRow(file) {
   });
 
   row.querySelector(".remove").addEventListener("click", async () => {
-    await api(`/api/files/${file.id}`, { method: "DELETE" });
+    await api(`/api/files/${encodeURIComponent(file.id)}`, { method: "DELETE" });
     prepared.delete(file.id);
     await refresh();
   });
