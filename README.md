@@ -1,8 +1,10 @@
 # Chute
 
-**Pick up a file from your terminal and drop it into your browser.**
+**Pick up a file from your terminal, or feed one to the little bin following you around the browser.**
 
-Chute is a tiny localhost bridge plus a Chrome extension. Send a file from any terminal:
+Chute is a localhost file queue plus a Chrome/Chromium extension.
+
+From a terminal:
 
 ```bash
 chute ./report.pdf
@@ -10,18 +12,22 @@ chute ./screenshot.png
 chute ./whole-directory
 ```
 
-Click the Chute extension. Your files appear in a Downloads-style list. Pick one up and drag it into ChatGPT, Claude, Gmail, GitHub, or any webpage that accepts file drops.
+From the browser, drop a file, a link, or selected text into the sticky Chute bin floating above the current webpage. Everything appears in the extension popup and side shelf, ready to attach or drag elsewhere.
 
-Directories are zipped automatically. Files never leave your computer until you deliberately drop or attach them to a website.
+Directories sent from the CLI are zipped automatically. Files remain on your computer until you deliberately attach or drag them to a website.
 
 ## What is included
 
-- `src/chute/`: dependency-free Python CLI and localhost server
-- `extension/`: unpacked Chrome Manifest V3 extension
-- persistent Chrome side shelf for reliable drag-and-drop
+- dependency-free Python CLI and localhost server
+- persistent sticky-note Chute bin on normal HTTP and HTTPS pages
+- streamed browser-to-local file ingestion
 - Downloads-style extension popup
-- generic **Attach** fallback for pages with a file input
-- queue, remove, clear, and automatic local-server startup
+- persistent Chrome side shelf
+- generic **Attach** fallback for pages with file inputs
+- Chrome virtual-file drag support through `DownloadURL`
+- automatic directory ZIP creation
+- queue listing, removal, clearing, and badge counts
+- default list cap of 20, optional 50, or Unlimited
 
 ## Install the computer side
 
@@ -70,7 +76,50 @@ Now run:
 chute ./anything.pdf
 ```
 
-Click Chute and drag the file row into the page. The popup attempts direct dragging. **Open shelf** launches the persistent Chrome side panel, which is more reliable because it stays open while the pointer crosses into the webpage.
+Reload an ordinary webpage. The little taped Chute bin appears in the lower-right corner. Drop a file into it to send the file back into the local Chute queue. Click the bin to open the persistent side shelf.
+
+Chrome does not allow extensions to run on internal pages such as `chrome://extensions`, and some protected browser pages may also suppress extensions.
+
+## Upgrade from v0.1
+
+Pull the new code and reinstall the editable package:
+
+```bash
+cd ~/dev/chute
+git pull
+source .venv/bin/activate
+python -m pip install -e .
+```
+
+The old v0.1 daemon does not have the browser-ingest endpoint, so restart it. On Linux:
+
+```bash
+pkill -f 'python.*-m chute serve' || true
+chute ./README.md
+```
+
+Then open `chrome://extensions`, press the reload button on Chute, and reload the webpage where you are testing it.
+
+## Browser-bin behavior
+
+- Dropped files are copied into Chute's local queue using a streamed upload.
+- Multiple dropped files are accepted sequentially.
+- Dropped links become portable `.url` Internet Shortcut files.
+- Dropped text becomes a timestamped `.txt` note.
+- The bin displays the current queue count.
+- The bin can be hidden from the extension popup.
+
+The bin is hosted in an isolated extension iframe and mounted at the maximum practical CSS z-index. This prevents ordinary page styles from deforming or covering it.
+
+## List size
+
+The popup and shelf show the newest 20 items by default. The popup setting can switch this to:
+
+- Latest 20
+- Latest 50
+- Unlimited
+
+Unlimited changes the visible metadata list, but Chute still eagerly prepares only the first 20 small files. Older rows prepare when hovered or clicked, preventing a very large queue from consuming all browser memory at once.
 
 ## Commands
 
@@ -80,25 +129,47 @@ chute send PATH [...]      queue files or directories
 chute list                 list queued files
 chute remove ID            remove one item by full or unique short ID
 chute clear                empty the queue
-chute path                 print Chute's local data directory
+chute path                 print Chute's data directory
 chute serve                run the localhost bridge
 ```
 
-The server binds only to `127.0.0.1:17891` by default. Set `CHUTE_HOME` to move the queue and copied files elsewhere.
+The server binds only to `127.0.0.1:17891` by default. Set `CHUTE_HOME` to move the queue and copied files elsewhere. Browser drops are limited to 8 GiB by default; set `CHUTE_MAX_UPLOAD_BYTES` to change that limit.
 
 ## How drag-out works
 
-A webpage cannot drag a disk path it was never given. Chute therefore copies the queued file into its local store. The extension fetches the bytes from localhost, creates a browser `File` object, and places that object into the drag data during the user's real `dragstart` gesture.
+Chute uses two drag representations:
 
-Files up to 24 MB are prepared automatically. For larger files, click the row once, wait for **Drag me**, then drag it. This prevents the extension from loading every large queued file into memory at once.
+1. A browser `File` object for permissive and same-document targets.
+2. Chrome's `DownloadURL` virtual-file drag format for crossing out of an extension page.
 
-Chrome's native Downloads bubble has privileged browser access that ordinary extensions do not. Chute gets as close as an extension can: a compact popup plus a persistent side shelf. The **Attach** button is provided as a fallback when a site rejects cross-document file dragging.
+The earlier v0.1 implementation included a `text/plain` filename fallback. Chrome preserved that text while stripping the scripted file, causing ChatGPT to receive only the filename. v0.2 removes that fallback and adds the localhost-backed virtual-file representation.
+
+The **Attach** button remains available for sites such as ChatGPT that expose a usable file input.
+
+## Multiple browsers
+
+The queue belongs to the local Chute daemon, not to one browser profile. Therefore, Chrome, Edge, Brave, and other compatible Chromium browsers on the same computer can see the same queue when the extension is installed in each browser.
+
+The synchronized Chrome settings currently cover preferences such as list size and bin visibility, not file contents.
+
+Planned later work:
+
+- Firefox/WebExtension package
+- encrypted device pairing
+- cross-device queue synchronization
+- selective expiration and storage quotas
+- conflict-free queue IDs across devices
 
 ## Development
 
 ```bash
 python -m unittest discover -s tests -v
 python -m compileall src
+node --check extension/background.js
+node --check extension/content.js
+node --check extension/bin.js
+node --check extension/shelf.js
+node --check extension/popup.js
 ```
 
 After editing extension files, open `chrome://extensions` and click the reload button on Chute.
@@ -106,12 +177,13 @@ After editing extension files, open `chrome://extensions` and click the reload b
 ## Security model
 
 - The bridge listens on loopback only by default.
-- Queue listings and destructive operations allow only Chrome-extension or local-service origins.
-- Individual file reads use an unguessable queue ID and allow cross-origin GET so the injected **Attach** fallback can fetch the selected file.
+- Queue listings, browser ingestion, and destructive operations accept only Chrome-extension or local-service origins.
+- Individual file reads use unguessable queue IDs and allow cross-origin GET so the injected **Attach** fallback and virtual-file drag can read the selected item.
+- Browser uploads are written incrementally instead of being buffered fully in Python memory.
 - Chute copies files into its private queue rather than exposing arbitrary filesystem paths.
-- Nothing is uploaded by the Python service.
+- The Python service does not upload files to the internet.
 - Removing an item deletes Chute's copy, never the original file.
 
 ## Status
 
-This is the first working implementation, version `0.1.0`. The most important real-world validation is testing drag-out behavior across current Chrome builds and common targets such as ChatGPT, Claude, Gmail, and GitHub.
+Version `0.2.0` adds the persistent sticky browser bin, streamed browser ingestion, configurable list limits, and the Chrome virtual-file drag fix. Physical drag-and-drop behavior still needs testing across individual Chromium builds and target websites because each target can implement its drop zone differently.
