@@ -3,7 +3,11 @@ const bin = document.querySelector("#bin");
 const label = document.querySelector("#label");
 const face = document.querySelector("#face");
 const count = document.querySelector("#count");
+const loveChute = document.querySelector("#love-chute");
+const contextMenu = document.querySelector("#context-menu");
+const layerToggle = document.querySelector("#layer-toggle");
 let busy = false;
+let layerMode = "front";
 
 function safeName(value, fallback) {
   const cleaned = String(value || "")
@@ -83,6 +87,14 @@ function animate(kind) {
   setTimeout(() => bin.classList.remove(kind), 600);
 }
 
+function updateLayerLabel() {
+  layerToggle.textContent = layerMode === "front" ? "Send Chute to back" : "Keep Chute on top";
+}
+
+function closeContextMenu() {
+  contextMenu.hidden = true;
+}
+
 async function refreshCount() {
   try {
     const response = await fetch(`${BASE_URL}/api/files`, { cache: "no-store" });
@@ -153,14 +165,49 @@ bin.addEventListener("drop", async (event) => {
 });
 
 bin.addEventListener("click", () => {
+  closeContextMenu();
   window.parent.postMessage({ type: "chute-open-side-panel" }, "*");
+});
+
+loveChute.addEventListener("click", (event) => {
+  event.stopPropagation();
+  closeContextMenu();
+  chrome.runtime.sendMessage({ type: "love-chute" });
+});
+
+document.addEventListener("contextmenu", (event) => {
+  event.preventDefault();
+  event.stopPropagation();
+  updateLayerLabel();
+  contextMenu.hidden = false;
+  layerToggle.focus();
+});
+
+document.addEventListener("pointerdown", (event) => {
+  if (!contextMenu.hidden && !contextMenu.contains(event.target)) closeContextMenu();
+});
+
+document.addEventListener("keydown", (event) => {
+  if (event.key === "Escape") closeContextMenu();
+});
+
+layerToggle.addEventListener("click", (event) => {
+  event.stopPropagation();
+  const next = layerMode === "front" ? "back" : "front";
+  window.parent.postMessage({ type: "chute-set-layer", mode: next }, "*");
+  closeContextMenu();
 });
 
 window.addEventListener("message", (event) => {
   if (event.data?.type === "chute-drag-active") {
     bin.classList.toggle("active", Boolean(event.data.active));
   }
+  if (event.data?.type === "chute-layer-state") {
+    layerMode = event.data.mode === "back" ? "back" : "front";
+    updateLayerLabel();
+  }
 });
 
+window.parent.postMessage({ type: "chute-request-layer" }, "*");
 refreshCount();
 setInterval(refreshCount, 3000);
