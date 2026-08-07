@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Chute",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "A persistent browser bin for files sent from the terminal or dropped from the web.",
   "minimum_chrome_version": "114",
   "permissions": ["activeTab", "scripting", "sidePanel", "storage"],
