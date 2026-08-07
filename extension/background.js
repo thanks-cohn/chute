@@ -1,4 +1,5 @@
 const BASE_URL = "http://127.0.0.1:17891";
+const DEFAULT_LOVE_URL = "https://www.patreon.com/";
 
 async function getFiles() {
   const response = await fetch(`${BASE_URL}/api/files`, { cache: "no-store" });
@@ -19,12 +20,33 @@ async function updateBadge() {
   }
 }
 
+function normalizeLoveUrl(value) {
+  try {
+    const url = new URL(String(value || ""));
+    return ["http:", "https:"].includes(url.protocol) ? url.href : DEFAULT_LOVE_URL;
+  } catch {
+    return DEFAULT_LOVE_URL;
+  }
+}
+
+async function openLoveChute() {
+  const { chuteLoveUrl } = await chrome.storage.sync.get({ chuteLoveUrl: DEFAULT_LOVE_URL });
+  await chrome.tabs.create({ url: normalizeLoveUrl(chuteLoveUrl) });
+}
+
 chrome.runtime.onInstalled.addListener(async () => {
   await chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: false });
-  const existing = await chrome.storage.sync.get(["chuteDisplayLimit", "chuteBinVisible"]);
+  const existing = await chrome.storage.sync.get([
+    "chuteDisplayLimit",
+    "chuteBinVisible",
+    "chuteBinLayer",
+    "chuteLoveUrl"
+  ]);
   const defaults = {};
   if (existing.chuteDisplayLimit === undefined) defaults.chuteDisplayLimit = 20;
   if (existing.chuteBinVisible === undefined) defaults.chuteBinVisible = true;
+  if (existing.chuteBinLayer === undefined) defaults.chuteBinLayer = "front";
+  if (existing.chuteLoveUrl === undefined) defaults.chuteLoveUrl = DEFAULT_LOVE_URL;
   if (Object.keys(defaults).length) await chrome.storage.sync.set(defaults);
   await updateBadge();
 });
@@ -34,6 +56,13 @@ chrome.runtime.onStartup.addListener(updateBadge);
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message?.type === "badge-refresh") {
     updateBadge().then(() => sendResponse({ ok: true }));
+    return true;
+  }
+
+  if (message?.type === "love-chute") {
+    openLoveChute()
+      .then(() => sendResponse({ ok: true }))
+      .catch((error) => sendResponse({ ok: false, error: error.message }));
     return true;
   }
 
