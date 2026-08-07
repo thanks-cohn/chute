@@ -20,6 +20,8 @@ Directories sent from the CLI are zipped automatically. Files remain on your com
 
 - dependency-free Python CLI and localhost server
 - persistent sticky-note Chute bin on normal HTTP and HTTPS pages
+- always-visible **❤️ Love Chute** support link under the sticky bin
+- right-click **Send Chute to back / Keep Chute on top** layer control
 - streamed browser-to-local file ingestion
 - Downloads-style extension popup
 - persistent Chrome side shelf
@@ -28,6 +30,7 @@ Directories sent from the CLI are zipped automatically. Files remain on your com
 - automatic directory ZIP creation
 - queue listing, removal, clearing, and badge counts
 - default list cap of 20, optional 50, or Unlimited
+- optional Linux systemd user-service autostart
 
 ## Install the computer side
 
@@ -62,6 +65,29 @@ Sending a file starts the localhost bridge automatically. You can also run it in
 chute serve
 ```
 
+### Linux: start Chute automatically with systemd
+
+For Linux desktops using systemd, Chute can install its own per-user service using the exact Python environment from which Chute is running:
+
+```bash
+chute systemd install
+```
+
+That writes `~/.config/systemd/user/chute.service`, reloads the user manager, and performs the equivalent of:
+
+```bash
+systemctl --user enable --now chute.service
+```
+
+Useful follow-up commands:
+
+```bash
+chute systemd status
+chute systemd remove
+```
+
+The browser popup also suggests `chute systemd install` whenever the local bridge is offline.
+
 ## Install the Chrome extension
 
 1. Open `chrome://extensions`.
@@ -80,7 +106,24 @@ Reload an ordinary webpage. The little taped Chute bin appears in the lower-righ
 
 Chrome does not allow extensions to run on internal pages such as `chrome://extensions`, and some protected browser pages may also suppress extensions.
 
-## Upgrade from v0.1
+## ❤️ Love Chute
+
+The sticky bin always shows **❤️ Love Chute** underneath it. Clicking it opens the configured support page in a new browser tab.
+
+Open the Chute popup and set **Love Chute link** to the exact Patreon, donation, GitHub Sponsors, or other support URL you want to use. The setting syncs through Chrome storage. Until a custom URL is entered, Chute falls back to `https://www.patreon.com/` rather than guessing a creator handle.
+
+## Sticky layer behavior
+
+Chute normally uses the maximum practical CSS z-index so ordinary webpage elements do not cover it.
+
+Right-click the sticky Chute and choose:
+
+- **Send Chute to back** to place it at the page's low stacking layer.
+- **Keep Chute on top** to restore the normal maximum-z behavior.
+
+The selected mode persists across pages. The popup mirrors this setting as **Sticky layer**, which gives you a reliable way to restore Chute even if a webpage covers it after it has been sent backward.
+
+## Upgrade from v0.1 or v0.2
 
 Pull the new code and reinstall the editable package:
 
@@ -91,11 +134,17 @@ source .venv/bin/activate
 python -m pip install -e .
 ```
 
-The old v0.1 daemon does not have the browser-ingest endpoint, so restart it. On Linux:
+If an older daemon is still running, restart it. On Linux:
 
 ```bash
 pkill -f 'python.*-m chute serve' || true
 chute ./README.md
+```
+
+Or make the new daemon persistent immediately:
+
+```bash
+chute systemd install
 ```
 
 Then open `chrome://extensions`, press the reload button on Chute, and reload the webpage where you are testing it.
@@ -108,8 +157,10 @@ Then open `chrome://extensions`, press the reload button on Chute, and reload th
 - Dropped text becomes a timestamped `.txt` note.
 - The bin displays the current queue count.
 - The bin can be hidden from the extension popup.
+- **❤️ Love Chute** remains visible directly beneath the bin.
+- Right-clicking the Chute surface opens the layer control.
 
-The bin is hosted in an isolated extension iframe and mounted at the maximum practical CSS z-index. This prevents ordinary page styles from deforming or covering it.
+The bin is hosted in an isolated extension iframe so ordinary page styles cannot deform its UI.
 
 ## List size
 
@@ -131,6 +182,9 @@ chute remove ID            remove one item by full or unique short ID
 chute clear                empty the queue
 chute path                 print Chute's data directory
 chute serve                run the localhost bridge
+chute systemd install      enable Chute at Linux login
+chute systemd status       inspect the user service
+chute systemd remove       disable and remove the user service
 ```
 
 The server binds only to `127.0.0.1:17891` by default. Set `CHUTE_HOME` to move the queue and copied files elsewhere. Browser drops are limited to 8 GiB by default; set `CHUTE_MAX_UPLOAD_BYTES` to change that limit.
@@ -142,7 +196,7 @@ Chute uses two drag representations:
 1. A browser `File` object for permissive and same-document targets.
 2. Chrome's `DownloadURL` virtual-file drag format for crossing out of an extension page.
 
-The earlier v0.1 implementation included a `text/plain` filename fallback. Chrome preserved that text while stripping the scripted file, causing ChatGPT to receive only the filename. v0.2 removes that fallback and adds the localhost-backed virtual-file representation.
+The earlier v0.1 implementation included a `text/plain` filename fallback. Chrome preserved that text while stripping the scripted file, causing ChatGPT to receive only the filename. v0.2 removed that fallback and added the localhost-backed virtual-file representation.
 
 The **Attach** button remains available for sites such as ChatGPT that expose a usable file input.
 
@@ -150,7 +204,7 @@ The **Attach** button remains available for sites such as ChatGPT that expose a 
 
 The queue belongs to the local Chute daemon, not to one browser profile. Therefore, Chrome, Edge, Brave, and other compatible Chromium browsers on the same computer can see the same queue when the extension is installed in each browser.
 
-The synchronized Chrome settings currently cover preferences such as list size and bin visibility, not file contents.
+The synchronized Chrome settings cover preferences such as list size, bin visibility, layer mode, and the **❤️ Love Chute** destination, not file contents.
 
 Planned later work:
 
@@ -183,7 +237,8 @@ After editing extension files, open `chrome://extensions` and click the reload b
 - Chute copies files into its private queue rather than exposing arbitrary filesystem paths.
 - The Python service does not upload files to the internet.
 - Removing an item deletes Chute's copy, never the original file.
+- **Love Chute link** accepts only `http://` or `https://` destinations.
 
 ## Status
 
-Version `0.2.0` adds the persistent sticky browser bin, streamed browser ingestion, configurable list limits, and the Chrome virtual-file drag fix. Physical drag-and-drop behavior still needs testing across individual Chromium builds and target websites because each target can implement its drop zone differently.
+Version `0.3.0` adds the permanent **❤️ Love Chute** footer, configurable support destination, persistent front/back sticky-layer controls, and Linux systemd user-service setup. Physical drag-and-drop behavior still needs testing across individual Chromium builds and target websites because each target can implement its drop zone differently.
