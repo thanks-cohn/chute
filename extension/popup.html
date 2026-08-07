@@ -19,7 +19,8 @@
       font-size: 11px;
     }
     .settings label { display: contents; }
-    .settings select {
+    .settings select,
+    .settings input[type="url"] {
       min-width: 103px;
       padding: 5px 7px;
       border: 1px solid #3a4032;
@@ -28,6 +29,7 @@
       background: #252a20;
       font: inherit;
     }
+    .settings input[type="url"] { width: 190px; }
     .toggle { width: 17px; height: 17px; accent-color: #d7ff3f; }
   </style>
 </head>
@@ -56,8 +58,19 @@
       <span>Sticky bin on webpages</span>
       <input id="bin-visible" class="toggle" type="checkbox" checked>
     </label>
+    <label>
+      <span>Sticky layer</span>
+      <select id="bin-layer">
+        <option value="front">Always on top</option>
+        <option value="back">Behind page</option>
+      </select>
+    </label>
+    <label>
+      <span>Love Chute link</span>
+      <input id="love-url" type="url" inputmode="url" placeholder="https://patreon.com/your-page" aria-label="Love Chute support URL">
+    </label>
   </section>
-  <div class="popup-note">Drag from Chute, or drop files and links into the sticky bin that follows you across normal webpages.</div>
+  <div class="popup-note">Drag from Chute, or drop files and links into the sticky bin. Right-click the sticky Chute to send it behind the page or restore it on top.</div>
   <script src="shelf.js"></script>
   <script src="popup.js"></script>
 </body>
