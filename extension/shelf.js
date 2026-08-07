@@ -165,7 +165,7 @@ async function refresh() {
     }
     chrome.runtime.sendMessage({ type: "badge-refresh" });
   } catch {
-    listElement.innerHTML = `<div class="empty"><strong>Chute is not running.</strong>Run <code>chute serve</code>, or send a file.</div>`;
+    listElement.innerHTML = `<div class="empty"><strong>Chute is not running.</strong>Run <code>chute serve</code>.<br><br>Linux autostart: <code>chute systemd install</code></div>`;
     setStatus("Cannot reach 127.0.0.1:17891", true);
   }
 }
