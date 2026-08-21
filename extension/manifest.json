@@ -12,7 +12,7 @@
     "https://*/*"
   ],
   "background": {
-    "service_worker": "background.js"
+    "service_worker": "background-entry.js"
   },
   "action": {
     "default_title": "Chute",
