@@ -6,7 +6,7 @@ from dataclasses import asdict
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from urllib.parse import unquote, urlparse
+from urllib.parse import parse_qs, unquote, urlparse
 
 from .store import Store
 
@@ -36,7 +36,7 @@ def max_upload_bytes() -> int:
 
 
 class ChuteHandler(BaseHTTPRequestHandler):
-    server_version = "Chute/0.2"
+    server_version = "Chute/2"
 
     @property
     def store(self) -> Store:
@@ -70,19 +70,83 @@ class ChuteHandler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(body)
 
+    def _send_file(
+        self,
+        file_path: Path,
+        content_type: str,
+        filename: str | None = None,
+        *,
+        immutable: bool = False,
+    ) -> None:
+        self.send_response(HTTPStatus.OK)
+        self._cors(public=True)
+        self.send_header("Content-Type", content_type)
+        self.send_header("Content-Length", str(file_path.stat().st_size))
+        if filename:
+            self.send_header("Content-Disposition", f'inline; filename="{_header_name(filename)}"')
+        self.send_header(
+            "Cache-Control",
+            "public, max-age=31536000, immutable" if immutable else "no-store",
+        )
+        self.end_headers()
+        with file_path.open("rb") as handle:
+            while chunk := handle.read(1024 * 1024):
+                self.wfile.write(chunk)
+
     def do_OPTIONS(self) -> None:  # noqa: N802
         self.send_response(HTTPStatus.NO_CONTENT)
         self._cors()
         self.end_headers()
 
     def do_GET(self) -> None:  # noqa: N802
-        path = urlparse(self.path).path
+        parsed = urlparse(self.path)
+        path = parsed.path
+
         if path == "/health":
             self._json({"ok": True, "service": "chute"})
             return
+
         if path == "/api/files":
-            self._json({"files": [public_item(item) for item in self.store.list()]})
+            active = self.store.list()
+            self._json({"files": [public_item(item, active=True) for item in active]})
             return
+
+        if path == "/api/history":
+            query = parse_qs(parsed.query)
+            requested_day = (query.get("date") or [None])[0]
+            dates = self.store.history_dates()
+            day = requested_day or (dates[0] if dates else None)
+            if day is None:
+                self._json(
+                    {
+                        "date": None,
+                        "files": [],
+                        "previous_date": None,
+                        "next_date": None,
+                    }
+                )
+                return
+            active_ids = self.store.active_ids()
+            items = self.store.history_day(day)
+            self._json(
+                {
+                    "date": day,
+                    "files": [public_item(item, active=item.id in active_ids) for item in items],
+                    "previous_date": self.store.previous_history_date(day),
+                    "next_date": self.store.next_history_date(day),
+                }
+            )
+            return
+
+        if path.startswith("/api/thumbnails/"):
+            item_id = unquote(path.removeprefix("/api/thumbnails/"))
+            thumbnail = self.store.get_thumbnail(item_id)
+            if thumbnail is None:
+                self._json({"error": "thumbnail not found"}, HTTPStatus.NOT_FOUND)
+                return
+            self._send_file(thumbnail, "image/webp", immutable=True)
+            return
+
         if path.startswith("/api/files/"):
             item_id = unquote(path.removeprefix("/api/files/"))
             found = self.store.get(item_id)
@@ -90,17 +154,9 @@ class ChuteHandler(BaseHTTPRequestHandler):
                 self._json({"error": "not found"}, HTTPStatus.NOT_FOUND)
                 return
             item, file_path = found
-            self.send_response(HTTPStatus.OK)
-            self._cors(public=True)
-            self.send_header("Content-Type", item.mime)
-            self.send_header("Content-Length", str(file_path.stat().st_size))
-            self.send_header("Content-Disposition", f'inline; filename="{_header_name(item.name)}"')
-            self.send_header("Cache-Control", "no-store")
-            self.end_headers()
-            with file_path.open("rb") as handle:
-                while chunk := handle.read(1024 * 1024):
-                    self.wfile.write(chunk)
+            self._send_file(file_path, item.mime, item.name)
             return
+
         self._json({"error": "not found"}, HTTPStatus.NOT_FOUND)
 
     def do_DELETE(self) -> None:  # noqa: N802
@@ -114,12 +170,29 @@ class ChuteHandler(BaseHTTPRequestHandler):
 
     def do_POST(self) -> None:  # noqa: N802
         path = urlparse(self.path).path
+
         if path == "/api/clear":
             self._json({"removed": self.store.clear()})
             return
+
         if path == "/api/upload":
             self._receive_upload()
             return
+
+        if path.startswith("/api/recall/"):
+            item_id = unquote(path.removeprefix("/api/recall/"))
+            item = self.store.recall(item_id)
+            if item is None:
+                self._json({"error": "history item is no longer available"}, HTTPStatus.NOT_FOUND)
+                return
+            self._json({"file": public_item(item, active=True)})
+            return
+
+        if path.startswith("/api/thumbnails/"):
+            item_id = unquote(path.removeprefix("/api/thumbnails/"))
+            self._receive_thumbnail(item_id)
+            return
+
         self._json({"error": "not found"}, HTTPStatus.NOT_FOUND)
 
     def _receive_upload(self) -> None:
@@ -149,12 +222,34 @@ class ChuteHandler(BaseHTTPRequestHandler):
         except (OSError, ValueError) as exc:
             self._json({"error": str(exc)}, HTTPStatus.BAD_REQUEST)
             return
-        self._json({"file": public_item(item)}, HTTPStatus.CREATED)
+        self._json({"file": public_item(item, active=True)}, HTTPStatus.CREATED)
+
+    def _receive_thumbnail(self, item_id: str) -> None:
+        origin = allowed_origin(self.headers.get("Origin"))
+        if not origin:
+            self._json({"error": "extension origin required"}, HTTPStatus.FORBIDDEN)
+            return
+        if self.headers.get("Content-Type", "").split(";", 1)[0] != "image/webp":
+            self._json({"error": "thumbnail must be image/webp"}, HTTPStatus.BAD_REQUEST)
+            return
+        length_header = self.headers.get("Content-Length")
+        if length_header is None:
+            self._json({"error": "Content-Length required"}, HTTPStatus.LENGTH_REQUIRED)
+            return
+        try:
+            size = int(length_header)
+            self.store.save_thumbnail(item_id, self.rfile, size)
+        except (OSError, ValueError) as exc:
+            self._json({"error": str(exc)}, HTTPStatus.BAD_REQUEST)
+            return
+        self._json({"ok": True}, HTTPStatus.CREATED)
 
 
-def public_item(item: object) -> dict[str, object]:
+def public_item(item: object, *, active: bool) -> dict[str, object]:
     row = asdict(item)
-    return {key: row[key] for key in ("id", "name", "size", "mime", "created_at")}
+    result = {key: row[key] for key in ("id", "name", "size", "mime", "created_at")}
+    result["active"] = active
+    return result
 
 
 def _header_name(name: str) -> str:
@@ -171,8 +266,10 @@ class ChuteServer(ThreadingHTTPServer):
 
 
 def serve(host: str = DEFAULT_HOST, port: int = DEFAULT_PORT, root: Path | None = None) -> None:
-    server = ChuteServer((host, port), Store(root))
+    store = Store(root)
+    server = ChuteServer((host, port), store)
     print(f"Chute is listening at http://{host}:{port}")
+    print(f"Chute home: {store.root}")
     print("Press Ctrl+C to stop.")
     try:
         server.serve_forever()
