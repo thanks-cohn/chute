@@ -101,33 +101,18 @@ function imageFromHtml(transfer) {
   }
 }
 
-function permissionPattern(url) {
+async function canFetchImage(url) {
   try {
     const parsed = new URL(url);
-    if (parsed.protocol !== "http:" && parsed.protocol !== "https:") return null;
-    return `${parsed.protocol}//${parsed.host}/*`;
+    return ["http:", "https:", "data:", "blob:"].includes(parsed.protocol);
   } catch {
-    return null;
-  }
-}
-
-async function requestImagePermission(url) {
-  const pattern = permissionPattern(url);
-  if (!pattern || !chrome.permissions?.request) return true;
-  try {
-    // Calling request directly from the drop gesture keeps Chromium's user-
-    // gesture requirement intact. Already-granted origins resolve silently.
-    return await chrome.permissions.request({ origins: [pattern] });
-  } catch (error) {
-    console.warn("Chute could not request image access:", error);
     return false;
   }
 }
 
 async function fetchImagePayload(candidate) {
   if (!candidate?.url) return null;
-  const allowed = await requestImagePermission(candidate.url);
-  if (!allowed) return null;
+  if (!(await canFetchImage(candidate.url))) return null;
 
   try {
     const response = await fetch(candidate.url, {
