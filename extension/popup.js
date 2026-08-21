@@ -1,4 +1,4 @@
-const BASE_URL = "http://127.0.0.1:17891";
+const POPUP_BASE_URL = "http://127.0.0.1:17891";
 const openShelfButton = document.querySelector("#open-shelf");
 const accessModeSelect = document.querySelector("#access-mode");
 const dragOutModeSelect = document.querySelector("#drag-out-mode");
@@ -76,7 +76,7 @@ clearChuteButton?.addEventListener("click", async () => {
   const originalText = clearChuteButton.textContent;
   clearChuteButton.textContent = "Clearing…";
   try {
-    const response = await fetch(`${BASE_URL}/api/clear`, {
+    const response = await fetch(`${POPUP_BASE_URL}/api/clear`, {
       method: "POST",
       cache: "no-store"
     });
