@@ -29,9 +29,22 @@ async function chuteUploadCustomThumbnail(blob, name, source = "browser-drop") {
 uploadBlob = async function(blob, name, source = "browser-drop") {
   const collector = chuteActiveUploadCollector;
   const payload = collector?.byBlob?.get(blob);
-  const result = payload?.chuteArtifactRole === "custom_thumbnail"
-    ? await chuteUploadCustomThumbnail(blob, name, source)
-    : await chuteBaseUploadBlobForProvenance(blob, name, source);
+  let result;
+
+  if (payload?.chuteArtifactRole === "custom_thumbnail") {
+    try {
+      result = await chuteUploadCustomThumbnail(blob, name, source);
+    } catch (error) {
+      // Updating the extension before the localhost runtime must never break
+      // intake. Older servers do not have /api/custom-thumbnails yet, so keep
+      // the custom derivative as an ordinary preserved file for this capture.
+      console.warn("Chute custom-thumbnail storage unavailable; using compatibility storage:", error);
+      result = await chuteBaseUploadBlobForProvenance(blob, name, source);
+    }
+  } else {
+    result = await chuteBaseUploadBlobForProvenance(blob, name, source);
+  }
+
   if (payload) collector.uploads.push({ payload, result });
   return result;
 };
@@ -163,6 +176,13 @@ consumePayloadsNow = async function(payloadPromise, expected) {
   }
 
   if (collector.uploads.length) {
-    await chuteFinalizeImageCapture(tracked, collector.uploads);
+    try {
+      await chuteFinalizeImageCapture(tracked, collector.uploads);
+    } catch (error) {
+      // Provenance and thumbnail finalization are additive. Once the actual
+      // file has been accepted by Chute, metadata failure must not turn the
+      // capture into a failed intake.
+      console.error("Chute captured the file but could not finish provenance:", error);
+    }
   }
 };
