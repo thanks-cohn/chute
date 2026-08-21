@@ -96,24 +96,52 @@ A date picker also allows jumping directly to a specific day.
 
 ## Install the computer side
 
-Chute requires Python 3.10 or newer.
+Chute requires Python 3.10 or newer and systemd for automatic startup.
+
+Run the user installer from the repository root or from anywhere inside the checkout:
 
 ```bash
-cd chute
-python3 -m venv .venv
-. .venv/bin/activate
-python -m pip install -e .
+sh scripts/install-user.sh
 ```
+
+The installer:
+
+- creates a private runtime at `~/.local/share/chute-runtime/venv`;
+- installs the `chute` command into `~/.local/bin`;
+- creates `~/.config/systemd/user/chute.service`;
+- enables and starts the service immediately;
+- keeps user data under `~/Chute`.
+
+No virtual-environment activation is required after installation.
 
 Confirm it works:
 
 ```bash
 chute --version
 chute path
-chute ./README.md
+systemctl --user status chute.service
 ```
 
-The default data path printed by `chute path` is `~/Chute`.
+The service starts automatically with the user's systemd session. For startup at machine boot even before login, enable lingering once:
+
+```bash
+sudo loginctl enable-linger "$USER"
+```
+
+Useful service commands:
+
+```bash
+systemctl --user restart chute.service
+systemctl --user stop chute.service
+systemctl --user start chute.service
+journalctl --user -u chute.service -f
+```
+
+To upgrade after pulling a new Chute version, rerun:
+
+```bash
+sh scripts/install-user.sh
+```
 
 ## Install the Chrome extension
 
@@ -136,8 +164,10 @@ chute list                 list live queued files
 chute remove ID            remove one item from the live basket
 chute clear                empty the live basket
 chute path                 print Chute's data directory
-chute serve                run the localhost bridge
+chute serve                run the localhost bridge manually
 ```
+
+Normal installs do not need `chute serve`; the systemd user service runs the bridge automatically.
 
 The server binds only to `127.0.0.1:17891` by default. Browser drops are limited to 8 GiB by default; set `CHUTE_MAX_UPLOAD_BYTES` to change that limit.
 
@@ -154,7 +184,7 @@ Only the first small live items are prepared eagerly. Older or larger rows prepa
 
 ## Multiple browsers
 
-The queue and history belong to the local Chute daemon, not to one browser profile. Chrome, Edge, Brave, and compatible Chromium browsers on the same computer can therefore see the same local state when the extension is installed in each browser.
+The queue and history belong to the local Chute daemon, not to one browser profile. Chrome, Edge, Brave, Opera, and compatible Chromium browsers on the same computer can therefore see the same local state when the extension is installed in each browser.
 
 Chrome-synced settings cover preferences such as history count, thumbnail visibility, and mascot visibility. File contents and history stay local.
 
@@ -170,7 +200,7 @@ node --check extension/shelf.js
 node --check extension/popup.js
 ```
 
-After editing extension files, open `chrome://extensions` and reload Chute.
+After editing extension files, open the browser's extension-management page and reload Chute.
 
 ## Security model
 
