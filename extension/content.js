@@ -15,7 +15,7 @@
     border: "0",
     zIndex: "2147483647",
     pointerEvents: "auto",
-    transition: "width 140ms ease, height 140ms ease, transform 140ms ease",
+    transition: "width 120ms ease, height 120ms ease",
     isolation: "isolate"
   });
 
@@ -34,8 +34,6 @@
   });
   shadow.append(frame);
 
-  let dragDepth = 0;
-  let active = false;
   let supportHover = false;
   let accessMode = "floating";
 
@@ -48,42 +46,12 @@
   }
 
   function renderSize() {
-    if (supportHover) {
-      host.style.width = "198px";
-      host.style.height = "174px";
-      host.style.transform = "translate(-2px, -2px)";
-    } else if (active) {
-      host.style.width = "116px";
-      host.style.height = "132px";
-      host.style.transform = "translate(-4px, -4px) rotate(-1deg)";
-    } else {
-      host.style.width = "92px";
-      host.style.height = "104px";
-      host.style.transform = "none";
-    }
+    // The host may grow to make room for auxiliary UI, but the bin inside the
+    // frame is bottom-right anchored, so the actual desktop-to-browser drop
+    // target never changes position.
+    host.style.width = supportHover ? "198px" : "92px";
+    host.style.height = supportHover ? "174px" : "104px";
   }
-
-  function setActive(next) {
-    if (active === next) return;
-    active = next;
-    renderSize();
-    frame.contentWindow?.postMessage({ type: "chute-drag-active", active: next }, "*");
-  }
-
-  document.addEventListener("dragenter", () => {
-    dragDepth += 1;
-    setActive(true);
-  }, true);
-
-  document.addEventListener("dragleave", () => {
-    dragDepth = Math.max(0, dragDepth - 1);
-    if (!dragDepth) setActive(false);
-  }, true);
-
-  document.addEventListener("drop", () => {
-    dragDepth = 0;
-    setActive(false);
-  }, true);
 
   window.addEventListener("message", (event) => {
     if (event.source !== frame.contentWindow) return;
