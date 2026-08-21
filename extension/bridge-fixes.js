@@ -34,21 +34,39 @@ function chuteToken(item) {
   return `${CHUTE_DRAG_PREFIX}${payload}`;
 }
 
-const originalDataTransferAdd = DataTransferItemList.prototype.add;
-DataTransferItemList.prototype.add = function(value, type) {
-  if (value instanceof File) chuteSyntheticFile = matchChuteFile(value);
-  return type === undefined
-    ? originalDataTransferAdd.call(this, value)
-    : originalDataTransferAdd.call(this, value, type);
-};
+try {
+  const originalDataTransferAdd = DataTransferItemList.prototype.add;
+  DataTransferItemList.prototype.add = function(value, type) {
+    if (value instanceof File) chuteSyntheticFile = matchChuteFile(value);
+    return type === undefined
+      ? originalDataTransferAdd.call(this, value)
+      : originalDataTransferAdd.call(this, value, type);
+  };
+} catch (error) {
+  console.warn("Chute could not wrap DataTransferItemList.add:", error);
+}
 
 document.addEventListener("dragstart", () => {
   chuteSyntheticFile = null;
 }, true);
 
 document.addEventListener("dragstart", (event) => {
-  if (!chuteSyntheticFile || !event.dataTransfer) return;
-  const token = chuteToken(chuteSyntheticFile);
+  if (!event.dataTransfer) return;
+
+  // Source-address mode already placed an explicit URL on the drag. Leave it
+  // alone. File/image mode is converted to a private Chute token instead.
+  try {
+    if (event.dataTransfer.getData("text/uri-list") || event.dataTransfer.getData("DownloadURL")) return;
+  } catch {}
+
+  const row = event.target instanceof Element ? event.target.closest(".file-row") : null;
+  const rowFile = row?.querySelector("img.file-thumb")?.__chuteFile || null;
+  const rowName = row?.querySelector(".file-name")?.textContent || "";
+  const namedFile = rowName ? chuteActiveFiles.find((item) => item.name === rowName) : null;
+  const item = chuteSyntheticFile || rowFile || namedFile;
+  if (!item?.id) return;
+
+  const token = chuteToken(item);
   try {
     event.dataTransfer.setData(CHUTE_DRAG_TYPE, token);
     event.dataTransfer.setData("text/plain", token);
