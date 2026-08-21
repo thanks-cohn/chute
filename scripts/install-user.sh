@@ -32,13 +32,28 @@ snapshot_count() {
   fi
 }
 
+checkpoint_tree() {
+  name=$1
+  source="$DATA_DIR/$name"
+  destination=$2
+  if [ ! -d "$source" ]; then
+    return
+  fi
+  mkdir -p "$destination/$name"
+  if ! cp -al "$source/." "$destination/$name/"; then
+    printf 'Could not checkpoint %s. Update aborted; your Chute data was not modified.\n' "$source" >&2
+    rm -rf "$destination"
+    exit 1
+  fi
+}
+
 make_update_snapshot() {
   files_before=$(snapshot_count "$DATA_DIR/files")
   thumbs_before=$(snapshot_count "$DATA_DIR/thumbs")
+  custom_before=$(snapshot_count "$DATA_DIR/custom-thumbnails")
   history_before=$(snapshot_count "$DATA_DIR/history")
 
-  # A fresh install with no user data does not need a checkpoint.
-  if [ "$files_before" -eq 0 ] && [ "$thumbs_before" -eq 0 ] && [ "$history_before" -eq 0 ] && [ ! -f "$DATA_DIR/queue.json" ]; then
+  if [ "$files_before" -eq 0 ] && [ "$thumbs_before" -eq 0 ] && [ "$custom_before" -eq 0 ] && [ "$history_before" -eq 0 ] && [ ! -f "$DATA_DIR/queue.json" ]; then
     return
   fi
 
@@ -48,33 +63,19 @@ make_update_snapshot() {
 
   printf 'Creating pre-update Chute safety checkpoint...\n'
 
-  # Preserved files and generated thumbnails are immutable Chute artifacts in
-  # normal operation. Hard links retain their bytes if a buggy future update
-  # unlinks the live pathname, without duplicating the file contents.
-  if [ -d "$DATA_DIR/files" ]; then
-    mkdir -p "$snapshot/files"
-    if ! cp -al "$DATA_DIR/files/." "$snapshot/files/"; then
-      printf 'Could not create hard-link checkpoint for %s/files. Update aborted; your data was not modified.\n' "$DATA_DIR" >&2
-      rm -rf "$snapshot"
-      exit 1
-    fi
-  fi
+  # Immutable artifact trees use hard links: deleting a live pathname later
+  # cannot destroy the bytes owned by this checkpoint, and large collections
+  # do not get duplicated on disk merely because Chute was updated.
+  checkpoint_tree files "$snapshot"
+  checkpoint_tree thumbs "$snapshot"
+  checkpoint_tree custom-thumbnails "$snapshot"
 
-  if [ -d "$DATA_DIR/thumbs" ]; then
-    mkdir -p "$snapshot/thumbs"
-    if ! cp -al "$DATA_DIR/thumbs/." "$snapshot/thumbs/"; then
-      printf 'Could not create hard-link checkpoint for %s/thumbs. Update aborted; your data was not modified.\n' "$DATA_DIR" >&2
-      rm -rf "$snapshot"
-      exit 1
-    fi
-  fi
-
-  # History and manifests can be appended/replaced during normal use, so copy
-  # their current bytes rather than hard-linking their mutable inode.
+  # Mutable logs/manifests are copied by value so later appends/replacements do
+  # not mutate the checkpointed version.
   if [ -d "$DATA_DIR/history" ]; then
     cp -a "$DATA_DIR/history" "$snapshot/history"
   fi
-  for manifest in queue.json image-provenance.jsonl; do
+  for manifest in queue.json image-provenance.jsonl image-provenance.txt; do
     if [ -f "$DATA_DIR/$manifest" ]; then
       cp -a "$DATA_DIR/$manifest" "$snapshot/$manifest"
     fi
@@ -85,6 +86,7 @@ make_update_snapshot() {
     printf 'data_dir=%s\n' "$DATA_DIR"
     printf 'files=%s\n' "$files_before"
     printf 'thumbs=%s\n' "$thumbs_before"
+    printf 'custom_thumbnails=%s\n' "$custom_before"
     printf 'history_files=%s\n' "$history_before"
   } > "$snapshot/MANIFEST.txt"
 
@@ -119,7 +121,6 @@ RestartSec=2
 WantedBy=default.target
 EOF
 
-# Stop an earlier service instance before reloading the installed runtime.
 systemctl --user stop chute.service >/dev/null 2>&1 || true
 systemctl --user daemon-reload
 systemctl --user enable --now chute.service
