@@ -1,0 +1,49 @@
+name: Build Chute desktop downloads
+
+on:
+  workflow_dispatch:
+
+jobs:
+  windows:
+    name: Windows companion
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Build Chute.exe
+        shell: pwsh
+        run: ./scripts/build-windows.ps1 -Python python
+      - name: Build Chromium extension package
+        shell: pwsh
+        run: python scripts/build-chrome-store.py
+      - name: Upload Windows download
+        uses: actions/upload-artifact@v4
+        with:
+          name: Chute-Windows
+          path: dist/windows/Chute.exe
+          if-no-files-found: error
+      - name: Upload Chromium extension
+        uses: actions/upload-artifact@v4
+        with:
+          name: Chute-Chromium-Extension
+          path: dist/chrome-store/chute-chrome-2.3.0.zip
+          if-no-files-found: error
+
+  linux:
+    name: Linux companion
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Build Chute Linux binary
+        run: sh scripts/build-linux.sh
+      - name: Upload Linux download
+        uses: actions/upload-artifact@v4
+        with:
+          name: Chute-Linux-glibc
+          path: dist/linux/Chute
+          if-no-files-found: error
