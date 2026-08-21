@@ -3,7 +3,9 @@ const bin = document.querySelector("#bin");
 const label = document.querySelector("#label");
 const face = document.querySelector("#face");
 const count = document.querySelector("#count");
+const supportCard = document.querySelector("#support-card");
 let busy = false;
+let supportHover = false;
 
 function safeName(value, fallback) {
   const cleaned = String(value || "")
@@ -100,6 +102,23 @@ async function refreshCount() {
   }
 }
 
+function setSupportHover(next) {
+  if (supportHover === next) return;
+  supportHover = next;
+  supportCard.classList.toggle("visible", next);
+  supportCard.setAttribute("aria-hidden", String(!next));
+  window.parent.postMessage({ type: "chute-support-hover", active: next }, "*");
+}
+
+bin.addEventListener("pointerenter", () => setSupportHover(true));
+bin.addEventListener("pointerleave", (event) => {
+  if (supportCard.contains(event.relatedTarget)) return;
+  setSupportHover(false);
+});
+supportCard.addEventListener("pointerenter", () => setSupportHover(true));
+supportCard.addEventListener("pointerleave", () => setSupportHover(false));
+supportCard.addEventListener("click", (event) => event.stopPropagation());
+
 bin.addEventListener("dragenter", (event) => {
   event.preventDefault();
   bin.classList.add("dragover");
@@ -117,6 +136,7 @@ bin.addEventListener("drop", async (event) => {
   event.preventDefault();
   event.stopPropagation();
   bin.classList.remove("dragover");
+  setSupportHover(false);
   if (busy) return;
 
   const payloads = droppedPayloads(event.dataTransfer);
