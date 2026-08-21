@@ -1,5 +1,5 @@
 param(
-    [string]$Python = "py"
+    [string]$Python = "python"
 )
 
 $ErrorActionPreference = "Stop"
@@ -11,7 +11,7 @@ $Dist = Join-Path $Repo "dist\windows"
 New-Item -ItemType Directory -Force -Path $BuildRoot, $Dist | Out-Null
 if (Test-Path $Venv) { Remove-Item -Recurse -Force $Venv }
 
-& $Python -3 -m venv $Venv
+& $Python -m venv $Venv
 $Py = Join-Path $Venv "Scripts\python.exe"
 & $Py -m pip install --upgrade pip
 & $Py -m pip install pyinstaller $Repo
@@ -36,5 +36,5 @@ finally {
 $Exe = Join-Path $Dist "Chute.exe"
 if (-not (Test-Path $Exe)) { throw "Build completed without producing $Exe" }
 Write-Host "Built: $Exe"
-Write-Host "The customer does not need Python."
-Write-Host "Next: powershell -ExecutionPolicy Bypass -File scripts\install-windows.ps1"
+Write-Host "Customer flow: download Chute.exe and double-click it once."
+Write-Host "No Python, PowerShell setup, administrator access, or Windows Service is required for the customer."
