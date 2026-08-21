@@ -71,7 +71,7 @@
       <div class="settings-note">The browser sticky and right-click menu feed the same local Chute used by your other installed Chromium browsers.</div>
 
       <button id="clear-chute" class="secondary-button" type="button">Clear Chute</button>
-      <div class="settings-note">Clear Chute empties the live basket only. History remains available for Recall while the preserved Chute copy exists.</div>
+      <div class="settings-note">Clear Chute empties this live working basket. Nothing is deleted from dated history; the Shelf keeps the archive available for Recall.</div>
 
       <a class="coffee-button" href="https://buy.stripe.com/7sI9CD0uQ96mdY43cc" target="_blank" rel="noopener noreferrer">☕ Buy the Creator a Coffee</a>
     </section>
@@ -87,9 +87,10 @@
   <div id="status" class="status">Connecting…</div>
   <main id="files" class="file-list"></main>
   <div id="history-sentinel" class="history-sentinel" aria-hidden="true"></div>
-  <div class="popup-note">History lives in <code>~/Chute/history/</code>. Removed items can be recalled while their preserved Chute copy exists.</div>
+  <div class="popup-note">Latest is your live working Chute. Dated history stays on disk and remains available in the Shelf or by choosing a date.</div>
 
   <script src="shelf.js"></script>
+  <script src="workflow-fixes.js"></script>
   <script src="drag-relay.js"></script>
   <script src="popup.js"></script>
 </body>
