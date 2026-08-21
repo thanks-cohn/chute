@@ -37,11 +37,22 @@
         <option value="source">Source address</option>
       </select>
 
-      <div class="setting-label">Browser image capture</div>
-      <select id="browser-image-capture" aria-label="How images dropped from webpages are stored">
-        <option value="full">Get full image (default)</option>
-        <option value="thumbnail">Get thumbnail only (512px)</option>
-      </select>
+      <label>
+        <span>Save full browser image</span>
+        <input id="browser-image-save-full" class="toggle" type="checkbox" checked>
+      </label>
+
+      <label>
+        <span>Save custom-size image copy</span>
+        <input id="browser-image-save-custom" class="toggle" type="checkbox">
+      </label>
+
+      <div class="setting-label">Custom copy max size</div>
+      <div class="dimension-control">
+        <input id="browser-image-width" type="number" min="16" max="4096" step="1" value="512" aria-label="Custom image maximum width">
+        <span>×</span>
+        <input id="browser-image-height" type="number" min="16" max="4096" step="1" value="512" aria-label="Custom image maximum height">
+      </div>
 
       <div class="setting-label">History shown</div>
       <div class="limit-control">
@@ -50,14 +61,14 @@
       </div>
 
       <label>
-        <span>Generated image thumbnails</span>
+        <span>Generated menu thumbnails</span>
         <input id="show-thumbnails" class="toggle" type="checkbox" checked>
       </label>
 
-      <div class="settings-note">Generated thumbnails are on by default. Chute creates one tiny 48px preview, saves it under <code>~/Chute/thumbs/</code>, and reuses it. Turn this off to show generic icons and generate no thumbnails.</div>
-      <div class="settings-note">Full image is the default for browser captures so later uploads keep their original quality. Thumbnail-only mode stores a reduced 512px copy instead.</div>
+      <div class="settings-note">Browser captures are independent: keep the full original, save a custom-size derivative, or save both. The custom copy preserves aspect ratio inside the width × height box. If both are off, Chute saves the source link instead.</div>
+      <div class="settings-note">Generated menu thumbnails are separate 48px recognition previews stored under <code>~/Chute/thumbs/</code>. They are on by default and are never used as the dragged file.</div>
       <div class="settings-note">Actual file / image is the default drag-out mode. Source address is available when you explicitly want Chute's served location instead.</div>
-      <div class="settings-note">The browser sticky and right-click menu both feed the same local Chute used by your other installed Chromium browsers.</div>
+      <div class="settings-note">The browser sticky and right-click menu feed the same local Chute used by your other installed Chromium browsers.</div>
 
       <button id="clear-chute" class="secondary-button" type="button">Clear Chute</button>
       <div class="settings-note">Clear Chute empties the live basket only. History remains available for Recall while the preserved Chute copy exists.</div>
@@ -79,7 +90,6 @@
   <div class="popup-note">History lives in <code>~/Chute/history/</code>. Removed items can be recalled while their preserved Chute copy exists.</div>
 
   <script src="shelf.js"></script>
-  <script src="bridge-fixes.js"></script>
   <script src="popup.js"></script>
 </body>
 </html>
