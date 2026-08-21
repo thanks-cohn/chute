@@ -48,6 +48,29 @@ async function chuteBackgroundSaveMini(itemId, blob) {
   return false;
 }
 
+async function chuteBackgroundUploadCustom(blob, name, source) {
+  const response = await fetch(`${CHUTE_BACKGROUND_BASE_URL}/api/custom-thumbnails`, {
+    method: "POST",
+    cache: "no-store",
+    headers: {
+      "Content-Type": blob.type || "image/webp",
+      "X-Chute-Filename": encodeURIComponent(safeName(name, "browser-custom.webp")),
+      "X-Chute-Mime": blob.type || "image/webp",
+      "X-Chute-Source": encodeURIComponent(source || "browser-context-menu")
+    },
+    body: blob
+  });
+  if (!response.ok) {
+    let detail = `Chute server returned ${response.status}`;
+    try {
+      const payload = await response.json();
+      if (payload.error) detail = payload.error;
+    } catch {}
+    throw new Error(detail);
+  }
+  return response.json();
+}
+
 async function chuteBackgroundAppendProvenance(record) {
   let lastError = null;
   for (const delay of [0, 300, 1000]) {
@@ -74,6 +97,7 @@ async function chuteBackgroundFinalizeImage(blob, name, imageUrl, pageUrl) {
   const { chuteThumbnails = true } = await chrome.storage.sync.get({ chuteThumbnails: true });
   let downloaded = null;
   let custom = null;
+  let customBlob = null;
   let sourceLink = null;
 
   if (capture.saveFull) {
@@ -83,7 +107,8 @@ async function chuteBackgroundFinalizeImage(blob, name, imageUrl, pageUrl) {
   if (capture.saveCustom) {
     try {
       const derivative = await createCustomImageCopy(blob, name, capture.width, capture.height);
-      custom = await uploadBlob(derivative.blob, derivative.name, imageUrl);
+      customBlob = derivative.blob;
+      custom = await chuteBackgroundUploadCustom(derivative.blob, derivative.name, imageUrl);
     } catch (error) {
       console.warn("Chute custom context-menu image copy failed:", error);
     }
@@ -100,8 +125,11 @@ async function chuteBackgroundFinalizeImage(blob, name, imageUrl, pageUrl) {
   let miniThumbnailId = null;
   const miniTarget = downloaded || custom;
   if (chuteThumbnails !== false && miniTarget?.file?.id) {
-    const saved = await chuteBackgroundSaveMini(miniTarget.file.id, downloaded ? blob : (await createCustomImageCopy(blob, name, capture.width, capture.height)).blob);
-    if (saved) miniThumbnailId = miniTarget.file.id;
+    const miniSource = downloaded ? blob : customBlob;
+    if (miniSource) {
+      const saved = await chuteBackgroundSaveMini(miniTarget.file.id, miniSource);
+      if (saved) miniThumbnailId = miniTarget.file.id;
+    }
   }
 
   await chuteBackgroundAppendProvenance({
