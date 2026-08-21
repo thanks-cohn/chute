@@ -6,7 +6,6 @@ const count = document.querySelector("#count");
 const supportCard = document.querySelector("#support-card");
 let busy = false;
 let supportHover = false;
-let supportIntroduced = false;
 let supportTimer = null;
 let pageDragSource = null;
 
@@ -244,12 +243,11 @@ function setDragVisual(active) {
 }
 
 bin.addEventListener("pointerenter", () => {
-  if (supportIntroduced || supportTimer) return;
+  if (supportHover || supportTimer) return;
   supportTimer = setTimeout(() => {
     supportTimer = null;
-    supportIntroduced = true;
     setSupportHover(true);
-  }, 450);
+  }, 280);
 });
 
 bin.addEventListener("pointerleave", (event) => {
