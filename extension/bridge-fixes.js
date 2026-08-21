@@ -5,6 +5,7 @@ const CHUTE_THUMB_SIZE = 48;
 
 let chuteActiveFiles = [];
 let chuteSyntheticFile = null;
+let chuteThumbnailsEnabled = true;
 const chuteThumbRepairs = new WeakSet();
 
 async function refreshChuteActiveFiles() {
@@ -109,6 +110,7 @@ async function makeTinyChuteThumbnail(blob) {
 }
 
 async function cachedThumb(file) {
+  if (!chuteThumbnailsEnabled) return null;
   const response = await fetch(chuteThumbUrl(file), { cache: "force-cache" });
   if (!response.ok) return null;
   const blob = await response.blob();
@@ -116,7 +118,7 @@ async function cachedThumb(file) {
 }
 
 async function repairChuteThumbnail(img) {
-  if (!img.hidden || chuteThumbRepairs.has(img)) return;
+  if (!chuteThumbnailsEnabled || !img.hidden || chuteThumbRepairs.has(img)) return;
   const file = img.__chuteFile;
   if (!file?.id || !String(file.mime || "").startsWith("image/")) return;
   chuteThumbRepairs.add(img);
@@ -131,7 +133,7 @@ async function repairChuteThumbnail(img) {
 
     // Give shelf.js's normal generator another moment before doing any work.
     await new Promise((resolve) => setTimeout(resolve, 900));
-    if (!img.hidden) return;
+    if (!chuteThumbnailsEnabled || !img.hidden) return;
     thumb = await cachedThumb(file);
     if (thumb) {
       img.src = URL.createObjectURL(thumb);
@@ -140,23 +142,24 @@ async function repairChuteThumbnail(img) {
     }
 
     const response = await fetch(chuteFileUrl(file), { cache: "no-store" });
-    if (!response.ok) return;
+    if (!response.ok || !chuteThumbnailsEnabled) return;
     const original = await response.blob();
 
     try {
-      thumb = await makeTinyChuteThumbnail(original);
-      img.src = URL.createObjectURL(thumb);
+      const generated = await makeTinyChuteThumbnail(original);
+      if (!chuteThumbnailsEnabled) return;
+      img.src = URL.createObjectURL(generated);
       img.hidden = false;
       try {
         await fetch(chuteThumbUrl(file), {
           method: "POST",
           headers: { "Content-Type": "image/webp" },
-          body: thumb
+          body: generated
         });
       } catch {}
     } catch {
-      // Reuse the already-fetched blob as a visual fallback. This is not a
-      // second processed copy and does not replace the original Chute file.
+      // Visual fallback only. No derivative is written if encoding fails.
+      if (!chuteThumbnailsEnabled) return;
       img.src = URL.createObjectURL(original);
       img.hidden = false;
     }
@@ -166,6 +169,7 @@ async function repairChuteThumbnail(img) {
 }
 
 function scanChuteThumbnails(root = document) {
+  if (!chuteThumbnailsEnabled) return;
   for (const img of root.querySelectorAll?.("img.file-thumb") || []) {
     if (!img.hidden) continue;
     setTimeout(() => repairChuteThumbnail(img), 700);
@@ -173,6 +177,7 @@ function scanChuteThumbnails(root = document) {
 }
 
 const chuteThumbObserver = new MutationObserver((records) => {
+  if (!chuteThumbnailsEnabled) return;
   for (const record of records) {
     for (const node of record.addedNodes) {
       if (!(node instanceof Element)) continue;
@@ -183,6 +188,17 @@ const chuteThumbObserver = new MutationObserver((records) => {
 });
 
 chuteThumbObserver.observe(document.documentElement, { childList: true, subtree: true });
+
+chrome.storage.sync.get({ chuteThumbnails: true }, ({ chuteThumbnails }) => {
+  chuteThumbnailsEnabled = chuteThumbnails !== false;
+  if (chuteThumbnailsEnabled) setTimeout(() => scanChuteThumbnails(), 200);
+});
+
+chrome.storage.onChanged.addListener((changes, area) => {
+  if (area !== "sync" || !changes.chuteThumbnails) return;
+  chuteThumbnailsEnabled = changes.chuteThumbnails.newValue !== false;
+  if (chuteThumbnailsEnabled) setTimeout(() => scanChuteThumbnails(), 200);
+});
+
 refreshChuteActiveFiles();
 setInterval(refreshChuteActiveFiles, 2500);
-setTimeout(() => scanChuteThumbnails(), 800);
