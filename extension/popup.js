@@ -43,13 +43,6 @@ unlimitedButton?.addEventListener("click", async () => {
 
 accessModeSelect?.addEventListener("change", async () => {
   const mode = accessModeSelect.value;
-  if (mode === "context" || mode === "both") {
-    try {
-      await chrome.permissions.request({ origins: ["http://*/*", "https://*/*"] });
-    } catch (error) {
-      console.warn("Optional Chute image-capture permission was not granted:", error);
-    }
-  }
   await chrome.storage.sync.set({
     chuteAccessMode: mode,
     chuteBinVisible: mode === "floating" || mode === "both"
