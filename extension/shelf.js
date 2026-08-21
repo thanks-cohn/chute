@@ -1,8 +1,7 @@
 const BASE_URL = "http://127.0.0.1:17891";
-const AUTO_PREPARE_LIMIT = 24 * 1024 * 1024;
-const AUTO_PREPARE_ROWS = 20;
 const THUMB_SIZE = 48;
-const prepared = new Map();
+const CHUTE_DRAG_TYPE = "application/x-chute-item";
+const CHUTE_DRAG_PREFIX = "CHUTE_ITEM:";
 const generatedThumbs = new Set();
 
 let displayLimit = 50;
@@ -14,6 +13,8 @@ let previousDate = null;
 let nextDate = null;
 let currentDate = null;
 let loadingHistory = false;
+let dragOutActive = false;
+let dragGeometrySnapshot = null;
 
 const listElement = document.querySelector("#files");
 const statusElement = document.querySelector("#status");
@@ -61,7 +62,15 @@ function thumbnailUrl(file) {
 }
 
 function dragFilename(name) {
-  return name.replace(/[:\r\n]/g, "_");
+  return String(name || "file").replace(/[:\r\n]/g, "_");
+}
+
+function chuteToken(file) {
+  return `${CHUTE_DRAG_PREFIX}${encodeURIComponent(JSON.stringify({
+    id: file.id,
+    name: file.name,
+    mime: file.mime || "application/octet-stream"
+  }))}`;
 }
 
 async function api(path, options = {}) {
@@ -75,35 +84,6 @@ async function api(path, options = {}) {
     throw new Error(detail || `Local bridge returned ${response.status}`);
   }
   return response;
-}
-
-async function prepare(file, row) {
-  const state = row.querySelector(".file-state");
-  if (!file.active) return null;
-  if (prepared.has(file.id)) {
-    state.textContent = dragOutMode === "source" ? "Drag address" : "Drag file";
-    row.draggable = true;
-    row.classList.add("ready");
-    return prepared.get(file.id);
-  }
-  state.textContent = "Preparing";
-  row.draggable = false;
-  try {
-    const response = await api(`/api/files/${encodeURIComponent(file.id)}`);
-    const blob = await response.blob();
-    const localFile = new File([blob], file.name, {
-      type: file.mime || blob.type || "application/octet-stream",
-      lastModified: Date.now()
-    });
-    prepared.set(file.id, localFile);
-    state.textContent = dragOutMode === "source" ? "Drag address" : "Drag file";
-    row.draggable = true;
-    row.classList.add("ready");
-    return localFile;
-  } catch (error) {
-    state.textContent = "Failed";
-    throw error;
-  }
 }
 
 function canvasThumbnail(blob) {
@@ -136,21 +116,21 @@ function canvasThumbnail(blob) {
 
 async function ensureThumbnail(file, img) {
   if (!showThumbnails || !file.mime?.startsWith("image/") || generatedThumbs.has(file.id)) return;
-  generatedThumbs.add(file.id);
 
   try {
     const cached = await fetch(thumbnailUrl(file), { cache: "force-cache" });
     if (cached.ok) {
-      img.src = URL.createObjectURL(await cached.blob());
-      img.hidden = false;
-      return;
+      const blob = await cached.blob();
+      if (blob.size) {
+        img.src = URL.createObjectURL(blob);
+        img.hidden = false;
+        generatedThumbs.add(file.id);
+        return;
+      }
     }
 
-    let source = prepared.get(file.id);
-    if (!source) {
-      const response = await api(`/api/files/${encodeURIComponent(file.id)}`);
-      source = await response.blob();
-    }
+    const response = await api(`/api/files/${encodeURIComponent(file.id)}`);
+    const source = await response.blob();
     const thumbnail = await canvasThumbnail(source);
     img.src = URL.createObjectURL(thumbnail);
     img.hidden = false;
@@ -160,8 +140,10 @@ async function ensureThumbnail(file, img) {
       headers: { "Content-Type": "image/webp" },
       body: thumbnail
     });
-  } catch {
+    generatedThumbs.add(file.id);
+  } catch (error) {
     img.hidden = true;
+    console.warn("Chute thumbnail generation failed:", error);
   }
 }
 
@@ -175,15 +157,61 @@ const thumbObserver = new IntersectionObserver((entries) => {
   }
 }, { rootMargin: "180px" });
 
+function lockPopupGeometry() {
+  if (!location.pathname.endsWith("/popup.html") || dragGeometrySnapshot) return;
+  const root = document.documentElement;
+  const body = document.body;
+  const rect = root.getBoundingClientRect();
+  dragGeometrySnapshot = {
+    rootStyle: root.getAttribute("style"),
+    bodyStyle: body.getAttribute("style")
+  };
+  const width = Math.ceil(rect.width);
+  const height = Math.ceil(rect.height);
+  root.style.width = `${width}px`;
+  root.style.minWidth = `${width}px`;
+  root.style.maxWidth = `${width}px`;
+  root.style.height = `${height}px`;
+  root.style.minHeight = `${height}px`;
+  root.style.maxHeight = `${height}px`;
+  body.style.width = `${width}px`;
+  body.style.minWidth = `${width}px`;
+  body.style.maxWidth = `${width}px`;
+  body.style.height = `${height}px`;
+  body.style.minHeight = `${height}px`;
+  body.style.maxHeight = `${height}px`;
+  body.style.overflow = "auto";
+}
+
+function unlockPopupGeometry() {
+  if (!dragGeometrySnapshot) return;
+  const root = document.documentElement;
+  const body = document.body;
+  if (dragGeometrySnapshot.rootStyle === null) root.removeAttribute("style");
+  else root.setAttribute("style", dragGeometrySnapshot.rootStyle);
+  if (dragGeometrySnapshot.bodyStyle === null) body.removeAttribute("style");
+  else body.setAttribute("style", dragGeometrySnapshot.bodyStyle);
+  dragGeometrySnapshot = null;
+}
+
+function beginDragOut() {
+  dragOutActive = true;
+  lockPopupGeometry();
+}
+
+function endDragOut() {
+  dragOutActive = false;
+  setTimeout(unlockPopupGeometry, 120);
+}
+
 function createRow(file, index) {
-  const autoPrepare = file.active && index < AUTO_PREPARE_ROWS && file.size <= AUTO_PREPARE_LIMIT;
   const row = document.createElement("article");
   row.className = `file-row${file.active ? "" : " archived"}`;
+  row.dataset.chuteId = file.id;
   const state = file.active
-    ? dragOutMode === "source"
-      ? "Drag address"
-      : (autoPrepare ? "Loading" : "Hover to prepare")
+    ? dragOutMode === "source" ? "Drag address" : "Drag original"
     : "In history";
+
   row.innerHTML = `
     <div class="file-icon">
       <span class="file-fallback">${iconFor(file)}</span>
@@ -201,6 +229,7 @@ function createRow(file, index) {
     thumb.className = "file-thumb";
     thumb.alt = "";
     thumb.hidden = true;
+    thumb.draggable = false;
     thumb.__chuteFile = file;
     icon.append(thumb);
     thumbObserver.observe(thumb);
@@ -209,65 +238,45 @@ function createRow(file, index) {
   const tools = row.querySelector(".file-tools");
 
   if (file.active) {
+    row.draggable = true;
+    row.classList.add("ready");
+
     const attach = document.createElement("button");
     attach.className = "secondary-button attach";
-    attach.title = "Attach to the active tab";
+    attach.title = "Attach the original file to the active tab";
     attach.textContent = "Attach";
 
     const remove = document.createElement("button");
     remove.className = "icon-button remove";
     remove.title = "Remove from the live chute";
     remove.textContent = "×";
-
     tools.append(attach, remove);
-
-    if (dragOutMode === "source") {
-      row.draggable = true;
-      row.classList.add("ready");
-    }
-
-    row.addEventListener("pointerenter", () => {
-      if (dragOutMode === "file") prepare(file, row).catch(() => {});
-    }, { once: true });
-
-    row.addEventListener("click", (event) => {
-      if (event.target.closest("button")) return;
-      if (dragOutMode === "file") {
-        prepare(file, row).catch((error) => setStatus(error.message, true));
-      }
-    });
 
     row.addEventListener("dragstart", (event) => {
       const transfer = event.dataTransfer;
-      const url = fileUrl(file);
+      if (!transfer) return;
+      beginDragOut();
 
       if (dragOutMode === "source") {
+        const url = fileUrl(file);
         const mime = file.mime || "application/octet-stream";
         transfer.effectAllowed = "copyLink";
         transfer.setData("text/uri-list", url);
         transfer.setData("text/plain", url);
         transfer.setData("DownloadURL", `${mime}:${dragFilename(file.name)}:${url}`);
-        setStatus(`Dragging address for ${file.name}`);
-        return;
+      } else {
+        const token = chuteToken(file);
+        transfer.effectAllowed = "copy";
+        transfer.setData(CHUTE_DRAG_TYPE, token);
+        transfer.setData("text/plain", token);
       }
 
-      const localFile = prepared.get(file.id);
-      if (!localFile) {
-        event.preventDefault();
-        setStatus("Hover over the file or click it once, then drag.", true);
-        return;
-      }
-
-      // File/image is the default Chute drag-out contract. Do not advertise a
-      // DownloadURL here: Chromium may prefer the URL representation and make
-      // destination sites receive an address instead of the actual file.
-      transfer.effectAllowed = "copy";
-      transfer.items.add(localFile);
       if (thumb && !thumb.hidden) {
         try { transfer.setDragImage(thumb, THUMB_SIZE / 2, THUMB_SIZE / 2); } catch {}
       }
-      setStatus(`Dragging file ${file.name}`);
     });
+
+    row.addEventListener("dragend", endDragOut);
 
     attach.addEventListener("click", async () => {
       const result = await chrome.runtime.sendMessage({ type: "attach-file", file });
@@ -276,11 +285,8 @@ function createRow(file, index) {
 
     remove.addEventListener("click", async () => {
       await api(`/api/files/${encodeURIComponent(file.id)}`, { method: "DELETE" });
-      prepared.delete(file.id);
       await resetHistory();
     });
-
-    if (autoPrepare && dragOutMode === "file") prepare(file, row).catch(() => {});
   } else {
     const recall = document.createElement("button");
     recall.className = "secondary-button recall";
@@ -308,7 +314,7 @@ function escapeHtml(value) {
 }
 
 function setStatus(message, error = false) {
-  if (!statusElement) return;
+  if (!statusElement || dragOutActive) return;
   statusElement.textContent = message;
   statusElement.classList.toggle("error", error);
 }
@@ -321,7 +327,7 @@ async function loadSettings() {
   });
   const next = Number(settings.chuteDisplayLimit);
   displayLimit = Number.isFinite(next) && next >= 0 ? Math.trunc(next) : 50;
-  showThumbnails = Boolean(settings.chuteThumbnails);
+  showThumbnails = settings.chuteThumbnails !== false;
   dragOutMode = settings.chuteDragOutMode === "source" ? "source" : "file";
 }
 
@@ -341,7 +347,7 @@ function updateHistoryNavigation(payload) {
 }
 
 async function appendDay(day = null) {
-  if (loadingHistory) return false;
+  if (loadingHistory || dragOutActive) return false;
   loadingHistory = true;
   try {
     const payload = await fetchHistoryDay(day);
@@ -368,6 +374,7 @@ async function fillNumericLimit() {
 }
 
 async function resetHistory(day = selectedDay || null) {
+  if (dragOutActive) return;
   try {
     loadedCount = 0;
     previousDate = null;
@@ -415,7 +422,7 @@ async function resetHistory(day = selectedDay || null) {
 
 const historyObserver = new IntersectionObserver(async (entries) => {
   if (!entries.some((entry) => entry.isIntersecting)) return;
-  if (selectedDay || displayLimit !== 0 || !previousDate || loadingHistory) return;
+  if (selectedDay || displayLimit !== 0 || !previousDate || loadingHistory || dragOutActive) return;
   const day = previousDate;
   await appendDay(day);
   setStatus(`${loadedCount} history items loaded · ∞`);
@@ -425,7 +432,6 @@ if (sentinel) historyObserver.observe(sentinel);
 
 clearButton?.addEventListener("click", async () => {
   await api("/api/clear", { method: "POST" });
-  prepared.clear();
   await resetHistory();
 });
 
@@ -464,7 +470,7 @@ chrome.storage.onChanged.addListener((changes, area) => {
     resetHistory();
   }
   if (changes.chuteThumbnails) {
-    showThumbnails = Boolean(changes.chuteThumbnails.newValue);
+    showThumbnails = changes.chuteThumbnails.newValue !== false;
     resetHistory();
   }
   if (changes.chuteDragOutMode) {
@@ -476,5 +482,5 @@ chrome.storage.onChanged.addListener((changes, area) => {
 loadSettings().then(resetHistory);
 
 setInterval(() => {
-  if (!selectedDay && displayLimit > 0 && window.scrollY < 80) resetHistory();
+  if (!dragOutActive && !selectedDay && displayLimit > 0 && window.scrollY < 80) resetHistory();
 }, 5000);
