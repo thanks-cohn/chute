@@ -47,6 +47,8 @@
   let dropActive = false;
   let dropActiveImage = false;
   let deliveringChuteFile = false;
+  let externalChuteDragItem = null;
+  let externalChuteDragTimer = null;
 
   function floatingEnabled(mode) {
     return mode === "floating" || mode === "both";
@@ -79,6 +81,7 @@
 
   function transferHasImage(transfer) {
     if (pageDragSource?.kind === "image") return true;
+    if (externalChuteDragItem?.mime?.startsWith("image/")) return true;
     try {
       return Array.from(transfer?.items || []).some((item) =>
         item.kind === "file" && String(item.type || "").toLowerCase().startsWith("image/")
@@ -202,6 +205,28 @@
       decodeChuteToken(transferText(transfer, "text/plain"));
   }
 
+  function rememberExternalChuteDrag(item) {
+    if (!item?.id || !item?.name) return;
+    externalChuteDragItem = {
+      id: String(item.id),
+      name: String(item.name),
+      mime: String(item.mime || "application/octet-stream")
+    };
+    if (externalChuteDragTimer) clearTimeout(externalChuteDragTimer);
+    externalChuteDragTimer = setTimeout(() => {
+      externalChuteDragItem = null;
+      externalChuteDragTimer = null;
+    }, 15000);
+  }
+
+  function clearExternalChuteDrag() {
+    externalChuteDragItem = null;
+    if (externalChuteDragTimer) {
+      clearTimeout(externalChuteDragTimer);
+      externalChuteDragTimer = null;
+    }
+  }
+
   async function deliverChuteFile(target, item) {
     if (deliveringChuteFile || !(target instanceof Element)) return;
     deliveringChuteFile = true;
@@ -237,6 +262,7 @@
       console.error("Chute could not deliver dragged file:", error);
     } finally {
       deliveringChuteFile = false;
+      clearExternalChuteDrag();
     }
   }
 
@@ -258,7 +284,7 @@
     if (deliveringChuteFile) return;
     if (!dragRouting) beginDragRouting();
 
-    const chuteItem = chuteTokenFromTransfer(event.dataTransfer);
+    const chuteItem = chuteTokenFromTransfer(event.dataTransfer) || externalChuteDragItem;
     const overChute = pointInLandingZone(event.clientX, event.clientY);
     const imageDrag = transferHasImage(event.dataTransfer);
     setDropActive(overChute, imageDrag);
@@ -279,7 +305,7 @@
   document.addEventListener("drop", (event) => {
     if (deliveringChuteFile) return;
 
-    const chuteItem = chuteTokenFromTransfer(event.dataTransfer);
+    const chuteItem = chuteTokenFromTransfer(event.dataTransfer) || externalChuteDragItem;
     const overChute = pointInLandingZone(event.clientX, event.clientY);
 
     if (chuteItem && !overChute) {
@@ -315,6 +341,13 @@
     setTimeout(() => {
       if (dragRouting) endDragRouting();
     }, 1000);
+  });
+
+  chrome.runtime.onMessage.addListener((message) => {
+    if (message?.type === "chute-drag-out-start") {
+      rememberExternalChuteDrag(message.file);
+      beginDragRouting();
+    }
   });
 
   window.addEventListener("message", (event) => {
