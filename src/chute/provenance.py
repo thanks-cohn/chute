@@ -1,10 +1,13 @@
 from __future__ import annotations
 
 import json
+import threading
 import uuid
 from datetime import datetime
 from pathlib import Path
 from typing import Any
+
+_PROVENANCE_LOCK = threading.RLock()
 
 
 def _clean_text(value: object) -> str:
@@ -59,8 +62,9 @@ def append_image_capture(store: Any, payload: dict[str, object]) -> dict[str, ob
 
     destination = Path(store.root) / "image-provenance.jsonl"
     destination.parent.mkdir(parents=True, exist_ok=True)
-    with destination.open("a", encoding="utf-8", newline="\n") as handle:
-        handle.write(json.dumps(record, ensure_ascii=False, separators=(",", ":")))
-        handle.write("\n")
+    with _PROVENANCE_LOCK:
+        with destination.open("a", encoding="utf-8", newline="\n") as handle:
+            handle.write(json.dumps(record, ensure_ascii=False, separators=(",", ":")))
+            handle.write("\n")
 
     return record
