@@ -2,11 +2,19 @@ const POPUP_BASE_URL = "http://127.0.0.1:17891";
 const openShelfButton = document.querySelector("#open-shelf");
 const accessModeSelect = document.querySelector("#access-mode");
 const dragOutModeSelect = document.querySelector("#drag-out-mode");
-const browserImageCaptureSelect = document.querySelector("#browser-image-capture");
+const saveFullToggle = document.querySelector("#browser-image-save-full");
+const saveCustomToggle = document.querySelector("#browser-image-save-custom");
+const customWidthInput = document.querySelector("#browser-image-width");
+const customHeightInput = document.querySelector("#browser-image-height");
 const displayLimitInput = document.querySelector("#display-limit");
 const unlimitedButton = document.querySelector("#display-unlimited");
 const thumbnailsToggle = document.querySelector("#show-thumbnails");
 const clearChuteButton = document.querySelector("#clear-chute");
+
+function clampDimension(value, fallback = 512) {
+  const next = Math.trunc(Number(value) || fallback);
+  return Math.min(4096, Math.max(16, next));
+}
 
 openShelfButton?.addEventListener("click", async () => {
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
@@ -25,16 +33,40 @@ async function loadPopupSettings() {
     chuteBinVisible: true,
     chuteThumbnails: true,
     chuteDragOutMode: "file",
-    chuteBrowserImageCapture: "full"
+    chuteBrowserImageCapture: "full",
+    chuteBrowserImageSaveFull: null,
+    chuteBrowserImageSaveCustom: null,
+    chuteBrowserImageWidth: 512,
+    chuteBrowserImageHeight: 512
   });
+
   const limit = Number(settings.chuteDisplayLimit);
   const mode = settings.chuteAccessMode || (settings.chuteBinVisible ? "floating" : "context");
+  const migratedFull = settings.chuteBrowserImageSaveFull === null
+    ? settings.chuteBrowserImageCapture !== "thumbnail"
+    : settings.chuteBrowserImageSaveFull !== false;
+  const migratedCustom = settings.chuteBrowserImageSaveCustom === null
+    ? settings.chuteBrowserImageCapture === "thumbnail"
+    : settings.chuteBrowserImageSaveCustom === true;
+
   displayLimitInput.value = String(limit > 0 ? limit : 50);
   unlimitedButton.classList.toggle("active", limit === 0);
   accessModeSelect.value = mode;
   dragOutModeSelect.value = settings.chuteDragOutMode === "source" ? "source" : "file";
-  browserImageCaptureSelect.value = settings.chuteBrowserImageCapture === "thumbnail" ? "thumbnail" : "full";
+  saveFullToggle.checked = migratedFull;
+  saveCustomToggle.checked = migratedCustom;
+  customWidthInput.value = String(clampDimension(settings.chuteBrowserImageWidth));
+  customHeightInput.value = String(clampDimension(settings.chuteBrowserImageHeight));
   thumbnailsToggle.checked = settings.chuteThumbnails !== false;
+
+  if (settings.chuteBrowserImageSaveFull === null || settings.chuteBrowserImageSaveCustom === null) {
+    await chrome.storage.sync.set({
+      chuteBrowserImageSaveFull: migratedFull,
+      chuteBrowserImageSaveCustom: migratedCustom,
+      chuteBrowserImageWidth: clampDimension(settings.chuteBrowserImageWidth),
+      chuteBrowserImageHeight: clampDimension(settings.chuteBrowserImageHeight)
+    });
+  }
 }
 
 displayLimitInput?.addEventListener("change", async () => {
@@ -62,10 +94,27 @@ dragOutModeSelect?.addEventListener("change", async () => {
   await chrome.storage.sync.set({ chuteDragOutMode: mode });
 });
 
-browserImageCaptureSelect?.addEventListener("change", async () => {
-  const mode = browserImageCaptureSelect.value === "thumbnail" ? "thumbnail" : "full";
-  await chrome.storage.sync.set({ chuteBrowserImageCapture: mode });
+saveFullToggle?.addEventListener("change", async () => {
+  await chrome.storage.sync.set({ chuteBrowserImageSaveFull: saveFullToggle.checked });
 });
+
+saveCustomToggle?.addEventListener("change", async () => {
+  await chrome.storage.sync.set({ chuteBrowserImageSaveCustom: saveCustomToggle.checked });
+});
+
+async function saveCustomDimensions() {
+  const width = clampDimension(customWidthInput.value);
+  const height = clampDimension(customHeightInput.value);
+  customWidthInput.value = String(width);
+  customHeightInput.value = String(height);
+  await chrome.storage.sync.set({
+    chuteBrowserImageWidth: width,
+    chuteBrowserImageHeight: height
+  });
+}
+
+customWidthInput?.addEventListener("change", saveCustomDimensions);
+customHeightInput?.addEventListener("change", saveCustomDimensions);
 
 thumbnailsToggle?.addEventListener("change", async () => {
   await chrome.storage.sync.set({ chuteThumbnails: thumbnailsToggle.checked });
@@ -81,7 +130,6 @@ clearChuteButton?.addEventListener("click", async () => {
       cache: "no-store"
     });
     if (!response.ok) throw new Error(`Local bridge returned ${response.status}`);
-    if (typeof prepared !== "undefined") prepared.clear();
     if (typeof resetHistory === "function") await resetHistory();
     chrome.runtime.sendMessage({ type: "badge-refresh" });
     clearChuteButton.textContent = "Chute cleared ✓";
