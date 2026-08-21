@@ -7,6 +7,7 @@ const generatedThumbs = new Set();
 
 let displayLimit = 50;
 let showThumbnails = true;
+let dragOutMode = "file";
 let selectedDay = "";
 let loadedCount = 0;
 let previousDate = null;
@@ -80,7 +81,7 @@ async function prepare(file, row) {
   const state = row.querySelector(".file-state");
   if (!file.active) return null;
   if (prepared.has(file.id)) {
-    state.textContent = "Drag me";
+    state.textContent = dragOutMode === "source" ? "Drag address" : "Drag file";
     row.draggable = true;
     row.classList.add("ready");
     return prepared.get(file.id);
@@ -95,7 +96,7 @@ async function prepare(file, row) {
       lastModified: Date.now()
     });
     prepared.set(file.id, localFile);
-    state.textContent = "Drag me";
+    state.textContent = dragOutMode === "source" ? "Drag address" : "Drag file";
     row.draggable = true;
     row.classList.add("ready");
     return localFile;
@@ -178,7 +179,11 @@ function createRow(file, index) {
   const autoPrepare = file.active && index < AUTO_PREPARE_ROWS && file.size <= AUTO_PREPARE_LIMIT;
   const row = document.createElement("article");
   row.className = `file-row${file.active ? "" : " archived"}`;
-  const state = file.active ? (autoPrepare ? "Loading" : "Hover to prepare") : "In history";
+  const state = file.active
+    ? dragOutMode === "source"
+      ? "Drag address"
+      : (autoPrepare ? "Loading" : "Hover to prepare")
+    : "In history";
   row.innerHTML = `
     <div class="file-icon">
       <span class="file-fallback">${iconFor(file)}</span>
@@ -190,14 +195,15 @@ function createRow(file, index) {
     <div class="file-tools"></div>`;
 
   const icon = row.querySelector(".file-icon");
+  let thumb = null;
   if (showThumbnails && file.mime?.startsWith("image/")) {
-    const img = document.createElement("img");
-    img.className = "file-thumb";
-    img.alt = "";
-    img.hidden = true;
-    img.__chuteFile = file;
-    icon.append(img);
-    thumbObserver.observe(img);
+    thumb = document.createElement("img");
+    thumb.className = "file-thumb";
+    thumb.alt = "";
+    thumb.hidden = true;
+    thumb.__chuteFile = file;
+    icon.append(thumb);
+    thumbObserver.observe(thumb);
   }
 
   const tools = row.querySelector(".file-tools");
@@ -215,16 +221,36 @@ function createRow(file, index) {
 
     tools.append(attach, remove);
 
+    if (dragOutMode === "source") {
+      row.draggable = true;
+      row.classList.add("ready");
+    }
+
     row.addEventListener("pointerenter", () => {
-      prepare(file, row).catch(() => {});
+      if (dragOutMode === "file") prepare(file, row).catch(() => {});
     }, { once: true });
 
     row.addEventListener("click", (event) => {
       if (event.target.closest("button")) return;
-      prepare(file, row).catch((error) => setStatus(error.message, true));
+      if (dragOutMode === "file") {
+        prepare(file, row).catch((error) => setStatus(error.message, true));
+      }
     });
 
     row.addEventListener("dragstart", (event) => {
+      const transfer = event.dataTransfer;
+      const url = fileUrl(file);
+
+      if (dragOutMode === "source") {
+        const mime = file.mime || "application/octet-stream";
+        transfer.effectAllowed = "copyLink";
+        transfer.setData("text/uri-list", url);
+        transfer.setData("text/plain", url);
+        transfer.setData("DownloadURL", `${mime}:${dragFilename(file.name)}:${url}`);
+        setStatus(`Dragging address for ${file.name}`);
+        return;
+      }
+
       const localFile = prepared.get(file.id);
       if (!localFile) {
         event.preventDefault();
@@ -232,12 +258,15 @@ function createRow(file, index) {
         return;
       }
 
-      const transfer = event.dataTransfer;
-      const mime = file.mime || localFile.type || "application/octet-stream";
+      // File/image is the default Chute drag-out contract. Do not advertise a
+      // DownloadURL here: Chromium may prefer the URL representation and make
+      // destination sites receive an address instead of the actual file.
       transfer.effectAllowed = "copy";
       transfer.items.add(localFile);
-      transfer.setData("DownloadURL", `${mime}:${dragFilename(file.name)}:${fileUrl(file)}`);
-      setStatus(`Dragging ${file.name}`);
+      if (thumb && !thumb.hidden) {
+        try { transfer.setDragImage(thumb, THUMB_SIZE / 2, THUMB_SIZE / 2); } catch {}
+      }
+      setStatus(`Dragging file ${file.name}`);
     });
 
     attach.addEventListener("click", async () => {
@@ -251,7 +280,7 @@ function createRow(file, index) {
       await resetHistory();
     });
 
-    if (autoPrepare) prepare(file, row).catch(() => {});
+    if (autoPrepare && dragOutMode === "file") prepare(file, row).catch(() => {});
   } else {
     const recall = document.createElement("button");
     recall.className = "secondary-button recall";
@@ -287,11 +316,13 @@ function setStatus(message, error = false) {
 async function loadSettings() {
   const settings = await chrome.storage.sync.get({
     chuteDisplayLimit: 50,
-    chuteThumbnails: true
+    chuteThumbnails: true,
+    chuteDragOutMode: "file"
   });
   const next = Number(settings.chuteDisplayLimit);
   displayLimit = Number.isFinite(next) && next >= 0 ? Math.trunc(next) : 50;
   showThumbnails = Boolean(settings.chuteThumbnails);
+  dragOutMode = settings.chuteDragOutMode === "source" ? "source" : "file";
 }
 
 async function fetchHistoryDay(day = null) {
@@ -434,6 +465,10 @@ chrome.storage.onChanged.addListener((changes, area) => {
   }
   if (changes.chuteThumbnails) {
     showThumbnails = Boolean(changes.chuteThumbnails.newValue);
+    resetHistory();
+  }
+  if (changes.chuteDragOutMode) {
+    dragOutMode = changes.chuteDragOutMode.newValue === "source" ? "source" : "file";
     resetHistory();
   }
 });
