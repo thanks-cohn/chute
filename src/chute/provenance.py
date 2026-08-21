@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Any
 
 _PROVENANCE_LOCK = threading.RLock()
+_TEXT_BLOCK_MARKER = "# CHUTE-IMAGE-CAPTURE\t1"
 
 
 def _clean_text(value: object) -> str:
@@ -51,6 +52,7 @@ def _append_clickable_text(destination: Path, record: dict[str, object]) -> None
     source_link_uri = _file_uri(record.get("source_link_file_location"))
 
     lines = [
+        _TEXT_BLOCK_MARKER,
         f"CAPTURE DATE: {record['capture_date']}",
         f"CAPTURED AT: {record['captured_at']}",
         f"CAPTURE ID: {record['capture_id']}",
