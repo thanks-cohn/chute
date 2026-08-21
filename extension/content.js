@@ -54,6 +54,14 @@
     return mode === "floating" || mode === "both";
   }
 
+  function preserveNativeDropLifecycle() {
+    const hostname = location.hostname.toLowerCase();
+    return hostname === "chatgpt.com" ||
+      hostname.endsWith(".chatgpt.com") ||
+      hostname === "chat.openai.com" ||
+      hostname.endsWith(".chat.openai.com");
+  }
+
   function renderVisibility() {
     host.style.display = floatingEnabled(accessMode) ? "block" : "none";
   }
@@ -294,7 +302,10 @@
 
     if (chuteItem && !overChute) {
       event.preventDefault();
-      event.stopPropagation();
+      // ChatGPT needs to observe the browser's trusted dragover/drop pair so
+      // its full-page "Drop anything" state can terminate normally. Chute's
+      // private token is not exposed as text/plain, so propagation is safe.
+      if (!preserveNativeDropLifecycle()) event.stopPropagation();
       try { event.dataTransfer.dropEffect = "copy"; } catch {}
       return;
     }
@@ -313,7 +324,7 @@
 
     if (chuteItem && !overChute) {
       event.preventDefault();
-      event.stopImmediatePropagation();
+      if (!preserveNativeDropLifecycle()) event.stopImmediatePropagation();
       const target = event.target;
       endDragRouting();
       deliverChuteFile(target, chuteItem);
