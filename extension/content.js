@@ -136,6 +136,7 @@
         return {
           kind: "image",
           url,
+          pageUrl: location.href,
           name: safeDragName(image.alt || image.getAttribute("aria-label") || "")
         };
       }
@@ -146,13 +147,14 @@
       return {
         kind: "link",
         url: link.href,
+        pageUrl: location.href,
         name: safeDragName(link.textContent || "")
       };
     }
 
     const selection = window.getSelection()?.toString().trim();
     if (selection) {
-      return { kind: "selection", text: selection.slice(0, 200000) };
+      return { kind: "selection", pageUrl: location.href, text: selection.slice(0, 200000) };
     }
 
     return null;
@@ -179,6 +181,7 @@
         uri: transferText(transfer, "text/uri-list"),
         html: transferText(transfer, "text/html"),
         text: transferText(transfer, "text/plain"),
+        pageUrl: location.href,
         source: pageDragSource
       }
     }, "*");
