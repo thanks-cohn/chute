@@ -36,13 +36,28 @@
 
   let dragDepth = 0;
   let active = false;
+  let supportHover = false;
+
+  function renderSize() {
+    if (supportHover) {
+      host.style.width = "198px";
+      host.style.height = "174px";
+      host.style.transform = "translate(-2px, -2px)";
+    } else if (active) {
+      host.style.width = "116px";
+      host.style.height = "132px";
+      host.style.transform = "translate(-4px, -4px) rotate(-1deg)";
+    } else {
+      host.style.width = "92px";
+      host.style.height = "104px";
+      host.style.transform = "none";
+    }
+  }
 
   function setActive(next) {
     if (active === next) return;
     active = next;
-    host.style.width = next ? "116px" : "92px";
-    host.style.height = next ? "132px" : "104px";
-    host.style.transform = next ? "translate(-4px, -4px) rotate(-1deg)" : "none";
+    renderSize();
     frame.contentWindow?.postMessage({ type: "chute-drag-active", active: next }, "*");
   }
 
@@ -62,8 +77,13 @@
   }, true);
 
   window.addEventListener("message", (event) => {
-    if (event.source === frame.contentWindow && event.data?.type === "chute-open-side-panel") {
+    if (event.source !== frame.contentWindow) return;
+    if (event.data?.type === "chute-open-side-panel") {
       chrome.runtime.sendMessage({ type: "open-side-panel" });
+    }
+    if (event.data?.type === "chute-support-hover") {
+      supportHover = Boolean(event.data.active);
+      renderSize();
     }
   });
 
