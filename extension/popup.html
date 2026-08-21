@@ -37,6 +37,12 @@
         <option value="source">Source address</option>
       </select>
 
+      <div class="setting-label">Browser image capture</div>
+      <select id="browser-image-capture" aria-label="How images dropped from webpages are stored">
+        <option value="full">Get full image (default)</option>
+        <option value="thumbnail">Get thumbnail only (512px)</option>
+      </select>
+
       <div class="setting-label">History shown</div>
       <div class="limit-control">
         <input id="display-limit" type="number" min="1" step="1" inputmode="numeric" value="50" aria-label="Number of history entries shown">
@@ -48,8 +54,13 @@
         <input id="show-thumbnails" class="toggle" type="checkbox" checked>
       </label>
 
-      <div class="settings-note">Actual file / image is the default. Source address is available when you explicitly want to drag Chute's served location instead.</div>
+      <div class="settings-note">Generated thumbnails are on by default. Chute creates one tiny 48px preview, saves it under <code>~/Chute/thumbs/</code>, and reuses it. Turn this off to show generic icons and generate no thumbnails.</div>
+      <div class="settings-note">Full image is the default for browser captures so later uploads keep their original quality. Thumbnail-only mode stores a reduced 512px copy instead.</div>
+      <div class="settings-note">Actual file / image is the default drag-out mode. Source address is available when you explicitly want Chute's served location instead.</div>
       <div class="settings-note">The browser sticky and right-click menu both feed the same local Chute used by your other installed Chromium browsers.</div>
+
+      <button id="clear-chute" class="secondary-button" type="button">Clear Chute</button>
+      <div class="settings-note">Clear Chute empties the live basket only. History remains available for Recall while the preserved Chute copy exists.</div>
 
       <a class="coffee-button" href="https://buy.stripe.com/7sI9CD0uQ96mdY43cc" target="_blank" rel="noopener noreferrer">☕ Buy the Creator a Coffee</a>
     </section>
