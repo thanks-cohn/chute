@@ -13,7 +13,7 @@ const clearChuteButton = document.querySelector("#clear-chute");
 
 function clampDimension(value, fallback = 512) {
   const next = Math.trunc(Number(value) || fallback);
-  return Math.min(4096, Math.max(16, next));
+  return Math.max(1, next);
 }
 
 openShelfButton?.addEventListener("click", async () => {
