@@ -24,6 +24,13 @@
   <details class="settings-panel">
     <summary>⚙ Settings</summary>
     <section class="settings" aria-label="Chute settings">
+      <div class="setting-label">Access</div>
+      <select id="access-mode" aria-label="How Chute appears in the browser">
+        <option value="floating">Floating mascot</option>
+        <option value="both">Mascot + right-click</option>
+        <option value="context">Right-click only</option>
+      </select>
+
       <div class="setting-label">History shown</div>
       <div class="limit-control">
         <input id="display-limit" type="number" min="1" step="1" inputmode="numeric" value="50" aria-label="Number of history entries shown">
@@ -35,10 +42,7 @@
         <input id="show-thumbnails" class="toggle" type="checkbox" checked>
       </label>
 
-      <label>
-        <span>Sticky Chute on webpages</span>
-        <input id="bin-visible" class="toggle" type="checkbox" checked>
-      </label>
+      <div class="settings-note">Right-click mode can send selected text, links, pages, and images. Direct image capture may request optional site access.</div>
 
       <a class="coffee-button" href="https://buy.stripe.com/7sI9CD0uQ96mdY43cc" target="_blank" rel="noopener noreferrer">☕ Buy the Creator a Coffee</a>
     </section>
