@@ -2,7 +2,11 @@
 
 **Pick up a file from your terminal, or feed one to the little bin following you around the browser.**
 
-Chute is a localhost file queue plus a Chrome/Chromium extension.
+Chute is a lightweight localhost file bridge plus a Chrome/Chromium extension. Premium v2 adds a recallable, bottomless local history without adding a database or image-processing dependency to Python.
+
+The original working release is preserved by the Git tag `v1`. Current v2 work lives on the `premium-v2` branch.
+
+## What Chute does
 
 From a terminal:
 
@@ -12,22 +16,83 @@ chute ./screenshot.png
 chute ./whole-directory
 ```
 
-From the browser, drop a file, a link, or selected text into the sticky Chute bin floating above the current webpage. Everything appears in the extension popup and side shelf, ready to attach or drag elsewhere.
+From the browser, drop a file, link, or selected text into the sticky Chute mascot. Items appear in the extension popup and side shelf, ready to attach or drag elsewhere.
 
-Directories sent from the CLI are zipped automatically. Files remain on your computer until you deliberately attach or drag them to a website.
+Directories sent from the CLI are zipped automatically. The Python service never uploads your files to the internet.
 
-## What is included
+## Premium v2
 
-- dependency-free Python CLI and localhost server
-- persistent sticky-note Chute bin on normal HTTP and HTTPS pages
-- streamed browser-to-local file ingestion
-- Downloads-style extension popup
-- persistent Chrome side shelf
-- generic **Attach** fallback for pages with file inputs
-- Chrome virtual-file drag support through `DownloadURL`
-- automatic directory ZIP creation
-- queue listing, removal, clearing, and badge counts
-- default list cap of 20, optional 50, or Unlimited
+Premium v2 adds:
+
+- default history view of 50 entries
+- any positive history count you choose
+- `∞` bottomless history that lazily loads older days
+- direct browsing by calendar day
+- generated 48px image thumbnails
+- thumbnail generation in the browser, so Python stays dependency-free
+- recall of removed historical items
+- preserved local Chute copies after Remove or Clear
+- a mascot supporter popout on hover
+- a **Buy the Creator a Coffee** entry in Settings
+- a frozen, C-friendly history format documented in `HISTORY_FORMAT.md`
+
+## Local storage
+
+Everything lives under:
+
+```text
+~/Chute/
+```
+
+unless `CHUTE_HOME` is explicitly set.
+
+```text
+~/Chute/
+├── queue.json          current live basket
+├── files/              preserved Chute copies
+├── thumbs/             tiny generated WebP thumbnails
+└── history/
+    ├── 2026-08-21.tsv
+    ├── 2026-08-22.tsv
+    └── ...
+```
+
+History is split by UTC day instead of being stored in one ever-growing database. Each daily file is append-only UTF-8 TSV with percent-encoded fields. See `HISTORY_FORMAT.md` for the frozen v1 format.
+
+## History and Recall
+
+Removing an item now means **remove it from the live Chute basket**. It does not erase the preserved Chute copy or its history record.
+
+Historical entries therefore show a **Recall** action. Recall puts the preserved item back into the live basket so it can be attached or dragged again.
+
+The history records `add`, `remove`, `clear`, and `recall` events with UTC timestamps.
+
+## Generated thumbnails
+
+Chute does not ask Python to decode images and does not require Pillow, ImageMagick, SQLite, or another heavyweight runtime dependency.
+
+When an image row approaches the visible extension area:
+
+1. the extension looks for an existing tiny thumbnail under `~/Chute/thumbs/`;
+2. if none exists, Chromium decodes the original image once;
+3. Chute draws it into a 48px canvas;
+4. Chromium compresses that derivative as a small WebP;
+5. the derivative is stored locally and reused thereafter.
+
+The thumbnail is a recognition aid, not a full preview. The original is never recompressed or replaced.
+
+## Bottomless history
+
+Settings allow:
+
+```text
+History shown
+[ 50 ] [ ∞ ]
+```
+
+The number field accepts any positive integer. `∞` does not load every historical item into the browser at once. The extension loads history by day as the user approaches the bottom of the list.
+
+A date picker also allows jumping directly to a specific day.
 
 ## Install the computer side
 
@@ -40,27 +105,15 @@ python3 -m venv .venv
 python -m pip install -e .
 ```
 
-On Windows PowerShell:
-
-```powershell
-cd chute
-py -m venv .venv
-.venv\Scripts\Activate.ps1
-python -m pip install -e .
-```
-
 Confirm it works:
 
 ```bash
 chute --version
+chute path
 chute ./README.md
 ```
 
-Sending a file starts the localhost bridge automatically. You can also run it in the foreground:
-
-```bash
-chute serve
-```
+The default data path printed by `chute path` is `~/Chute`.
 
 ## Install the Chrome extension
 
@@ -70,95 +123,40 @@ chute serve
 4. Select this repository's `extension` directory.
 5. Pin **Chute** to the toolbar.
 
-Now run:
+Reload a normal webpage. The taped Chute mascot appears near the lower-right corner. Drop something onto it to add it to Chute. Click it to open the shelf.
 
-```bash
-chute ./anything.pdf
-```
-
-Reload an ordinary webpage. The little taped Chute bin appears in the lower-right corner. Drop a file into it to send the file back into the local Chute queue. Click the bin to open the persistent side shelf.
-
-Chrome does not allow extensions to run on internal pages such as `chrome://extensions`, and some protected browser pages may also suppress extensions.
-
-## Upgrade from v0.1
-
-Pull the new code and reinstall the editable package:
-
-```bash
-cd ~/dev/chute
-git pull
-source .venv/bin/activate
-python -m pip install -e .
-```
-
-The old v0.1 daemon does not have the browser-ingest endpoint, so restart it. On Linux:
-
-```bash
-pkill -f 'python.*-m chute serve' || true
-chute ./README.md
-```
-
-Then open `chrome://extensions`, press the reload button on Chute, and reload the webpage where you are testing it.
-
-## Browser-bin behavior
-
-- Dropped files are copied into Chute's local queue using a streamed upload.
-- Multiple dropped files are accepted sequentially.
-- Dropped links become portable `.url` Internet Shortcut files.
-- Dropped text becomes a timestamped `.txt` note.
-- The bin displays the current queue count.
-- The bin can be hidden from the extension popup.
-
-The bin is hosted in an isolated extension iframe and mounted at the maximum practical CSS z-index. This prevents ordinary page styles from deforming or covering it.
-
-## List size
-
-The popup and shelf show the newest 20 items by default. The popup setting can switch this to:
-
-- Latest 20
-- Latest 50
-- Unlimited
-
-Unlimited changes the visible metadata list, but Chute still eagerly prepares only the first 20 small files. Older rows prepare when hovered or clicked, preventing a very large queue from consuming all browser memory at once.
+Chrome does not allow content scripts on internal pages such as `chrome://extensions`.
 
 ## Commands
 
 ```text
 chute FILE [FILE ...]      shorthand for chute send
 chute send PATH [...]      queue files or directories
-chute list                 list queued files
-chute remove ID            remove one item by full or unique short ID
-chute clear                empty the queue
+chute list                 list live queued files
+chute remove ID            remove one item from the live basket
+chute clear                empty the live basket
 chute path                 print Chute's data directory
 chute serve                run the localhost bridge
 ```
 
-The server binds only to `127.0.0.1:17891` by default. Set `CHUTE_HOME` to move the queue and copied files elsewhere. Browser drops are limited to 8 GiB by default; set `CHUTE_MAX_UPLOAD_BYTES` to change that limit.
+The server binds only to `127.0.0.1:17891` by default. Browser drops are limited to 8 GiB by default; set `CHUTE_MAX_UPLOAD_BYTES` to change that limit.
 
-## How drag-out works
+## Drag-out behavior
 
 Chute uses two drag representations:
 
-1. A browser `File` object for permissive and same-document targets.
+1. a browser `File` object for permissive and same-document targets;
 2. Chrome's `DownloadURL` virtual-file drag format for crossing out of an extension page.
 
-The earlier v0.1 implementation included a `text/plain` filename fallback. Chrome preserved that text while stripping the scripted file, causing ChatGPT to receive only the filename. v0.2 removes that fallback and adds the localhost-backed virtual-file representation.
+The **Attach** button remains available for sites that expose a usable file input.
 
-The **Attach** button remains available for sites such as ChatGPT that expose a usable file input.
+Only the first small live items are prepared eagerly. Older or larger rows prepare when hovered or clicked so bottomless history does not become bottomless RAM usage.
 
 ## Multiple browsers
 
-The queue belongs to the local Chute daemon, not to one browser profile. Therefore, Chrome, Edge, Brave, and other compatible Chromium browsers on the same computer can see the same queue when the extension is installed in each browser.
+The queue and history belong to the local Chute daemon, not to one browser profile. Chrome, Edge, Brave, and compatible Chromium browsers on the same computer can therefore see the same local state when the extension is installed in each browser.
 
-The synchronized Chrome settings currently cover preferences such as list size and bin visibility, not file contents.
-
-Planned later work:
-
-- Firefox/WebExtension package
-- encrypted device pairing
-- cross-device queue synchronization
-- selective expiration and storage quotas
-- conflict-free queue IDs across devices
+Chrome-synced settings cover preferences such as history count, thumbnail visibility, and mascot visibility. File contents and history stay local.
 
 ## Development
 
@@ -172,18 +170,18 @@ node --check extension/shelf.js
 node --check extension/popup.js
 ```
 
-After editing extension files, open `chrome://extensions` and click the reload button on Chute.
+After editing extension files, open `chrome://extensions` and reload Chute.
 
 ## Security model
 
-- The bridge listens on loopback only by default.
-- Queue listings, browser ingestion, and destructive operations accept only Chrome-extension or local-service origins.
-- Individual file reads use unguessable queue IDs and allow cross-origin GET so the injected **Attach** fallback and virtual-file drag can read the selected item.
-- Browser uploads are written incrementally instead of being buffered fully in Python memory.
-- Chute copies files into its private queue rather than exposing arbitrary filesystem paths.
-- The Python service does not upload files to the internet.
-- Removing an item deletes Chute's copy, never the original file.
+- the bridge listens on loopback only by default;
+- queue listings, browser ingestion, recall, thumbnail writes, and live-basket changes accept only Chrome-extension or local-service origins;
+- individual preserved-file reads use unguessable Chute IDs;
+- browser uploads are streamed to disk rather than buffered fully in Python memory;
+- Chute copies files into its private local store instead of exposing arbitrary filesystem paths;
+- the Python service does not upload files to the internet;
+- Remove and Clear affect the live basket, while preserved copies remain available for history/Recall.
 
 ## Status
 
-Version `0.2.0` adds the persistent sticky browser bin, streamed browser ingestion, configurable list limits, and the Chrome virtual-file drag fix. Physical drag-and-drop behavior still needs testing across individual Chromium builds and target websites because each target can implement its drop zone differently.
+`premium-v2` is the active development branch. The storage/history core is versioned as `2.0.0`, while the original pre-history implementation remains permanently addressable through tag `v1`.
