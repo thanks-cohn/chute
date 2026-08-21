@@ -1,6 +1,9 @@
 (() => {
   if (window.top !== window || document.getElementById("__chute_sticky_host")) return;
 
+  const BASE_WIDTH = 92;
+  const BASE_HEIGHT = 104;
+
   const host = document.createElement("div");
   host.id = "__chute_sticky_host";
   Object.assign(host.style, {
@@ -8,8 +11,8 @@
     position: "fixed",
     right: "18px",
     bottom: "18px",
-    width: "92px",
-    height: "104px",
+    width: `${BASE_WIDTH}px`,
+    height: `${BASE_HEIGHT}px`,
     margin: "0",
     padding: "0",
     border: "0",
@@ -37,6 +40,8 @@
   let accessMode = "floating";
   let pageDragSource = null;
   let clearDragTimer = null;
+  let dragRouting = false;
+  let dropActive = false;
 
   function floatingEnabled(mode) {
     return mode === "floating" || mode === "both";
@@ -47,10 +52,52 @@
   }
 
   function renderSize() {
-    // The browser landing point stays physically fixed. Auxiliary UI is
-    // allowed to grow upward/left, but the bottom-right bin never moves.
-    host.style.width = supportHover ? "198px" : "92px";
-    host.style.height = supportHover ? "174px" : "104px";
+    // The visible Chute remains bottom-right anchored. Auxiliary UI may grow
+    // upward/left, but the landing zone is always the same BASE_WIDTH/HEIGHT.
+    host.style.width = supportHover ? "198px" : `${BASE_WIDTH}px`;
+    host.style.height = supportHover ? "174px" : `${BASE_HEIGHT}px`;
+  }
+
+  function stableLandingRect() {
+    const rect = host.getBoundingClientRect();
+    return {
+      left: rect.right - BASE_WIDTH,
+      right: rect.right,
+      top: rect.bottom - BASE_HEIGHT,
+      bottom: rect.bottom
+    };
+  }
+
+  function pointInLandingZone(x, y) {
+    if (!floatingEnabled(accessMode) || host.style.display === "none") return false;
+    const rect = stableLandingRect();
+    return x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom;
+  }
+
+  function setDropActive(next) {
+    if (dropActive === next) return;
+    dropActive = next;
+    frame.contentWindow?.postMessage({ type: "chute-page-drop-active", active: next }, "*");
+  }
+
+  function beginDragRouting() {
+    if (dragRouting) return;
+    dragRouting = true;
+    // Chromium can make an extension iframe an unreliable cross-origin drop
+    // receiver. During a drag, let the parent page own Chute's landing zone and
+    // hand the payload to the iframe explicitly with structured postMessage.
+    frame.style.pointerEvents = "none";
+    if (supportHover) {
+      supportHover = false;
+      renderSize();
+      frame.contentWindow?.postMessage({ type: "chute-force-support-closed" }, "*");
+    }
+  }
+
+  function endDragRouting() {
+    dragRouting = false;
+    frame.style.pointerEvents = "auto";
+    setDropActive(false);
   }
 
   function safeDragName(value) {
@@ -96,6 +143,28 @@
     frame.contentWindow?.postMessage({ type: "chute-page-drag-source", source }, "*");
   }
 
+  function transferText(transfer, type) {
+    try {
+      return transfer?.getData(type) || "";
+    } catch {
+      return "";
+    }
+  }
+
+  function handDropToChute(transfer) {
+    const files = transfer?.files ? Array.from(transfer.files) : [];
+    frame.contentWindow?.postMessage({
+      type: "chute-page-drop",
+      drop: {
+        files,
+        uri: transferText(transfer, "text/uri-list"),
+        html: transferText(transfer, "text/html"),
+        text: transferText(transfer, "text/plain"),
+        source: pageDragSource
+      }
+    }, "*");
+  }
+
   document.addEventListener("dragstart", (event) => {
     if (clearDragTimer) {
       clearTimeout(clearDragTimer);
@@ -103,17 +172,56 @@
     }
     pageDragSource = describePageDrag(event.target);
     sendDragSource(pageDragSource);
+    beginDragRouting();
+  }, true);
+
+  document.addEventListener("dragenter", () => {
+    // This also catches files entering the browser from the desktop, where no
+    // page dragstart event exists.
+    beginDragRouting();
+  }, true);
+
+  document.addEventListener("dragover", (event) => {
+    if (!dragRouting) beginDragRouting();
+    const overChute = pointInLandingZone(event.clientX, event.clientY);
+    setDropActive(overChute);
+    if (!overChute) return;
+
+    event.preventDefault();
+    event.stopPropagation();
+    try {
+      event.dataTransfer.dropEffect = "copy";
+    } catch {}
+  }, true);
+
+  document.addEventListener("drop", (event) => {
+    const overChute = pointInLandingZone(event.clientX, event.clientY);
+    if (overChute) {
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      handDropToChute(event.dataTransfer);
+    }
+    pageDragSource = null;
+    sendDragSource(null);
+    endDragRouting();
   }, true);
 
   document.addEventListener("dragend", () => {
-    // Keep the source metadata alive briefly because the drop inside the
-    // extension iframe and the page's dragend can be delivered very close
-    // together by Chromium.
+    // Keep source metadata alive briefly because Chromium may dispatch dragend
+    // almost alongside a cross-context drop.
     clearDragTimer = setTimeout(() => {
       pageDragSource = null;
       sendDragSource(null);
-    }, 1200);
+      endDragRouting();
+    }, 250);
   }, true);
+
+  window.addEventListener("blur", () => {
+    if (!dragRouting) return;
+    setTimeout(() => {
+      if (dragRouting) endDragRouting();
+    }, 1000);
+  });
 
   window.addEventListener("message", (event) => {
     if (event.source !== frame.contentWindow) return;
