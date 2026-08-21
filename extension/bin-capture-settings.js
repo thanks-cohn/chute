@@ -33,7 +33,7 @@ function chuteWithProvenance(payload, provenance, role) {
 
 async function chuteMakeCustomImageCopy(payload) {
   const blob = payload?.blob;
-  if (!blob || !String(blob.type || "").toLowerCase().startsWith("image/")) return null;
+  if (!blob) return null;
 
   const bitmap = await createImageBitmap(blob);
   const scale = Math.min(
@@ -77,27 +77,9 @@ function chuteImageLinkFallback(candidate) {
   };
 }
 
-normalizedPayloads = async function(args = {}) {
-  const actualFiles = Array.from(args.files || []).filter((file) => file instanceof Blob);
-  if (actualFiles.length) return chuteBaseNormalizedPayloads(args);
-
-  const htmlImage = imageFromHtmlText(args.html || "");
-  const candidate = args.source?.kind === "image" ? args.source : htmlImage;
-  if (!candidate?.url) return chuteBaseNormalizedPayloads(args);
-
-  const pageUrl = String(args.pageUrl || args.source?.pageUrl || candidate.pageUrl || "");
-  const provenance = {
-    captureId: chuteCaptureId(),
-    pageUrl,
-    imageUrl: String(candidate.url)
-  };
-
-  const full = await chuteBaseFetchImagePayload(candidate);
-  if (!full) {
-    return [chuteWithProvenance(chuteImageLinkFallback(candidate), provenance, "source_link_file")];
-  }
-
+async function chuteConfiguredImageOutputs(full, candidate, provenance) {
   const outputs = [];
+
   if (chuteSaveFullBrowserImage) {
     outputs.push(chuteWithProvenance(full, provenance, "downloaded_image"));
   }
@@ -113,6 +95,45 @@ normalizedPayloads = async function(args = {}) {
 
   if (outputs.length) return outputs;
   return [chuteWithProvenance(chuteImageLinkFallback(candidate), provenance, "source_link_file")];
+}
+
+normalizedPayloads = async function(args = {}) {
+  const actualFiles = Array.from(args.files || []).filter((file) => file instanceof Blob);
+  const htmlImage = imageFromHtmlText(args.html || "");
+  const candidate = args.source?.kind === "image" ? args.source : htmlImage;
+
+  // A true local-file drop should remain a plain file operation. Chromium can
+  // also expose a webpage image as a File during drag/drop, though. In that
+  // case source.kind === "image" tells us it is still a browser-image capture
+  // and therefore must honor the full/custom image settings.
+  if (actualFiles.length && !candidate?.url) {
+    return chuteBaseNormalizedPayloads(args);
+  }
+
+  if (!candidate?.url) return chuteBaseNormalizedPayloads(args);
+
+  const pageUrl = String(args.pageUrl || args.source?.pageUrl || candidate.pageUrl || "");
+  const provenance = {
+    captureId: chuteCaptureId(),
+    pageUrl,
+    imageUrl: String(candidate.url)
+  };
+
+  if (actualFiles.length) {
+    const basePayloads = await chuteBaseNormalizedPayloads(args);
+    const full = basePayloads.find((payload) => payload?.blob) || null;
+    if (!full) {
+      return [chuteWithProvenance(chuteImageLinkFallback(candidate), provenance, "source_link_file")];
+    }
+    return chuteConfiguredImageOutputs(full, candidate, provenance);
+  }
+
+  const full = await chuteBaseFetchImagePayload(candidate);
+  if (!full) {
+    return [chuteWithProvenance(chuteImageLinkFallback(candidate), provenance, "source_link_file")];
+  }
+
+  return chuteConfiguredImageOutputs(full, candidate, provenance);
 };
 
 chrome.storage.sync.get({
