@@ -8,6 +8,10 @@
   <style>
     body { width: 390px; max-height: 600px; overflow: auto; }
     .popup-note { padding: 0 13px 11px; color: #8f9882; font-size: 10px; }
+    .setup-card { margin: 10px 12px 4px; padding: 12px; border: 1px solid #4b523f; border-radius: 10px; background: #171a14; }
+    .setup-title { font-weight: 700; margin-bottom: 4px; }
+    .setup-copy { color: #aab29f; font-size: 11px; line-height: 1.45; margin-bottom: 9px; }
+    .setup-button { display: inline-block; text-decoration: none; }
   </style>
 </head>
 <body>
@@ -20,6 +24,12 @@
       <button id="open-shelf" class="primary-button">Open shelf</button>
     </div>
   </header>
+
+  <section id="platform-setup" class="setup-card" hidden>
+    <div id="platform-setup-title" class="setup-title">Finish setting up Chute</div>
+    <div id="platform-setup-copy" class="setup-copy">Chute needs its tiny local companion to share files between browsers.</div>
+    <a id="platform-setup-button" class="primary-button setup-button" target="_blank" rel="noopener noreferrer">Install Chute</a>
+  </section>
 
   <details class="settings-panel">
     <summary>⚙ Settings</summary>
@@ -92,6 +102,7 @@
   <script src="shelf.js"></script>
   <script src="workflow-fixes.js"></script>
   <script src="drag-relay.js"></script>
+  <script src="platform-setup.js"></script>
   <script src="popup.js"></script>
 </body>
 </html>
