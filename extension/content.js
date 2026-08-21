@@ -1,6 +1,9 @@
 (() => {
   if (window.top !== window || document.getElementById("__chute_sticky_host")) return;
 
+  const BASE_URL = "http://127.0.0.1:17891";
+  const CHUTE_DRAG_TYPE = "application/x-chute-item";
+  const CHUTE_DRAG_PREFIX = "CHUTE_ITEM:";
   const BASE_WIDTH = 92;
   const BASE_HEIGHT = 104;
 
@@ -42,6 +45,8 @@
   let clearDragTimer = null;
   let dragRouting = false;
   let dropActive = false;
+  let dropActiveImage = false;
+  let deliveringChuteFile = false;
 
   function floatingEnabled(mode) {
     return mode === "floating" || mode === "both";
@@ -52,8 +57,6 @@
   }
 
   function renderSize() {
-    // The visible Chute remains bottom-right anchored. Auxiliary UI may grow
-    // upward/left, but the landing zone is always the same BASE_WIDTH/HEIGHT.
     host.style.width = supportHover ? "198px" : `${BASE_WIDTH}px`;
     host.style.height = supportHover ? "174px" : `${BASE_HEIGHT}px`;
   }
@@ -74,18 +77,31 @@
     return x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom;
   }
 
-  function setDropActive(next) {
-    if (dropActive === next) return;
+  function transferHasImage(transfer) {
+    if (pageDragSource?.kind === "image") return true;
+    try {
+      return Array.from(transfer?.items || []).some((item) =>
+        item.kind === "file" && String(item.type || "").toLowerCase().startsWith("image/")
+      );
+    } catch {
+      return false;
+    }
+  }
+
+  function setDropActive(next, imageDrag = false) {
+    if (dropActive === next && dropActiveImage === imageDrag) return;
     dropActive = next;
-    frame.contentWindow?.postMessage({ type: "chute-page-drop-active", active: next }, "*");
+    dropActiveImage = imageDrag;
+    frame.contentWindow?.postMessage({
+      type: "chute-page-drop-active",
+      active: next,
+      imageDrag: Boolean(next && imageDrag)
+    }, "*");
   }
 
   function beginDragRouting() {
     if (dragRouting) return;
     dragRouting = true;
-    // Chromium can make an extension iframe an unreliable cross-origin drop
-    // receiver. During a drag, let the parent page own Chute's landing zone and
-    // hand the payload to the iframe explicitly with structured postMessage.
     frame.style.pointerEvents = "none";
     if (supportHover) {
       supportHover = false;
@@ -97,7 +113,7 @@
   function endDragRouting() {
     dragRouting = false;
     frame.style.pointerEvents = "auto";
-    setDropActive(false);
+    setDropActive(false, false);
   }
 
   function safeDragName(value) {
@@ -165,6 +181,65 @@
     }, "*");
   }
 
+  function decodeChuteToken(value) {
+    const text = String(value || "");
+    if (!text.startsWith(CHUTE_DRAG_PREFIX)) return null;
+    try {
+      const payload = JSON.parse(decodeURIComponent(text.slice(CHUTE_DRAG_PREFIX.length)));
+      if (!payload?.id || !payload?.name) return null;
+      return {
+        id: String(payload.id),
+        name: String(payload.name),
+        mime: String(payload.mime || "application/octet-stream")
+      };
+    } catch {
+      return null;
+    }
+  }
+
+  function chuteTokenFromTransfer(transfer) {
+    return decodeChuteToken(transferText(transfer, CHUTE_DRAG_TYPE)) ||
+      decodeChuteToken(transferText(transfer, "text/plain"));
+  }
+
+  async function deliverChuteFile(target, item) {
+    if (deliveringChuteFile || !(target instanceof Element)) return;
+    deliveringChuteFile = true;
+    try {
+      const response = await fetch(`${BASE_URL}/api/files/${encodeURIComponent(item.id)}`, {
+        cache: "no-store"
+      });
+      if (!response.ok) throw new Error(`Chute returned ${response.status}`);
+      const blob = await response.blob();
+      const file = new File([blob], item.name, {
+        type: item.mime || blob.type || "application/octet-stream",
+        lastModified: Date.now()
+      });
+      const transfer = new DataTransfer();
+      transfer.items.add(file);
+      transfer.effectAllowed = "copy";
+
+      const input = target.matches('input[type="file"]')
+        ? target
+        : target.closest("label")?.querySelector('input[type="file"]');
+      if (input) {
+        input.files = transfer.files;
+        input.dispatchEvent(new Event("input", { bubbles: true }));
+        input.dispatchEvent(new Event("change", { bubbles: true }));
+        return;
+      }
+
+      const options = { bubbles: true, cancelable: true, dataTransfer: transfer };
+      target.dispatchEvent(new DragEvent("dragenter", options));
+      target.dispatchEvent(new DragEvent("dragover", options));
+      target.dispatchEvent(new DragEvent("drop", options));
+    } catch (error) {
+      console.error("Chute could not deliver dragged file:", error);
+    } finally {
+      deliveringChuteFile = false;
+    }
+  }
+
   document.addEventListener("dragstart", (event) => {
     if (clearDragTimer) {
       clearTimeout(clearDragTimer);
@@ -176,39 +251,58 @@
   }, true);
 
   document.addEventListener("dragenter", () => {
-    // This also catches files entering the browser from the desktop, where no
-    // page dragstart event exists.
     beginDragRouting();
   }, true);
 
   document.addEventListener("dragover", (event) => {
+    if (deliveringChuteFile) return;
     if (!dragRouting) beginDragRouting();
-    const overChute = pointInLandingZone(event.clientX, event.clientY);
-    setDropActive(overChute);
-    if (!overChute) return;
 
+    const chuteItem = chuteTokenFromTransfer(event.dataTransfer);
+    const overChute = pointInLandingZone(event.clientX, event.clientY);
+    const imageDrag = transferHasImage(event.dataTransfer);
+    setDropActive(overChute, imageDrag);
+
+    if (chuteItem && !overChute) {
+      event.preventDefault();
+      event.stopPropagation();
+      try { event.dataTransfer.dropEffect = "copy"; } catch {}
+      return;
+    }
+
+    if (!overChute) return;
     event.preventDefault();
     event.stopPropagation();
-    try {
-      event.dataTransfer.dropEffect = "copy";
-    } catch {}
+    try { event.dataTransfer.dropEffect = "copy"; } catch {}
   }, true);
 
   document.addEventListener("drop", (event) => {
+    if (deliveringChuteFile) return;
+
+    const chuteItem = chuteTokenFromTransfer(event.dataTransfer);
     const overChute = pointInLandingZone(event.clientX, event.clientY);
+
+    if (chuteItem && !overChute) {
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      const target = event.target;
+      endDragRouting();
+      deliverChuteFile(target, chuteItem);
+      return;
+    }
+
     if (overChute) {
       event.preventDefault();
       event.stopImmediatePropagation();
       handDropToChute(event.dataTransfer);
     }
+
     pageDragSource = null;
     sendDragSource(null);
     endDragRouting();
   }, true);
 
   document.addEventListener("dragend", () => {
-    // Keep source metadata alive briefly because Chromium may dispatch dragend
-    // almost alongside a cross-context drop.
     clearDragTimer = setTimeout(() => {
       pageDragSource = null;
       sendDragSource(null);
