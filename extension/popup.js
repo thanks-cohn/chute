@@ -1,5 +1,6 @@
 const openShelfButton = document.querySelector("#open-shelf");
 const accessModeSelect = document.querySelector("#access-mode");
+const dragOutModeSelect = document.querySelector("#drag-out-mode");
 const displayLimitInput = document.querySelector("#display-limit");
 const unlimitedButton = document.querySelector("#display-unlimited");
 const thumbnailsToggle = document.querySelector("#show-thumbnails");
@@ -19,13 +20,15 @@ async function loadPopupSettings() {
     chuteDisplayLimit: 50,
     chuteAccessMode: null,
     chuteBinVisible: true,
-    chuteThumbnails: true
+    chuteThumbnails: true,
+    chuteDragOutMode: "file"
   });
   const limit = Number(settings.chuteDisplayLimit);
   const mode = settings.chuteAccessMode || (settings.chuteBinVisible ? "floating" : "context");
   displayLimitInput.value = String(limit > 0 ? limit : 50);
   unlimitedButton.classList.toggle("active", limit === 0);
   accessModeSelect.value = mode;
+  dragOutModeSelect.value = settings.chuteDragOutMode === "source" ? "source" : "file";
   thumbnailsToggle.checked = Boolean(settings.chuteThumbnails);
 }
 
@@ -47,6 +50,11 @@ accessModeSelect?.addEventListener("change", async () => {
     chuteAccessMode: mode,
     chuteBinVisible: mode === "floating" || mode === "both"
   });
+});
+
+dragOutModeSelect?.addEventListener("change", async () => {
+  const mode = dragOutModeSelect.value === "source" ? "source" : "file";
+  await chrome.storage.sync.set({ chuteDragOutMode: mode });
 });
 
 thumbnailsToggle?.addEventListener("change", async () => {
