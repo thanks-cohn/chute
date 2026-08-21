@@ -31,6 +31,12 @@
         <option value="context">Right-click only</option>
       </select>
 
+      <div class="setting-label">Drag out as</div>
+      <select id="drag-out-mode" aria-label="What dragging an item out of Chute sends">
+        <option value="file">Actual file / image</option>
+        <option value="source">Source address</option>
+      </select>
+
       <div class="setting-label">History shown</div>
       <div class="limit-control">
         <input id="display-limit" type="number" min="1" step="1" inputmode="numeric" value="50" aria-label="Number of history entries shown">
@@ -42,6 +48,7 @@
         <input id="show-thumbnails" class="toggle" type="checkbox" checked>
       </label>
 
+      <div class="settings-note">Actual file / image is the default. Source address is available when you explicitly want to drag Chute's served location instead.</div>
       <div class="settings-note">The browser sticky and right-click menu both feed the same local Chute used by your other installed Chromium browsers.</div>
 
       <a class="coffee-button" href="https://buy.stripe.com/7sI9CD0uQ96mdY43cc" target="_blank" rel="noopener noreferrer">☕ Buy the Creator a Coffee</a>
