@@ -8,6 +8,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, unquote, urlparse
 
+from .provenance import append_image_capture
 from .store import Store
 
 DEFAULT_HOST = "127.0.0.1"
@@ -179,6 +180,10 @@ class ChuteHandler(BaseHTTPRequestHandler):
             self._receive_upload()
             return
 
+        if path == "/api/provenance/image":
+            self._receive_image_provenance()
+            return
+
         if path.startswith("/api/recall/"):
             item_id = unquote(path.removeprefix("/api/recall/"))
             item = self.store.recall(item_id)
@@ -223,6 +228,48 @@ class ChuteHandler(BaseHTTPRequestHandler):
             self._json({"error": str(exc)}, HTTPStatus.BAD_REQUEST)
             return
         self._json({"file": public_item(item, active=True)}, HTTPStatus.CREATED)
+
+    def _receive_image_provenance(self) -> None:
+        origin = allowed_origin(self.headers.get("Origin"))
+        if not origin:
+            self._json({"error": "extension origin required"}, HTTPStatus.FORBIDDEN)
+            return
+        if self.headers.get("Content-Type", "").split(";", 1)[0] != "application/json":
+            self._json({"error": "provenance must be application/json"}, HTTPStatus.BAD_REQUEST)
+            return
+
+        length_header = self.headers.get("Content-Length")
+        if length_header is None:
+            self._json({"error": "Content-Length required"}, HTTPStatus.LENGTH_REQUIRED)
+            return
+        try:
+            size = int(length_header)
+        except ValueError:
+            self._json({"error": "invalid Content-Length"}, HTTPStatus.BAD_REQUEST)
+            return
+        if size < 2 or size > 128 * 1024:
+            self._json({"error": "invalid provenance size"}, HTTPStatus.BAD_REQUEST)
+            return
+
+        raw = self.rfile.read(size)
+        if len(raw) != size:
+            self._json({"error": "provenance upload ended early"}, HTTPStatus.BAD_REQUEST)
+            return
+        try:
+            payload = json.loads(raw.decode("utf-8"))
+        except (UnicodeDecodeError, json.JSONDecodeError):
+            self._json({"error": "invalid provenance JSON"}, HTTPStatus.BAD_REQUEST)
+            return
+        if not isinstance(payload, dict) or not str(payload.get("image_url") or "").strip():
+            self._json({"error": "image_url is required"}, HTTPStatus.BAD_REQUEST)
+            return
+
+        try:
+            record = append_image_capture(self.store, payload)
+        except OSError as exc:
+            self._json({"error": str(exc)}, HTTPStatus.BAD_REQUEST)
+            return
+        self._json({"record": record}, HTTPStatus.CREATED)
 
     def _receive_thumbnail(self, item_id: str) -> None:
         origin = allowed_origin(self.headers.get("Origin"))
