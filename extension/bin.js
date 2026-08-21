@@ -9,6 +9,11 @@ let supportHover = false;
 let supportTimer = null;
 let supportCloseTimer = null;
 let pageDragSource = null;
+let serverCount = 0;
+let pendingSignals = 0;
+let optimisticFloor = 0;
+let lastSyncOkay = false;
+let intakeQueue = Promise.resolve();
 
 function safeName(value, fallback) {
   const cleaned = String(value || "")
@@ -214,20 +219,50 @@ function animate(kind) {
   setTimeout(() => bin.classList.remove(kind), 420);
 }
 
+function renderCount() {
+  const total = pendingSignals > 0 ? Math.max(serverCount, optimisticFloor) : serverCount;
+  count.hidden = total === 0;
+  count.textContent = total > 99 ? "99+" : String(total);
+  count.classList.toggle("pending", pendingSignals > 0);
+  count.classList.toggle("synced", pendingSignals === 0 && total > 0 && lastSyncOkay);
+}
+
+function beginOptimisticIntake(expected = 1) {
+  const amount = Math.max(1, Math.trunc(Number(expected) || 1));
+  optimisticFloor = Math.max(optimisticFloor, serverCount) + amount;
+  pendingSignals += amount;
+  lastSyncOkay = false;
+  renderCount();
+}
+
+function finishOptimisticIntake(expected = 1, succeeded = true) {
+  const amount = Math.max(1, Math.trunc(Number(expected) || 1));
+  pendingSignals = Math.max(0, pendingSignals - amount);
+  if (!succeeded) lastSyncOkay = false;
+  if (pendingSignals === 0) optimisticFloor = serverCount;
+  renderCount();
+}
+
 async function refreshCount() {
   try {
     const response = await fetch(`${BASE_URL}/api/files`, { cache: "no-store" });
     if (!response.ok) throw new Error();
     const payload = await response.json();
-    const total = payload.files?.length || 0;
-    count.hidden = total === 0;
-    count.textContent = total > 99 ? "99+" : String(total);
-    label.textContent = "CHUTE";
-    face.textContent = "•ᴗ•";
+    serverCount = payload.files?.length || 0;
+    lastSyncOkay = true;
+    renderCount();
+    if (!busy && pendingSignals === 0) {
+      label.textContent = "CHUTE";
+      face.textContent = "•ᴗ•";
+    }
   } catch {
-    count.hidden = true;
-    label.textContent = "OFF";
-    face.textContent = "•︵•";
+    lastSyncOkay = false;
+    renderCount();
+    if (!busy && pendingSignals === 0) {
+      count.hidden = true;
+      label.textContent = "OFF";
+      face.textContent = "•︵•";
+    }
   }
 }
 
@@ -281,23 +316,18 @@ supportCard.addEventListener("pointerenter", () => {
 supportCard.addEventListener("pointerleave", () => scheduleSupportClose());
 supportCard.addEventListener("click", (event) => event.stopPropagation());
 
-async function consumePayloads(payloadPromise) {
-  if (busy) return;
+async function consumePayloadsNow(payloadPromise, expected) {
   busy = true;
   setDragVisual(false);
   cancelSupportClose();
   setSupportHover(false);
-  label.textContent = "READING";
+  label.textContent = pendingSignals > expected ? "QUEUED" : "READING";
   face.textContent = "•◡•";
 
+  let succeeded = false;
   try {
     const payloads = await payloadPromise;
-    if (!payloads.length) {
-      animate("failure");
-      label.textContent = "NO DATA";
-      face.textContent = "×︵×";
-      return;
-    }
+    if (!payloads.length) throw new Error("No usable drop data");
 
     label.textContent = payloads.length > 1 ? `0/${payloads.length}` : "EATING";
     let completed = 0;
@@ -309,6 +339,8 @@ async function consumePayloads(payloadPromise) {
       if (payloads.length > 1) label.textContent = `${completed}/${payloads.length}`;
     }
 
+    await refreshCount();
+    succeeded = true;
     animate("success");
     label.textContent = usedImageFallback ? "LINK SAVED" : "GOT IT";
     face.textContent = "^ᴗ^";
@@ -319,13 +351,23 @@ async function consumePayloads(payloadPromise) {
     face.textContent = "×︵×";
     console.error("Chute drop failed:", error);
   } finally {
+    finishOptimisticIntake(expected, succeeded);
     busy = false;
     pageDragSource = null;
-    setTimeout(refreshCount, 1100);
+    await refreshCount();
   }
 }
 
-// Keep direct iframe drops as a fallback. The primary path is now routed by
+function enqueuePayloads(payloadPromise, expected = 1) {
+  const amount = Math.max(1, Math.trunc(Number(expected) || 1));
+  beginOptimisticIntake(amount);
+  intakeQueue = intakeQueue.then(
+    () => consumePayloadsNow(payloadPromise, amount),
+    () => consumePayloadsNow(payloadPromise, amount)
+  );
+}
+
+// Keep direct iframe drops as a fallback. The primary path is routed by
 // content.js so Chromium cannot lose the drop at the page/extension boundary.
 bin.addEventListener("dragenter", (event) => {
   event.preventDefault();
@@ -345,7 +387,8 @@ bin.addEventListener("dragleave", (event) => {
 bin.addEventListener("drop", (event) => {
   event.preventDefault();
   event.stopPropagation();
-  consumePayloads(droppedPayloads(event.dataTransfer));
+  const expected = event.dataTransfer?.files?.length || 1;
+  enqueuePayloads(droppedPayloads(event.dataTransfer), expected);
 });
 
 bin.addEventListener("click", () => {
@@ -376,10 +419,12 @@ window.addEventListener("message", (event) => {
   }
 
   if (event.data?.type === "chute-page-drop") {
-    consumePayloads(normalizedPayloads(event.data.drop || {}));
+    const drop = event.data.drop || {};
+    const expected = Array.from(drop.files || []).length || 1;
+    enqueuePayloads(normalizedPayloads(drop), expected);
   }
 });
 
 window.parent.postMessage({ type: "chute-request-drag-source" }, "*");
 refreshCount();
-setInterval(refreshCount, 3000);
+setInterval(refreshCount, 1200);
