@@ -34,8 +34,47 @@ def _thumbnail_path(store: Any, item_id: object) -> str | None:
     return str(Path(found).resolve())
 
 
+def _file_uri(path_value: object) -> str:
+    text = _clean_text(path_value)
+    if not text:
+        return ""
+    try:
+        return Path(text).resolve().as_uri()
+    except ValueError:
+        return ""
+
+
+def _append_clickable_text(destination: Path, record: dict[str, object]) -> None:
+    downloaded_uri = _file_uri(record.get("downloaded_image_location"))
+    mini_uri = _file_uri(record.get("mini_thumbnail_location"))
+    custom_uri = _file_uri(record.get("custom_thumbnail_location"))
+    source_link_uri = _file_uri(record.get("source_link_file_location"))
+
+    lines = [
+        f"CAPTURE DATE: {record['capture_date']}",
+        f"CAPTURED AT: {record['captured_at']}",
+        f"CAPTURE ID: {record['capture_id']}",
+        f"PAGE URL: {record['page_url']}",
+        f"IMAGE URL: {record['image_url']}",
+        f"DOWNLOADED IMAGE: {'yes' if record['downloaded_image'] else 'no'}",
+        f"DOWNLOADED IMAGE LOCATION: {downloaded_uri or 'none'}",
+        f"MINI THUMBNAIL: {'yes' if record['mini_thumbnail'] else 'no'}",
+        f"MINI THUMBNAIL LOCATION: {mini_uri or 'none'}",
+        f"CUSTOM THUMBNAIL: {'yes' if record['custom_thumbnail'] else 'no'}",
+        f"CUSTOM THUMBNAIL LOCATION: {custom_uri or 'none'}",
+        f"SOURCE LINK FILE: {'yes' if record['source_link_file'] else 'no'}",
+        f"SOURCE LINK FILE LOCATION: {source_link_uri or 'none'}",
+        "",
+        "=" * 80,
+        "",
+    ]
+
+    with destination.open("a", encoding="utf-8", newline="\n") as handle:
+        handle.write("\n".join(lines))
+
+
 def append_image_capture(store: Any, payload: dict[str, object]) -> dict[str, object]:
-    """Append exactly one self-contained JSONL record for one browser image capture."""
+    """Append one canonical JSONL record and one clickable plain-text block."""
 
     now = datetime.now().astimezone()
     downloaded_location = _item_path(store, payload.get("downloaded_image_id"))
@@ -60,11 +99,14 @@ def append_image_capture(store: Any, payload: dict[str, object]) -> dict[str, ob
         "source_link_file_location": source_link_location,
     }
 
-    destination = Path(store.root) / "image-provenance.jsonl"
-    destination.parent.mkdir(parents=True, exist_ok=True)
+    jsonl_destination = Path(store.root) / "image-provenance.jsonl"
+    text_destination = Path(store.root) / "image-provenance.txt"
+    jsonl_destination.parent.mkdir(parents=True, exist_ok=True)
+
     with _PROVENANCE_LOCK:
-        with destination.open("a", encoding="utf-8", newline="\n") as handle:
+        with jsonl_destination.open("a", encoding="utf-8", newline="\n") as handle:
             handle.write(json.dumps(record, ensure_ascii=False, separators=(",", ":")))
             handle.write("\n")
+        _append_clickable_text(text_destination, record)
 
     return record
