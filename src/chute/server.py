@@ -177,7 +177,11 @@ class ChuteHandler(BaseHTTPRequestHandler):
             return
 
         if path == "/api/upload":
-            self._receive_upload()
+            self._receive_upload(custom_thumbnail=False)
+            return
+
+        if path == "/api/custom-thumbnails":
+            self._receive_upload(custom_thumbnail=True)
             return
 
         if path == "/api/provenance/image":
@@ -200,7 +204,7 @@ class ChuteHandler(BaseHTTPRequestHandler):
 
         self._json({"error": "not found"}, HTTPStatus.NOT_FOUND)
 
-    def _receive_upload(self) -> None:
+    def _receive_upload(self, *, custom_thumbnail: bool) -> None:
         origin = allowed_origin(self.headers.get("Origin"))
         if not origin:
             self._json({"error": "extension origin required"}, HTTPStatus.FORBIDDEN)
@@ -222,8 +226,26 @@ class ChuteHandler(BaseHTTPRequestHandler):
         name = unquote(self.headers.get("X-Chute-Filename", "browser-file"))
         mime = self.headers.get("X-Chute-Mime") or self.headers.get("Content-Type")
         source = unquote(self.headers.get("X-Chute-Source", "browser-drop"))
+        if custom_thumbnail and (mime or "").split(";", 1)[0].lower() != "image/webp":
+            self._json({"error": "custom thumbnail must be image/webp"}, HTTPStatus.BAD_REQUEST)
+            return
         try:
-            item = self.store.add_stream(name, self.rfile, size, mime=mime, source_path=source)
+            if custom_thumbnail:
+                item = self.store.add_custom_stream(
+                    name,
+                    self.rfile,
+                    size,
+                    mime=mime,
+                    source_path=source,
+                )
+            else:
+                item = self.store.add_stream(
+                    name,
+                    self.rfile,
+                    size,
+                    mime=mime,
+                    source_path=source,
+                )
         except (OSError, ValueError) as exc:
             self._json({"error": str(exc)}, HTTPStatus.BAD_REQUEST)
             return
