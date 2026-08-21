@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "Chute",
-  "version": "2.0.0",
-  "description": "A persistent browser chute with local recallable history and generated image thumbnails.",
+  "version": "2.3.0",
+  "description": "One local Chute shared across Chromium browsers with recallable history, provenance, and image derivatives.",
   "minimum_chrome_version": "116",
   "permissions": ["activeTab", "contextMenus", "scripting", "sidePanel", "storage"],
   "host_permissions": [
