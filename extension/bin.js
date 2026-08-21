@@ -77,15 +77,22 @@ async function uploadBlob(blob, name, source = "browser-drop") {
   return response.json();
 }
 
-function firstUri(transfer) {
-  return transfer.getData("text/uri-list")
+function firstUriText(value) {
+  return String(value || "")
     .split(/\r?\n/)
     .map((line) => line.trim())
     .find((line) => line && !line.startsWith("#")) || "";
 }
 
-function imageFromHtml(transfer) {
-  const html = transfer.getData("text/html");
+function firstUri(transfer) {
+  try {
+    return firstUriText(transfer.getData("text/uri-list"));
+  } catch {
+    return "";
+  }
+}
+
+function imageFromHtmlText(html) {
   if (!html) return null;
   try {
     const doc = new DOMParser().parseFromString(html, "text/html");
@@ -101,7 +108,15 @@ function imageFromHtml(transfer) {
   }
 }
 
-async function canFetchImage(url) {
+function imageFromHtml(transfer) {
+  try {
+    return imageFromHtmlText(transfer.getData("text/html"));
+  } catch {
+    return null;
+  }
+}
+
+function canFetchImage(url) {
   try {
     const parsed = new URL(url);
     return ["http:", "https:", "data:", "blob:"].includes(parsed.protocol);
@@ -111,8 +126,7 @@ async function canFetchImage(url) {
 }
 
 async function fetchImagePayload(candidate) {
-  if (!candidate?.url) return null;
-  if (!(await canFetchImage(candidate.url))) return null;
+  if (!candidate?.url || !canFetchImage(candidate.url)) return null;
 
   try {
     const response = await fetch(candidate.url, {
@@ -136,46 +150,61 @@ async function fetchImagePayload(candidate) {
   }
 }
 
-async function droppedPayloads(transfer) {
-  const files = [...(transfer.files || [])];
-  if (files.length) {
-    return files.map((file) => ({
+async function normalizedPayloads({ files = [], uri = "", html = "", text = "", source = null } = {}) {
+  const actualFiles = Array.from(files || []).filter((file) => file instanceof Blob);
+  if (actualFiles.length) {
+    return actualFiles.map((file, index) => ({
       blob: file,
-      name: file.name,
+      name: safeName(file.name, `browser-file-${index + 1}`),
       source: "browser-file-drop",
       kind: "file"
     }));
   }
 
-  const htmlImage = imageFromHtml(transfer);
-  const candidate = pageDragSource?.kind === "image" ? pageDragSource : htmlImage;
+  const htmlImage = imageFromHtmlText(html);
+  const candidate = source?.kind === "image" ? source : htmlImage;
   if (candidate?.url) {
     const image = await fetchImagePayload(candidate);
     if (image) return [image];
   }
 
-  const uri = firstUri(transfer) || candidate?.url || (pageDragSource?.kind === "link" ? pageDragSource.url : "");
-  if (uri) {
-    const body = `[InternetShortcut]\r\nURL=${uri}\r\n`;
+  const resolvedUri = firstUriText(uri) || candidate?.url || (source?.kind === "link" ? source.url : "");
+  if (resolvedUri) {
+    const body = `[InternetShortcut]\r\nURL=${resolvedUri}\r\n`;
     return [{
       blob: new Blob([body], { type: "application/internet-shortcut" }),
-      name: linkName(uri),
-      source: uri,
+      name: linkName(resolvedUri),
+      source: resolvedUri,
       kind: candidate?.kind === "image" ? "image-link" : "link"
     }];
   }
 
-  const text = transfer.getData("text/plain").trim() ||
-    (pageDragSource?.kind === "selection" ? pageDragSource.text : "");
-  if (text) {
+  const resolvedText = String(text || "").trim() ||
+    (source?.kind === "selection" ? String(source.text || "").trim() : "");
+  if (resolvedText) {
     return [{
-      blob: new Blob([`${text}\n`], { type: "text/plain;charset=utf-8" }),
+      blob: new Blob([`${resolvedText}\n`], { type: "text/plain;charset=utf-8" }),
       name: `browser-note-${new Date().toISOString().replace(/[:.]/g, "-")}.txt`,
       source: "browser-selection",
       kind: "text"
     }];
   }
+
   return [];
+}
+
+async function droppedPayloads(transfer) {
+  let text = "";
+  let html = "";
+  try { text = transfer.getData("text/plain"); } catch {}
+  try { html = transfer.getData("text/html"); } catch {}
+  return normalizedPayloads({
+    files: transfer.files ? Array.from(transfer.files) : [],
+    uri: firstUri(transfer),
+    html,
+    text,
+    source: pageDragSource || imageFromHtml(transfer)
+  });
 }
 
 function animate(kind) {
@@ -210,6 +239,10 @@ function setSupportHover(next) {
   window.parent.postMessage({ type: "chute-support-hover", active: next }, "*");
 }
 
+function setDragVisual(active) {
+  bin.classList.toggle("dragover", Boolean(active));
+}
+
 bin.addEventListener("pointerenter", () => {
   if (supportIntroduced || supportTimer) return;
   supportTimer = setTimeout(() => {
@@ -231,34 +264,16 @@ supportCard.addEventListener("pointerenter", () => setSupportHover(true));
 supportCard.addEventListener("pointerleave", () => setSupportHover(false));
 supportCard.addEventListener("click", (event) => event.stopPropagation());
 
-bin.addEventListener("dragenter", (event) => {
-  event.preventDefault();
-  bin.classList.add("dragover");
-});
-
-bin.addEventListener("dragover", (event) => {
-  event.preventDefault();
-  event.dataTransfer.dropEffect = "copy";
-  bin.classList.add("dragover");
-});
-
-bin.addEventListener("dragleave", (event) => {
-  if (!bin.contains(event.relatedTarget)) bin.classList.remove("dragover");
-});
-
-bin.addEventListener("drop", async (event) => {
-  event.preventDefault();
-  event.stopPropagation();
-  bin.classList.remove("dragover");
-  setSupportHover(false);
+async function consumePayloads(payloadPromise) {
   if (busy) return;
-
   busy = true;
+  setDragVisual(false);
+  setSupportHover(false);
   label.textContent = "READING";
   face.textContent = "•◡•";
 
   try {
-    const payloads = await droppedPayloads(event.dataTransfer);
+    const payloads = await payloadPromise;
     if (!payloads.length) {
       animate("failure");
       label.textContent = "NO DATA";
@@ -275,6 +290,7 @@ bin.addEventListener("drop", async (event) => {
       usedImageFallback ||= payload.kind === "image-link";
       if (payloads.length > 1) label.textContent = `${completed}/${payloads.length}`;
     }
+
     animate("success");
     label.textContent = usedImageFallback ? "LINK SAVED" : "GOT IT";
     face.textContent = "^ᴗ^";
@@ -289,6 +305,29 @@ bin.addEventListener("drop", async (event) => {
     pageDragSource = null;
     setTimeout(refreshCount, 1100);
   }
+}
+
+// Keep direct iframe drops as a fallback. The primary path is now routed by
+// content.js so Chromium cannot lose the drop at the page/extension boundary.
+bin.addEventListener("dragenter", (event) => {
+  event.preventDefault();
+  setDragVisual(true);
+});
+
+bin.addEventListener("dragover", (event) => {
+  event.preventDefault();
+  event.dataTransfer.dropEffect = "copy";
+  setDragVisual(true);
+});
+
+bin.addEventListener("dragleave", (event) => {
+  if (!bin.contains(event.relatedTarget)) setDragVisual(false);
+});
+
+bin.addEventListener("drop", (event) => {
+  event.preventDefault();
+  event.stopPropagation();
+  consumePayloads(droppedPayloads(event.dataTransfer));
 });
 
 bin.addEventListener("click", () => {
@@ -297,8 +336,28 @@ bin.addEventListener("click", () => {
 
 window.addEventListener("message", (event) => {
   if (event.source !== window.parent) return;
+
   if (event.data?.type === "chute-page-drag-source") {
     pageDragSource = event.data.source || null;
+    return;
+  }
+
+  if (event.data?.type === "chute-page-drop-active") {
+    setDragVisual(event.data.active);
+    return;
+  }
+
+  if (event.data?.type === "chute-force-support-closed") {
+    if (supportTimer) {
+      clearTimeout(supportTimer);
+      supportTimer = null;
+    }
+    setSupportHover(false);
+    return;
+  }
+
+  if (event.data?.type === "chute-page-drop") {
+    consumePayloads(normalizedPayloads(event.data.drop || {}));
   }
 });
 
