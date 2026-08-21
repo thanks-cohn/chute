@@ -3,7 +3,7 @@
   "name": "Chute",
   "version": "2.0.0",
   "description": "A persistent browser chute with local recallable history and generated image thumbnails.",
-  "minimum_chrome_version": "114",
+  "minimum_chrome_version": "116",
   "permissions": ["activeTab", "contextMenus", "scripting", "sidePanel", "storage"],
   "host_permissions": [
     "http://127.0.0.1:17891/*",
