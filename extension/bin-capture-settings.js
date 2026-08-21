@@ -23,41 +23,6 @@ function chuteCaptureId() {
   return `${Date.now()}-${Math.random().toString(16).slice(2)}`;
 }
 
-function chuteUniqueImageUrls(...groups) {
-  const result = [];
-  const seen = new Set();
-  for (const group of groups) {
-    const values = Array.isArray(group) ? group : [group];
-    for (const value of values) {
-      const text = String(value || "").trim();
-      if (!text || seen.has(text)) continue;
-      seen.add(text);
-      result.push(text);
-    }
-  }
-  return result;
-}
-
-function chuteMergeImageCandidate(source, htmlImage) {
-  const sourceImage = source?.kind === "image" ? source : null;
-  const urls = chuteUniqueImageUrls(
-    htmlImage?.urls,
-    htmlImage?.url,
-    sourceImage?.urls,
-    sourceImage?.url
-  );
-  if (!urls.length) return sourceImage || htmlImage || null;
-  return {
-    ...(sourceImage || {}),
-    ...(htmlImage || {}),
-    kind: "image",
-    urls,
-    url: urls[0],
-    name: sourceImage?.name || htmlImage?.name || "",
-    pageUrl: htmlImage?.pageUrl || sourceImage?.pageUrl || ""
-  };
-}
-
 function chuteWithProvenance(payload, provenance, role) {
   return {
     ...payload,
@@ -117,10 +82,10 @@ normalizedPayloads = async function(args = {}) {
   if (actualFiles.length) return chuteBaseNormalizedPayloads(args);
 
   const htmlImage = imageFromHtmlText(args.html || "");
-  const candidate = chuteMergeImageCandidate(args.source, htmlImage);
+  const candidate = args.source?.kind === "image" ? args.source : htmlImage;
   if (!candidate?.url) return chuteBaseNormalizedPayloads(args);
 
-  const pageUrl = String(candidate.pageUrl || args.source?.pageUrl || args.pageUrl || "");
+  const pageUrl = String(args.pageUrl || args.source?.pageUrl || candidate.pageUrl || "");
   const provenance = {
     captureId: chuteCaptureId(),
     pageUrl,
@@ -131,8 +96,6 @@ normalizedPayloads = async function(args = {}) {
   if (!full) {
     return [chuteWithProvenance(chuteImageLinkFallback(candidate), provenance, "source_link_file")];
   }
-
-  provenance.imageUrl = String(full.resolvedImageUrl || full.source || candidate.url);
 
   const outputs = [];
   if (chuteSaveFullBrowserImage) {
