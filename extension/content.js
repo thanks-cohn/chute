@@ -15,7 +15,6 @@
     border: "0",
     zIndex: "2147483647",
     pointerEvents: "auto",
-    transition: "width 120ms ease, height 120ms ease",
     isolation: "isolate"
   });
 
@@ -36,6 +35,8 @@
 
   let supportHover = false;
   let accessMode = "floating";
+  let pageDragSource = null;
+  let clearDragTimer = null;
 
   function floatingEnabled(mode) {
     return mode === "floating" || mode === "both";
@@ -46,12 +47,73 @@
   }
 
   function renderSize() {
-    // The host may grow to make room for auxiliary UI, but the bin inside the
-    // frame is bottom-right anchored, so the actual desktop-to-browser drop
-    // target never changes position.
+    // The browser landing point stays physically fixed. Auxiliary UI is
+    // allowed to grow upward/left, but the bottom-right bin never moves.
     host.style.width = supportHover ? "198px" : "92px";
     host.style.height = supportHover ? "174px" : "104px";
   }
+
+  function safeDragName(value) {
+    return String(value || "")
+      .replace(/[\\/:*?"<>|\r\n]+/g, "_")
+      .trim()
+      .slice(0, 180);
+  }
+
+  function describePageDrag(target) {
+    if (!(target instanceof Element)) return null;
+
+    const image = target.closest("img");
+    if (image) {
+      const url = image.currentSrc || image.src;
+      if (url) {
+        return {
+          kind: "image",
+          url,
+          name: safeDragName(image.alt || image.getAttribute("aria-label") || "")
+        };
+      }
+    }
+
+    const link = target.closest("a[href]");
+    if (link?.href) {
+      return {
+        kind: "link",
+        url: link.href,
+        name: safeDragName(link.textContent || "")
+      };
+    }
+
+    const selection = window.getSelection()?.toString().trim();
+    if (selection) {
+      return { kind: "selection", text: selection.slice(0, 200000) };
+    }
+
+    return null;
+  }
+
+  function sendDragSource(source) {
+    frame.contentWindow?.postMessage({ type: "chute-page-drag-source", source }, "*");
+  }
+
+  document.addEventListener("dragstart", (event) => {
+    if (clearDragTimer) {
+      clearTimeout(clearDragTimer);
+      clearDragTimer = null;
+    }
+    pageDragSource = describePageDrag(event.target);
+    sendDragSource(pageDragSource);
+  }, true);
+
+  document.addEventListener("dragend", () => {
+    // Keep the source metadata alive briefly because the drop inside the
+    // extension iframe and the page's dragend can be delivered very close
+    // together by Chromium.
+    clearDragTimer = setTimeout(() => {
+      pageDragSource = null;
+      sendDragSource(null);
+    }, 1200);
+  }, true);
 
   window.addEventListener("message", (event) => {
     if (event.source !== frame.contentWindow) return;
@@ -61,6 +123,9 @@
     if (event.data?.type === "chute-support-hover") {
       supportHover = Boolean(event.data.active);
       renderSize();
+    }
+    if (event.data?.type === "chute-request-drag-source") {
+      sendDragSource(pageDragSource);
     }
   });
 
