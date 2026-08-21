@@ -1,0 +1,69 @@
+name: Chute desktop release
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "desktop-v*"
+
+permissions:
+  contents: write
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build Chute for Windows
+        shell: powershell
+        run: powershell -ExecutionPolicy Bypass -File scripts\build-windows.ps1
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Chute-Windows
+          path: dist/windows/Chute-Windows.exe
+
+  linux:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build Chute for Linux
+        run: |
+          chmod +x scripts/build-linux.sh
+          ./scripts/build-linux.sh
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Chute-Linux
+          path: dist/linux/Chute-Linux-x86_64
+
+  chrome-store:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build Chrome Web Store package
+        run: python3 scripts/build-chrome-store.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Chute-Chrome-Web-Store
+          path: |
+            dist/chrome-store/chute-chrome-*.zip
+            dist/chrome-store/store-assets/*
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/desktop-v')
+    needs: [windows, linux, chrome-store]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: release-assets
+      - name: Publish release assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          find release-assets -type f -maxdepth 3 -print
+          gh release create "$GITHUB_REF_NAME" \
+            release-assets/Chute-Windows/Chute-Windows.exe \
+            release-assets/Chute-Linux/Chute-Linux-x86_64 \
+            release-assets/Chute-Chrome-Web-Store/chute-chrome-*.zip \
+            --title "Chute ${GITHUB_REF_NAME#desktop-}" \
+            --generate-notes
