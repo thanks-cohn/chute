@@ -1,9 +1,11 @@
 {
   "manifest_version": 3,
   "name": "Chute",
-  "version": "2.0.0",
-  "description": "A persistent browser chute with local recallable history and generated image thumbnails.",
+  "short_name": "Chute",
+  "version": "2.2.0",
+  "description": "Move files and images between webpages and one local Chute basket shared across Chromium browsers.",
   "minimum_chrome_version": "114",
+  "homepage_url": "https://github.com/thanks-cohn/chute",
   "permissions": ["activeTab", "contextMenus", "scripting", "sidePanel", "storage"],
   "host_permissions": [
     "http://127.0.0.1:17891/*",
@@ -31,7 +33,7 @@
   ],
   "web_accessible_resources": [
     {
-      "resources": ["bin.html", "bin.css", "bin.js"],
+      "resources": ["bin.html", "bin.css", "bin.js", "bin-capture-settings.js", "bin-drag-support.js"],
       "matches": ["http://*/*", "https://*/*"]
     }
   ]
