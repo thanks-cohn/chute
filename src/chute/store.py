@@ -17,6 +17,7 @@ from urllib.parse import quote, unquote
 _LOCK = threading.RLock()
 _HISTORY_MAGIC = "# CHUTE-HISTORY\t1\tUTF-8\tTSV\tPCT\n"
 _HISTORY_COLUMNS = "# timestamp_utc\tevent\tid\tname\tstored_name\tsize\tmime\tsource_path\n"
+_CUSTOM_PREFIX = "custom-thumbnails/"
 
 
 def data_home() -> Path:
@@ -54,10 +55,12 @@ class Store:
         self.root = (root or data_home()).expanduser().resolve()
         self.files_dir = self.root / "files"
         self.thumbs_dir = self.root / "thumbs"
+        self.custom_thumbs_dir = self.root / "custom-thumbnails"
         self.history_dir = self.root / "history"
         self.queue_path = self.root / "queue.json"
         self.files_dir.mkdir(parents=True, exist_ok=True)
         self.thumbs_dir.mkdir(parents=True, exist_ok=True)
+        self.custom_thumbs_dir.mkdir(parents=True, exist_ok=True)
         self.history_dir.mkdir(parents=True, exist_ok=True)
         if not self.queue_path.exists():
             self._write_queue([])
@@ -86,6 +89,13 @@ class Store:
         if not any(row.get("id") == item.id for row in rows):
             rows.append(asdict(item))
             self._write_queue(rows)
+
+    def _stored_path(self, stored_name: object) -> Path:
+        value = str(stored_name or "")
+        leaf = Path(value).name
+        if value.startswith(_CUSTOM_PREFIX):
+            return self.custom_thumbs_dir / leaf
+        return self.files_dir / leaf
 
     def _history_path(self, timestamp: str) -> Path:
         return self.history_dir / f"{timestamp[:10]}.tsv"
@@ -188,15 +198,13 @@ class Store:
 
     def list(self) -> list[QueueItem]:
         with _LOCK:
-            valid: list[dict] = []
-            changed = False
-            for row in self._read_queue():
-                if (self.files_dir / row.get("stored_name", "")).is_file():
-                    valid.append(row)
-                else:
-                    changed = True
-            if changed:
-                self._write_queue(valid)
+            # Never silently rewrite queue metadata because an artifact is
+            # momentarily unavailable. Missing files can be recovered later.
+            valid = [
+                row
+                for row in self._read_queue()
+                if self._stored_path(row.get("stored_name", "")).is_file()
+            ]
             valid.sort(key=lambda row: row.get("created_at", ""), reverse=True)
             return [QueueItem(**row) for row in valid]
 
@@ -243,14 +251,54 @@ class Store:
         mime: str | None = None,
         source_path: str = "browser-drop",
     ) -> QueueItem:
+        return self._add_stream_to(
+            self.files_dir,
+            "",
+            name,
+            stream,
+            size,
+            mime=mime,
+            source_path=source_path,
+        )
+
+    def add_custom_stream(
+        self,
+        name: str,
+        stream: BinaryIO,
+        size: int,
+        mime: str | None = "image/webp",
+        source_path: str = "browser-custom-thumbnail",
+    ) -> QueueItem:
+        return self._add_stream_to(
+            self.custom_thumbs_dir,
+            _CUSTOM_PREFIX,
+            name,
+            stream,
+            size,
+            mime=mime,
+            source_path=source_path,
+        )
+
+    def _add_stream_to(
+        self,
+        directory: Path,
+        stored_prefix: str,
+        name: str,
+        stream: BinaryIO,
+        size: int,
+        *,
+        mime: str | None,
+        source_path: str,
+    ) -> QueueItem:
         if size < 0:
             raise ValueError("Upload size cannot be negative")
 
         display_name = Path(name).name.strip() or "browser-file"
         item_id = uuid.uuid4().hex
-        stored_name = f"{item_id}-{display_name}"
-        destination = self.files_dir / stored_name
-        partial = self.files_dir / f".{stored_name}.part"
+        leaf_name = f"{item_id}-{display_name}"
+        stored_name = f"{stored_prefix}{leaf_name}"
+        destination = directory / leaf_name
+        partial = directory / f".{leaf_name}.part"
         remaining = size
 
         try:
@@ -301,7 +349,7 @@ class Store:
             item = self._find_history_item(item_id)
         if item is None:
             return None
-        path = self.files_dir / item.stored_name
+        path = self._stored_path(item.stored_name)
         return (item, path) if path.is_file() else None
 
     def remove(self, item_id: str) -> bool:
@@ -337,7 +385,7 @@ class Store:
             item = self._find_history_item(item_id)
             if item is None:
                 return None
-            path = self.files_dir / item.stored_name
+            path = self._stored_path(item.stored_name)
             if not path.is_file():
                 return None
             self._append_queue(item)
