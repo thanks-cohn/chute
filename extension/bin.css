@@ -5,10 +5,12 @@
 
 * { box-sizing: border-box; }
 html, body { width: 100%; height: 100%; margin: 0; overflow: hidden; background: transparent; }
-body { display: grid; place-items: end center; padding: 8px 6px 4px; }
+body { position: relative; }
 
 .bin {
-  position: relative;
+  position: absolute;
+  top: 8px;
+  right: 6px;
   width: 78px;
   height: 88px;
   padding: 0;
@@ -90,6 +92,45 @@ body { display: grid; place-items: end center; padding: 8px 6px 4px; }
 .bin.dragover .label { font-size: 0; }
 .bin.active .label::after,
 .bin.dragover .label::after { content: "DROP!"; font-size: 11px; }
+
+.support-card {
+  position: absolute;
+  top: 100px;
+  right: 4px;
+  width: 184px;
+  padding: 8px;
+  border: 1px solid rgba(74, 58, 19, .28);
+  border-radius: 9px;
+  background: #fff7cc;
+  color: #4a3a13;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, .22);
+  opacity: 0;
+  transform: translateY(-5px) scale(.98);
+  pointer-events: none;
+  transition: opacity 120ms ease, transform 120ms ease;
+}
+.support-card.visible {
+  opacity: 1;
+  transform: none;
+  pointer-events: auto;
+}
+.support-copy {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 10px;
+  font-weight: 700;
+}
+.support-card a {
+  display: block;
+  padding: 6px 7px;
+  border-radius: 7px;
+  background: #4a3a13;
+  color: #fff8c6;
+  font-size: 10px;
+  font-weight: 900;
+  text-align: center;
+  text-decoration: none;
+}
 
 .bin.success { animation: happy 520ms ease; }
 .bin.failure { animation: nope 380ms ease; }
