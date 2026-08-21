@@ -8,56 +8,54 @@
   <style>
     body { width: 390px; max-height: 600px; overflow: auto; }
     .popup-note { padding: 0 13px 11px; color: #8f9882; font-size: 10px; }
-    .settings {
-      display: grid;
-      grid-template-columns: 1fr auto;
-      gap: 9px 12px;
-      align-items: center;
-      padding: 10px 13px;
-      border-top: 1px solid #262a22;
-      color: #afb7a2;
-      font-size: 11px;
-    }
-    .settings label { display: contents; }
-    .settings select {
-      min-width: 103px;
-      padding: 5px 7px;
-      border: 1px solid #3a4032;
-      border-radius: 7px;
-      color: #eff2e8;
-      background: #252a20;
-      font: inherit;
-    }
-    .toggle { width: 17px; height: 17px; accent-color: #d7ff3f; }
   </style>
 </head>
 <body>
   <header class="topbar">
     <div class="brand">
       <div class="logo">↓</div>
-      <div><div class="title">Chute</div><div class="subtitle">Your terminal and browser files</div></div>
+      <div><div class="title">Chute</div><div class="subtitle">Pick up. Drop anywhere.</div></div>
     </div>
     <div class="actions">
       <button id="open-shelf" class="primary-button">Open shelf</button>
     </div>
   </header>
+
+  <details class="settings-panel">
+    <summary>⚙ Settings</summary>
+    <section class="settings" aria-label="Chute settings">
+      <div class="setting-label">History shown</div>
+      <div class="limit-control">
+        <input id="display-limit" type="number" min="1" step="1" inputmode="numeric" value="50" aria-label="Number of history entries shown">
+        <button id="display-unlimited" class="infinity-button" type="button" title="Bottomless history">∞</button>
+      </div>
+
+      <label>
+        <span>Generated image thumbnails</span>
+        <input id="show-thumbnails" class="toggle" type="checkbox" checked>
+      </label>
+
+      <label>
+        <span>Sticky Chute on webpages</span>
+        <input id="bin-visible" class="toggle" type="checkbox" checked>
+      </label>
+
+      <a class="coffee-button" href="https://github.com/thanks-cohn/chute" target="_blank" rel="noopener noreferrer">☕ Buy the Creator a Coffee</a>
+    </section>
+  </details>
+
+  <div class="history-nav">
+    <button id="history-prev" class="icon-button" type="button" title="Older day">‹</button>
+    <input id="history-date" type="date" aria-label="Browse Chute history by day">
+    <button id="history-latest" class="secondary-button" type="button">Latest</button>
+    <button id="history-next" class="icon-button" type="button" title="Newer day">›</button>
+  </div>
+
   <div id="status" class="status">Connecting…</div>
   <main id="files" class="file-list"></main>
-  <section class="settings" aria-label="Chute settings">
-    <label>
-      <span>Files shown</span>
-      <select id="display-limit">
-        <option value="20">Latest 20</option>
-        <option value="50">Latest 50</option>
-        <option value="0">Unlimited</option>
-      </select>
-    </label>
-    <label>
-      <span>Sticky bin on webpages</span>
-      <input id="bin-visible" class="toggle" type="checkbox" checked>
-    </label>
-  </section>
-  <div class="popup-note">Drag from Chute, or drop files and links into the sticky bin that follows you across normal webpages.</div>
+  <div id="history-sentinel" class="history-sentinel" aria-hidden="true"></div>
+  <div class="popup-note">History lives in <code>~/Chute/history/</code>. Removed items can be recalled while their preserved Chute copy exists.</div>
+
   <script src="shelf.js"></script>
   <script src="popup.js"></script>
 </body>
