@@ -64,13 +64,11 @@ def _append_clickable_text(destination: Path, record: dict[str, object]) -> None
         f"CUSTOM THUMBNAIL LOCATION: {custom_uri or 'none'}",
         f"SOURCE LINK FILE: {'yes' if record['source_link_file'] else 'no'}",
         f"SOURCE LINK FILE LOCATION: {source_link_uri or 'none'}",
-        "",
-        "=" * 80,
-        "",
     ]
 
     with destination.open("a", encoding="utf-8", newline="\n") as handle:
         handle.write("\n".join(lines))
+        handle.write("\n\n")
 
 
 def append_image_capture(store: Any, payload: dict[str, object]) -> dict[str, object]:
