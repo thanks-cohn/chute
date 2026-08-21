@@ -29,17 +29,17 @@ if ! "$VENV_DIR/bin/python" -m pip --version >/dev/null 2>&1; then
 fi
 
 printf 'Installing Chute into its private runtime...\n'
-"$VENV_DIR/bin/python" -m pip install --upgrade "$REPO_DIR"
+"$VENV_DIR/bin/python" -m pip install --upgrade --no-deps "$REPO_DIR"
 ln -sfn "$VENV_DIR/bin/chute" "$BIN_DIR/chute"
 
-cat > "$UNIT_PATH" <<'EOF'
+cat > "$UNIT_PATH" <<EOF
 [Unit]
 Description=Chute localhost file bridge
 After=default.target
 
 [Service]
 Type=simple
-ExecStart=%h/.local/share/chute-runtime/venv/bin/chute serve
+ExecStart="$VENV_DIR/bin/chute" serve
 Restart=on-failure
 RestartSec=2
 
