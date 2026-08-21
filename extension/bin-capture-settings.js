@@ -18,6 +18,19 @@ function chuteCustomCopyName(name, maxWidth, maxHeight) {
   return `${base}-${maxWidth}x${maxHeight}.webp`;
 }
 
+function chuteCaptureId() {
+  if (globalThis.crypto?.randomUUID) return globalThis.crypto.randomUUID();
+  return `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+}
+
+function chuteWithProvenance(payload, provenance, role) {
+  return {
+    ...payload,
+    chuteProvenance: provenance,
+    chuteArtifactRole: role
+  };
+}
+
 async function chuteMakeCustomImageCopy(payload) {
   const blob = payload?.blob;
   if (!blob || !String(blob.type || "").toLowerCase().startsWith("image/")) return null;
@@ -72,23 +85,34 @@ normalizedPayloads = async function(args = {}) {
   const candidate = args.source?.kind === "image" ? args.source : htmlImage;
   if (!candidate?.url) return chuteBaseNormalizedPayloads(args);
 
+  const pageUrl = String(args.pageUrl || args.source?.pageUrl || candidate.pageUrl || "");
+  const provenance = {
+    captureId: chuteCaptureId(),
+    pageUrl,
+    imageUrl: String(candidate.url)
+  };
+
   const full = await chuteBaseFetchImagePayload(candidate);
-  if (!full) return chuteBaseNormalizedPayloads(args);
+  if (!full) {
+    return [chuteWithProvenance(chuteImageLinkFallback(candidate), provenance, "source_link_file")];
+  }
 
   const outputs = [];
-  if (chuteSaveFullBrowserImage) outputs.push(full);
+  if (chuteSaveFullBrowserImage) {
+    outputs.push(chuteWithProvenance(full, provenance, "downloaded_image"));
+  }
 
   if (chuteSaveCustomBrowserImage) {
     try {
       const custom = await chuteMakeCustomImageCopy(full);
-      if (custom) outputs.push(custom);
+      if (custom) outputs.push(chuteWithProvenance(custom, provenance, "custom_thumbnail"));
     } catch (error) {
       console.warn("Chute could not create custom browser image copy:", error);
     }
   }
 
   if (outputs.length) return outputs;
-  return [chuteImageLinkFallback(candidate)];
+  return [chuteWithProvenance(chuteImageLinkFallback(candidate), provenance, "source_link_file")];
 };
 
 chrome.storage.sync.get({
