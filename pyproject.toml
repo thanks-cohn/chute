@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "chute-cli"
-version = "2.0.0"
+version = "2.2.0"
 description = "A persistent browser file chute with recallable local history."
 readme = "README.md"
 requires-python = ">=3.10"
@@ -15,10 +15,12 @@ classifiers = [
   "Programming Language :: Python :: 3",
   "License :: OSI Approved :: MIT License",
   "Operating System :: OS Independent",
+  "Operating System :: Microsoft :: Windows",
 ]
 
 [project.scripts]
 chute = "chute.cli:main"
+chute-windows = "chute.windows_app:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
