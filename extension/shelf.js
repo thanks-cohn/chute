@@ -268,7 +268,6 @@ function createRow(file, index) {
         const token = chuteToken(file);
         transfer.effectAllowed = "copy";
         transfer.setData(CHUTE_DRAG_TYPE, token);
-        transfer.setData("text/plain", token);
       }
 
       if (thumb && !thumb.hidden) {
@@ -430,22 +429,9 @@ const historyObserver = new IntersectionObserver(async (entries) => {
 
 if (sentinel) historyObserver.observe(sentinel);
 
-clearButton?.addEventListener("click", async () => {
-  await api("/api/clear", { method: "POST" });
-  await resetHistory();
-});
-
-refreshButton?.addEventListener("click", () => resetHistory());
-
 historyDateInput?.addEventListener("change", async () => {
-  selectedDay = historyDateInput.value;
+  selectedDay = historyDateInput.value || "";
   await resetHistory(selectedDay || null);
-});
-
-historyLatestButton?.addEventListener("click", async () => {
-  selectedDay = "";
-  if (historyDateInput) historyDateInput.value = "";
-  await resetHistory();
 });
 
 historyPrevButton?.addEventListener("click", async () => {
@@ -462,25 +448,35 @@ historyNextButton?.addEventListener("click", async () => {
   await resetHistory(selectedDay);
 });
 
-chrome.storage.onChanged.addListener((changes, area) => {
-  if (area !== "sync") return;
-  if (changes.chuteDisplayLimit) {
-    const next = Number(changes.chuteDisplayLimit.newValue);
-    displayLimit = Number.isFinite(next) && next >= 0 ? Math.trunc(next) : 50;
-    resetHistory();
-  }
-  if (changes.chuteThumbnails) {
-    showThumbnails = changes.chuteThumbnails.newValue !== false;
-    resetHistory();
-  }
-  if (changes.chuteDragOutMode) {
-    dragOutMode = changes.chuteDragOutMode.newValue === "source" ? "source" : "file";
-    resetHistory();
+historyLatestButton?.addEventListener("click", async () => {
+  selectedDay = "";
+  if (historyDateInput) historyDateInput.value = "";
+  await resetHistory();
+});
+
+clearButton?.addEventListener("click", async () => {
+  try {
+    const response = await api("/api/clear", { method: "POST" });
+    const result = await response.json();
+    await resetHistory();
+    setStatus(`Cleared ${result.removed} item${result.removed === 1 ? "" : "s"} · preserved for Recall`);
+  } catch (error) {
+    setStatus(error.message, true);
   }
 });
 
-loadSettings().then(resetHistory);
+refreshButton?.addEventListener("click", () => resetHistory());
+
+chrome.storage.onChanged.addListener(async (changes, area) => {
+  if (area !== "sync") return;
+  if (changes.chuteDisplayLimit || changes.chuteThumbnails || changes.chuteDragOutMode) {
+    await loadSettings();
+    await resetHistory();
+  }
+});
+
+loadSettings().then(() => resetHistory());
 
 setInterval(() => {
-  if (!dragOutActive && !selectedDay && displayLimit > 0 && window.scrollY < 80) resetHistory();
+  if (!dragOutActive && !selectedDay && window.scrollY < 8) resetHistory();
 }, 5000);
