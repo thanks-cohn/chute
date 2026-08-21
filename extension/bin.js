@@ -7,6 +7,7 @@ const supportCard = document.querySelector("#support-card");
 let busy = false;
 let supportHover = false;
 let supportTimer = null;
+let supportCloseTimer = null;
 let pageDragSource = null;
 
 function safeName(value, fallback) {
@@ -238,11 +239,26 @@ function setSupportHover(next) {
   window.parent.postMessage({ type: "chute-support-hover", active: next }, "*");
 }
 
+function cancelSupportClose() {
+  if (!supportCloseTimer) return;
+  clearTimeout(supportCloseTimer);
+  supportCloseTimer = null;
+}
+
+function scheduleSupportClose() {
+  cancelSupportClose();
+  supportCloseTimer = setTimeout(() => {
+    supportCloseTimer = null;
+    setSupportHover(false);
+  }, 2000);
+}
+
 function setDragVisual(active) {
   bin.classList.toggle("dragover", Boolean(active));
 }
 
 bin.addEventListener("pointerenter", () => {
+  cancelSupportClose();
   if (supportHover || supportTimer) return;
   supportTimer = setTimeout(() => {
     supportTimer = null;
@@ -250,22 +266,26 @@ bin.addEventListener("pointerenter", () => {
   }, 280);
 });
 
-bin.addEventListener("pointerleave", (event) => {
+bin.addEventListener("pointerleave", () => {
   if (supportTimer) {
     clearTimeout(supportTimer);
     supportTimer = null;
   }
-  if (supportCard.contains(event.relatedTarget)) return;
-  setSupportHover(false);
+  if (supportHover) scheduleSupportClose();
 });
-supportCard.addEventListener("pointerenter", () => setSupportHover(true));
-supportCard.addEventListener("pointerleave", () => setSupportHover(false));
+
+supportCard.addEventListener("pointerenter", () => {
+  cancelSupportClose();
+  setSupportHover(true);
+});
+supportCard.addEventListener("pointerleave", () => scheduleSupportClose());
 supportCard.addEventListener("click", (event) => event.stopPropagation());
 
 async function consumePayloads(payloadPromise) {
   if (busy) return;
   busy = true;
   setDragVisual(false);
+  cancelSupportClose();
   setSupportHover(false);
   label.textContent = "READING";
   face.textContent = "•◡•";
@@ -350,6 +370,7 @@ window.addEventListener("message", (event) => {
       clearTimeout(supportTimer);
       supportTimer = null;
     }
+    cancelSupportClose();
     setSupportHover(false);
     return;
   }
