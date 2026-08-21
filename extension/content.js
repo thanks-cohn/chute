@@ -37,6 +37,15 @@
   let dragDepth = 0;
   let active = false;
   let supportHover = false;
+  let accessMode = "floating";
+
+  function floatingEnabled(mode) {
+    return mode === "floating" || mode === "both";
+  }
+
+  function renderVisibility() {
+    host.style.display = floatingEnabled(accessMode) ? "block" : "none";
+  }
 
   function renderSize() {
     if (supportHover) {
@@ -87,13 +96,24 @@
     }
   });
 
-  chrome.storage.sync.get({ chuteBinVisible: true }, ({ chuteBinVisible }) => {
-    host.style.display = chuteBinVisible ? "block" : "none";
+  chrome.storage.sync.get({
+    chuteAccessMode: null,
+    chuteBinVisible: true
+  }, ({ chuteAccessMode, chuteBinVisible }) => {
+    accessMode = chuteAccessMode || (chuteBinVisible ? "floating" : "context");
+    renderVisibility();
   });
 
   chrome.storage.onChanged.addListener((changes, area) => {
-    if (area === "sync" && changes.chuteBinVisible) {
-      host.style.display = changes.chuteBinVisible.newValue ? "block" : "none";
+    if (area !== "sync") return;
+    if (changes.chuteAccessMode) {
+      accessMode = changes.chuteAccessMode.newValue || "floating";
+      renderVisibility();
+      return;
+    }
+    if (changes.chuteBinVisible) {
+      accessMode = changes.chuteBinVisible.newValue ? "floating" : "context";
+      renderVisibility();
     }
   });
 
