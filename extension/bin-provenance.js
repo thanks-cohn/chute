@@ -3,10 +3,35 @@ const chuteBaseUploadBlobForProvenance = uploadBlob;
 const chuteBaseConsumePayloadsNowForProvenance = consumePayloadsNow;
 let chuteActiveUploadCollector = null;
 
+async function chuteUploadCustomThumbnail(blob, name, source = "browser-drop") {
+  const response = await fetch(`${BASE_URL}/api/custom-thumbnails`, {
+    method: "POST",
+    cache: "no-store",
+    headers: {
+      "Content-Type": blob.type || "image/webp",
+      "X-Chute-Filename": encodeURIComponent(safeName(name, "browser-custom.webp")),
+      "X-Chute-Mime": blob.type || "image/webp",
+      "X-Chute-Source": encodeURIComponent(source)
+    },
+    body: blob
+  });
+  if (!response.ok) {
+    let message = `Local bridge returned ${response.status}`;
+    try {
+      const payload = await response.json();
+      if (payload.error) message = payload.error;
+    } catch {}
+    throw new Error(message);
+  }
+  return response.json();
+}
+
 uploadBlob = async function(blob, name, source = "browser-drop") {
-  const result = await chuteBaseUploadBlobForProvenance(blob, name, source);
   const collector = chuteActiveUploadCollector;
   const payload = collector?.byBlob?.get(blob);
+  const result = payload?.chuteArtifactRole === "custom_thumbnail"
+    ? await chuteUploadCustomThumbnail(blob, name, source)
+    : await chuteBaseUploadBlobForProvenance(blob, name, source);
   if (payload) collector.uploads.push({ payload, result });
   return result;
 };
