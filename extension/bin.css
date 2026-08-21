@@ -78,6 +78,17 @@ body { position: relative; }
   font-size: 11px;
   font-weight: 900;
   line-height: 17px;
+  transition: background 120ms ease, color 120ms ease, box-shadow 120ms ease;
+}
+.count.pending {
+  background: #d89628;
+  color: #2d1c05;
+  box-shadow: 0 0 0 2px rgba(255, 232, 122, .72);
+}
+.count.synced {
+  background: #66d875;
+  color: #12351a;
+  box-shadow: 0 0 0 2px rgba(198, 255, 203, .72);
 }
 
 /* Stay physically anchored. React only when the file is over Chute itself. */
