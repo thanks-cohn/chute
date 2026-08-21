@@ -16,9 +16,49 @@ chute ./screenshot.png
 chute ./whole-directory
 ```
 
-From the browser, drop a file, link, or selected text into the sticky Chute mascot. Items appear in the extension popup and side shelf, ready to attach or drag elsewhere.
+From the browser, drop a file, link, selected text, or a webpage image into the sticky Chute mascot. Items appear in the extension popup and side shelf, ready to attach or drag elsewhere.
 
 Directories sent from the CLI are zipped automatically. The Python service never uploads your files to the internet.
+
+## One Chute, many browsers
+
+Chute is meant to be more than a browser extension. The local Chute service is a **shared handoff interface** between your desktop tools and every browser that has the Chute extension installed.
+
+There is one local basket and one local history:
+
+```text
+                 ┌── Chrome
+Desktop / CLI ── Chute ── Opera
+                 ├── Brave
+                 ├── Edge
+                 └── Chromium
+```
+
+That means a file or image added through one browser is immediately available through the others on the same computer. For example:
+
+```text
+Opera → Chute → Chrome
+Chrome → Chute → Brave
+terminal → Chute → any installed browser
+```
+
+The browser extension is therefore a view into the same local Chute, not a separate per-browser storage system.
+
+A future native desktop sticky will be a second surface onto that same basket. Browser sticky and desktop sticky are intentionally separate concepts so users will be able to choose **browser only, desktop only, both, or neither**. The current Premium v2 implementation includes the browser sticky; the native desktop overlay is future work and is not silently emulated by the browser extension.
+
+## Browser sticky behavior
+
+The browser sticky is designed as a physical landing point between a webpage and the local computer:
+
+- it is visible by default on ordinary `http://` and `https://` pages;
+- its bottom-right landing point stays physically fixed while you drag;
+- only the Chute itself reacts when the pointer is actually over the drop target;
+- dragging a local file onto it sends the file to the shared Chute basket;
+- dragging a webpage image onto it tries to capture the actual image bytes;
+- if a site prevents Chute from retrieving the image bytes, Chute visibly falls back to saving the source link instead of silently doing nothing;
+- the small supporter card is deliberately restrained so accidental pointer passes do not keep making the sticky jump around.
+
+Chute requests normal `http://` and `https://` host access because capturing arbitrary dragged webpage images is part of the core browser-bridge behavior. The captured bytes are sent only to the local Chute service at `127.0.0.1`; Chute does not upload them to a remote Chute server.
 
 ## Premium v2
 
@@ -32,6 +72,8 @@ Premium v2 adds:
 - thumbnail generation in the browser, so Python stays dependency-free
 - recall of removed historical items
 - preserved local Chute copies after Remove or Clear
+- a stable browser sticky that accepts files and webpage images
+- optional browser right-click **Send to Chute** access
 - a mascot supporter popout on hover
 - a **Buy the Creator a Coffee** entry in Settings
 - a frozen, C-friendly history format documented in `HISTORY_FORMAT.md`
@@ -194,7 +236,9 @@ Windows and macOS use different background-service systems, so the current `inst
 
 If `$HOME/.local/bin` is not already on a user's `PATH`, add it once in the shell configuration or invoke the installed command by its full path. Most modern Linux desktop distributions include it automatically.
 
-## Install the Chrome extension
+## Install the browser extension
+
+### Chrome
 
 1. Open `chrome://extensions`.
 2. Enable **Developer mode**.
@@ -202,9 +246,13 @@ If `$HOME/.local/bin` is not already on a user's `PATH`, add it once in the shel
 4. Select this repository's `extension` directory.
 5. Pin **Chute** to the toolbar.
 
-For Opera, open `opera://extensions`, enable developer mode, and load the same `extension` directory as an unpacked extension.
+### Opera
 
-Reload a normal webpage. The taped Chute mascot appears near the lower-right corner. Drop something onto it to add it to Chute. Click it to open the shelf.
+1. Open `opera://extensions`.
+2. Enable developer mode.
+3. Load the same `extension` directory as an unpacked extension.
+
+Reload a normal webpage after loading or reloading Chute. The taped Chute mascot appears near the lower-right corner. Drop something onto it to add it to the shared local Chute. Click it to open the shelf.
 
 Chrome and Opera do not allow ordinary content scripts on their protected internal browser pages.
 
@@ -235,11 +283,17 @@ The **Attach** button remains available for sites that expose a usable file inpu
 
 Only the first small live items are prepared eagerly. Older or larger rows prepare when hovered or clicked so bottomless history does not become bottomless RAM usage.
 
-## Multiple browsers
+## Browser access modes
 
-The queue and history belong to the local Chute daemon, not to one browser profile. Chrome, Edge, Brave, Opera, and compatible Chromium browsers on the same computer can therefore see the same local state when the extension is installed in each browser.
+The current browser extension exposes three browser-side access modes:
 
-Chrome-synced settings cover preferences such as history count, thumbnail visibility, and mascot visibility. File contents and history stay local.
+```text
+Floating mascot
+Mascot + right-click
+Right-click only
+```
+
+These settings affect the browser surface only. The future native desktop sticky is deliberately a separate surface rather than being coupled to this browser setting.
 
 ## Development
 
@@ -262,7 +316,8 @@ After editing extension files, open the browser's extension-management page and 
 - individual preserved-file reads use unguessable Chute IDs;
 - browser uploads are streamed to disk rather than buffered fully in Python memory;
 - Chute copies files into its private local store instead of exposing arbitrary filesystem paths;
-- the Python service does not upload files to the internet;
+- the browser extension can read `http://` and `https://` resources so a user can drag webpage images into Chute;
+- captured browser files are sent to the local loopback Chute service, not uploaded to a remote Chute server;
 - Remove and Clear affect the live basket, while preserved copies remain available for history/Recall.
 
 ## Status
