@@ -10,16 +10,25 @@
   <header class="topbar">
     <div class="brand">
       <div class="logo">↓</div>
-      <div><div class="title">Chute Shelf</div><div class="subtitle">Pick up. Drop anywhere.</div></div>
+      <div><div class="title">Chute Shelf</div><div class="subtitle">Your bottomless local history.</div></div>
     </div>
     <div class="actions">
       <button id="refresh" class="icon-button" title="Refresh">↻</button>
-      <button id="clear" class="secondary-button">Clear</button>
+      <button id="clear" class="secondary-button">Clear live chute</button>
     </div>
   </header>
+
+  <div class="history-nav">
+    <button id="history-prev" class="icon-button" type="button" title="Older day">‹</button>
+    <input id="history-date" type="date" aria-label="Browse Chute history by day">
+    <button id="history-latest" class="secondary-button" type="button">Latest</button>
+    <button id="history-next" class="icon-button" type="button" title="Newer day">›</button>
+  </div>
+
   <div id="status" class="status">Connecting…</div>
   <main id="files" class="file-list"></main>
-  <footer class="footer">For large files, click once to prepare them before dragging.</footer>
+  <div id="history-sentinel" class="history-sentinel" aria-hidden="true"></div>
+  <footer class="footer">Removed files stay in history and can be recalled. History is stored as daily UTF-8 TSV under <code>~/Chute/history/</code>.</footer>
   <script src="shelf.js"></script>
 </body>
 </html>
