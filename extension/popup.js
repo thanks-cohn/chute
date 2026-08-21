@@ -18,11 +18,11 @@ function clampDimension(value, fallback = 512) {
 
 openShelfButton?.addEventListener("click", async () => {
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-  if (chrome.sidePanel?.open && tab?.windowId) {
-    await chrome.sidePanel.open({ windowId: tab.windowId });
-  } else {
-    await chrome.tabs.create({ url: chrome.runtime.getURL("shelf.html") });
+  if (!chrome.sidePanel?.open || !tab?.windowId) {
+    console.error("Chute Shelf requires browser side-panel support.");
+    return;
   }
+  await chrome.sidePanel.open({ windowId: tab.windowId });
   window.close();
 });
 
