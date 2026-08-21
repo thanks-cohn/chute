@@ -9,7 +9,7 @@ const chuteBaseFetchImagePayload = fetchImagePayload;
 
 function chuteClampCaptureDimension(value, fallback = CHUTE_CUSTOM_IMAGE_DEFAULT) {
   const next = Math.trunc(Number(value) || fallback);
-  return Math.min(4096, Math.max(16, next));
+  return Math.max(1, next);
 }
 
 function chuteCustomCopyName(name, maxWidth, maxHeight) {
@@ -38,8 +38,7 @@ async function chuteMakeCustomImageCopy(payload) {
   const bitmap = await createImageBitmap(blob);
   const scale = Math.min(
     chuteCustomBrowserImageWidth / bitmap.width,
-    chuteCustomBrowserImageHeight / bitmap.height,
-    1
+    chuteCustomBrowserImageHeight / bitmap.height
   );
   const width = Math.max(1, Math.round(bitmap.width * scale));
   const height = Math.max(1, Math.round(bitmap.height * scale));
