@@ -1,8 +1,10 @@
 const openShelfButton = document.querySelector("#open-shelf");
-const displayLimitSelect = document.querySelector("#display-limit");
+const displayLimitInput = document.querySelector("#display-limit");
+const unlimitedButton = document.querySelector("#display-unlimited");
 const binVisibleToggle = document.querySelector("#bin-visible");
+const thumbnailsToggle = document.querySelector("#show-thumbnails");
 
-openShelfButton.addEventListener("click", async () => {
+openShelfButton?.addEventListener("click", async () => {
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
   if (tab?.windowId) {
     await chrome.sidePanel.open({ windowId: tab.windowId });
@@ -12,19 +14,35 @@ openShelfButton.addEventListener("click", async () => {
 
 async function loadPopupSettings() {
   const settings = await chrome.storage.sync.get({
-    chuteDisplayLimit: 20,
-    chuteBinVisible: true
+    chuteDisplayLimit: 50,
+    chuteBinVisible: true,
+    chuteThumbnails: true
   });
-  displayLimitSelect.value = String(settings.chuteDisplayLimit);
+  const limit = Number(settings.chuteDisplayLimit);
+  displayLimitInput.value = String(limit > 0 ? limit : 50);
+  unlimitedButton.classList.toggle("active", limit === 0);
   binVisibleToggle.checked = Boolean(settings.chuteBinVisible);
+  thumbnailsToggle.checked = Boolean(settings.chuteThumbnails);
 }
 
-displayLimitSelect.addEventListener("change", async () => {
-  await chrome.storage.sync.set({ chuteDisplayLimit: Number(displayLimitSelect.value) });
+displayLimitInput?.addEventListener("change", async () => {
+  const value = Math.max(1, Math.trunc(Number(displayLimitInput.value) || 50));
+  displayLimitInput.value = String(value);
+  unlimitedButton.classList.remove("active");
+  await chrome.storage.sync.set({ chuteDisplayLimit: value });
 });
 
-binVisibleToggle.addEventListener("change", async () => {
+unlimitedButton?.addEventListener("click", async () => {
+  unlimitedButton.classList.add("active");
+  await chrome.storage.sync.set({ chuteDisplayLimit: 0 });
+});
+
+binVisibleToggle?.addEventListener("change", async () => {
   await chrome.storage.sync.set({ chuteBinVisible: binVisibleToggle.checked });
+});
+
+thumbnailsToggle?.addEventListener("change", async () => {
+  await chrome.storage.sync.set({ chuteThumbnails: thumbnailsToggle.checked });
 });
 
 loadPopupSettings();
