@@ -31,7 +31,14 @@
   ],
   "web_accessible_resources": [
     {
-      "resources": ["bin.html", "bin.css", "bin.js"],
+      "resources": [
+        "bin.html",
+        "bin.css",
+        "bin.js",
+        "bin-capture-settings.js",
+        "bin-provenance.js",
+        "bin-drag-support.js"
+      ],
       "matches": ["http://*/*", "https://*/*"]
     }
   ]
