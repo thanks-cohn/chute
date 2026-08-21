@@ -35,7 +35,6 @@
         "bin.html",
         "bin.css",
         "bin.js",
-        "bin-image-resolver.js",
         "bin-capture-settings.js",
         "bin-provenance.js",
         "bin-drag-support.js"
