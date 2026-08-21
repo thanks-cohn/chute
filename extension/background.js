@@ -25,6 +25,52 @@ function internetShortcut(url) {
   });
 }
 
+function clampCaptureDimension(value, fallback = 512) {
+  const next = Math.trunc(Number(value) || fallback);
+  return Math.min(4096, Math.max(16, next));
+}
+
+function customCopyName(name, maxWidth, maxHeight) {
+  const base = String(name || "browser-image").replace(/\.[a-z0-9]{2,8}$/i, "") || "browser-image";
+  return `${base}-${maxWidth}x${maxHeight}.webp`;
+}
+
+async function getBrowserImageCaptureSettings() {
+  const settings = await chrome.storage.sync.get({
+    chuteBrowserImageCapture: "full",
+    chuteBrowserImageSaveFull: null,
+    chuteBrowserImageSaveCustom: null,
+    chuteBrowserImageWidth: 512,
+    chuteBrowserImageHeight: 512
+  });
+  return {
+    saveFull: settings.chuteBrowserImageSaveFull === null
+      ? settings.chuteBrowserImageCapture !== "thumbnail"
+      : settings.chuteBrowserImageSaveFull !== false,
+    saveCustom: settings.chuteBrowserImageSaveCustom === null
+      ? settings.chuteBrowserImageCapture === "thumbnail"
+      : settings.chuteBrowserImageSaveCustom === true,
+    width: clampCaptureDimension(settings.chuteBrowserImageWidth),
+    height: clampCaptureDimension(settings.chuteBrowserImageHeight)
+  };
+}
+
+async function createCustomImageCopy(blob, name, maxWidth, maxHeight) {
+  const bitmap = await createImageBitmap(blob);
+  const scale = Math.min(maxWidth / bitmap.width, maxHeight / bitmap.height, 1);
+  const width = Math.max(1, Math.round(bitmap.width * scale));
+  const height = Math.max(1, Math.round(bitmap.height * scale));
+  const canvas = new OffscreenCanvas(width, height);
+  const context = canvas.getContext("2d", { alpha: true });
+  context.drawImage(bitmap, 0, 0, width, height);
+  bitmap.close();
+  const derivative = await canvas.convertToBlob({ type: "image/webp", quality: 0.9 });
+  return {
+    blob: derivative,
+    name: customCopyName(name, maxWidth, maxHeight)
+  };
+}
+
 async function uploadBlob(blob, name, source) {
   const response = await fetch(`${BASE_URL}/api/upload`, {
     method: "POST",
@@ -85,6 +131,34 @@ async function openShelf(sender) {
   await chrome.tabs.create({ url: chrome.runtime.getURL("shelf.html") });
 }
 
+async function sendImageBytesToChute(blob, name, sourceUrl) {
+  const capture = await getBrowserImageCaptureSettings();
+  let saved = false;
+
+  if (capture.saveFull) {
+    await uploadBlob(blob, name, sourceUrl);
+    saved = true;
+  }
+
+  if (capture.saveCustom) {
+    try {
+      const custom = await createCustomImageCopy(blob, name, capture.width, capture.height);
+      await uploadBlob(custom.blob, custom.name, sourceUrl);
+      saved = true;
+    } catch (error) {
+      console.warn("Chute custom image copy failed:", error);
+    }
+  }
+
+  if (!saved) {
+    await uploadBlob(
+      internetShortcut(sourceUrl),
+      `${urlName(sourceUrl, "browser-image")}.url`,
+      sourceUrl
+    );
+  }
+}
+
 async function sendContextToChute(info, tab) {
   if (info.selectionText) {
     const text = `${info.selectionText}\n`;
@@ -110,7 +184,7 @@ async function sendContextToChute(info, tab) {
         const subtype = blob.type.split("/")[1]?.split("+")[0] || "img";
         name = `${name}.${subtype === "jpeg" ? "jpg" : subtype}`;
       }
-      await uploadBlob(blob, name, info.srcUrl);
+      await sendImageBytesToChute(blob, name, info.srcUrl);
       return;
     } catch {
       const name = `${urlName(info.srcUrl, "browser-image")}.url`;
@@ -126,6 +200,14 @@ async function sendContextToChute(info, tab) {
   }
 }
 
+async function relayDragOutStart(file) {
+  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+  if (!tab?.id) return;
+  try {
+    await chrome.tabs.sendMessage(tab.id, { type: "chute-drag-out-start", file });
+  } catch {}
+}
+
 chrome.runtime.onInstalled.addListener(async () => {
   if (chrome.sidePanel?.setPanelBehavior) {
     await chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: false });
@@ -135,15 +217,30 @@ chrome.runtime.onInstalled.addListener(async () => {
     "chuteDisplayLimit",
     "chuteBinVisible",
     "chuteAccessMode",
-    "chuteThumbnails"
+    "chuteThumbnails",
+    "chuteDragOutMode",
+    "chuteBrowserImageCapture",
+    "chuteBrowserImageSaveFull",
+    "chuteBrowserImageSaveCustom",
+    "chuteBrowserImageWidth",
+    "chuteBrowserImageHeight"
   ]);
   const defaults = {};
   if (existing.chuteDisplayLimit === undefined) defaults.chuteDisplayLimit = 50;
   if (existing.chuteThumbnails === undefined) defaults.chuteThumbnails = true;
+  if (existing.chuteDragOutMode === undefined) defaults.chuteDragOutMode = "file";
   if (existing.chuteAccessMode === undefined) {
     defaults.chuteAccessMode = existing.chuteBinVisible === false ? "context" : "floating";
   }
   if (existing.chuteBinVisible === undefined) defaults.chuteBinVisible = true;
+  if (existing.chuteBrowserImageSaveFull === undefined) {
+    defaults.chuteBrowserImageSaveFull = existing.chuteBrowserImageCapture !== "thumbnail";
+  }
+  if (existing.chuteBrowserImageSaveCustom === undefined) {
+    defaults.chuteBrowserImageSaveCustom = existing.chuteBrowserImageCapture === "thumbnail";
+  }
+  if (existing.chuteBrowserImageWidth === undefined) defaults.chuteBrowserImageWidth = 512;
+  if (existing.chuteBrowserImageHeight === undefined) defaults.chuteBrowserImageHeight = 512;
   if (Object.keys(defaults).length) await chrome.storage.sync.set(defaults);
 
   const mode = defaults.chuteAccessMode || existing.chuteAccessMode || "floating";
@@ -182,6 +279,13 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
   if (message?.type === "open-side-panel") {
     openShelf(sender)
+      .then(() => sendResponse({ ok: true }))
+      .catch((error) => sendResponse({ ok: false, error: error.message }));
+    return true;
+  }
+
+  if (message?.type === "chute-drag-out-start") {
+    relayDragOutStart(message.file)
       .then(() => sendResponse({ ok: true }))
       .catch((error) => sendResponse({ ok: false, error: error.message }));
     return true;
