@@ -106,13 +106,13 @@ sh scripts/install-user.sh
 
 The installer:
 
-- creates a private runtime at `~/.local/share/chute-runtime/venv`;
-- installs the `chute` command into `~/.local/bin`;
-- creates `~/.config/systemd/user/chute.service`;
+- creates a private runtime under `${XDG_DATA_HOME:-$HOME/.local/share}/chute-runtime/venv`;
+- exposes the `chute` command through `$HOME/.local/bin/chute`;
+- creates the user service under `${XDG_CONFIG_HOME:-$HOME/.config}/systemd/user/chute.service`;
 - enables and starts the service immediately;
-- keeps user data under `~/Chute`.
+- keeps Chute data under `$HOME/Chute` by default.
 
-No virtual-environment activation is required after installation.
+No virtual-environment activation is required after installation. Chute does **not** install packages into the system Python environment.
 
 Confirm it works:
 
@@ -143,6 +143,57 @@ To upgrade after pulling a new Chute version, rerun:
 sh scripts/install-user.sh
 ```
 
+### Arch / Garuda and `externally-managed-environment`
+
+Modern Arch-family systems protect the system Python installation through PEP 668. If an **older Chute installer** prints:
+
+```text
+error: externally-managed-environment
+```
+
+**Do not use `--break-system-packages`.** Premium v2's current installer creates its own private virtual environment and therefore does not need to modify the system Python installation.
+
+If `git pull` refuses to update `scripts/install-user.sh` because an earlier `chmod` or local edit changed it, restore that one file and pull again:
+
+```bash
+cd /path/to/chute
+git restore scripts/install-user.sh
+git pull --ff-only
+sh scripts/install-user.sh
+```
+
+On Arch/Garuda the package named `pip` does not exist as such (`python-pip` is the distro package), but the normal Chute Premium v2 installation should not require installing system pip at all.
+
+## Portability
+
+Chute does not contain a hard-coded username or a hard-coded clone location.
+
+The installer discovers its own repository location from the script path and derives per-user locations from standard environment variables:
+
+```text
+$HOME
+$XDG_DATA_HOME
+$XDG_CONFIG_HOME
+```
+
+Therefore all of these are valid examples without modifying Chute:
+
+```text
+/home/alice/dev/chute
+/home/bob/Downloads/chute
+/home/someone/projects/chute
+```
+
+Each user receives their own corresponding data and runtime directories. Nothing depends on `/home/emmadoku` or another specific account name.
+
+The current automatic installer is portable across **Linux distributions that provide Python 3.10+ with `venv` support and systemd user services**. A distribution may package the Python `venv` component separately; if `python3 -m venv` is unavailable, install that distribution's Python-venv package first.
+
+The browser extension targets Chromium-family browsers such as Chrome, Opera, Brave, Edge, and Chromium. Browser-specific side-panel behavior can vary, but the localhost queue/history is browser-independent and shared by all installed Chute extensions for that user.
+
+Windows and macOS use different background-service systems, so the current `install-user.sh` is not their installer. The Python storage code already avoids embedding a Linux username, but proper native Windows/macOS installers would be separate future work.
+
+If `$HOME/.local/bin` is not already on a user's `PATH`, add it once in the shell configuration or invoke the installed command by its full path. Most modern Linux desktop distributions include it automatically.
+
 ## Install the Chrome extension
 
 1. Open `chrome://extensions`.
@@ -151,9 +202,11 @@ sh scripts/install-user.sh
 4. Select this repository's `extension` directory.
 5. Pin **Chute** to the toolbar.
 
+For Opera, open `opera://extensions`, enable developer mode, and load the same `extension` directory as an unpacked extension.
+
 Reload a normal webpage. The taped Chute mascot appears near the lower-right corner. Drop something onto it to add it to Chute. Click it to open the shelf.
 
-Chrome does not allow content scripts on internal pages such as `chrome://extensions`.
+Chrome and Opera do not allow ordinary content scripts on their protected internal browser pages.
 
 ## Commands
 
