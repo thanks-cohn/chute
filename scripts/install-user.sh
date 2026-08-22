@@ -157,6 +157,12 @@ systemctl --user stop chute.service >/dev/null 2>&1 || true
 systemctl --user daemon-reload
 systemctl --user enable --now chute.service
 
+# v2.5 adds a native desktop surface that shares the exact same Chute data.
+# Its installer is deliberately non-fatal while the desktop layer is still an
+# experimental KDE/Plasma milestone: browser Chute remains usable if the local
+# machine does not yet have the Qt build prerequisites.
+sh "$SCRIPT_DIR/install-desktop-overlay.sh"
+
 printf '\nChute computer-side setup is complete.\n'
 printf 'Data:    %s\n' "$DATA_DIR"
 printf 'Service: systemctl --user status chute.service\n'
