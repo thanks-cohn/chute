@@ -10,6 +10,7 @@ UNIT_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/systemd/user"
 UNIT_PATH="$UNIT_DIR/chute.service"
 DATA_DIR="${CHUTE_HOME:-$HOME/Chute}"
 SAFETY_DIR="$DATA_DIR/.update-safety"
+EXTENSION_DIR="$REPO_DIR/extension"
 
 if ! command -v python3 >/dev/null 2>&1; then
   printf 'Chute requires Python 3.10 or newer.\n' >&2
@@ -93,6 +94,105 @@ make_update_snapshot() {
   printf 'Safety checkpoint: %s\n' "$snapshot"
 }
 
+BROWSER_CMD=""
+EXTENSIONS_URL=""
+
+select_browser() {
+  candidate=$1
+  url=$2
+  if [ -n "$BROWSER_CMD" ]; then
+    return
+  fi
+  if command -v "$candidate" >/dev/null 2>&1; then
+    BROWSER_CMD=$(command -v "$candidate")
+    EXTENSIONS_URL=$url
+  fi
+}
+
+choose_browser() {
+  DEFAULT_BROWSER=""
+  if command -v xdg-settings >/dev/null 2>&1; then
+    DEFAULT_BROWSER=$(xdg-settings get default-web-browser 2>/dev/null || true)
+  fi
+
+  case "$DEFAULT_BROWSER" in
+    *opera*)
+      select_browser opera "opera://extensions"
+      ;;
+    *brave*)
+      select_browser brave-browser "brave://extensions"
+      select_browser brave "brave://extensions"
+      ;;
+    *microsoft-edge*|*edge*)
+      select_browser microsoft-edge-stable "edge://extensions"
+      select_browser microsoft-edge "edge://extensions"
+      ;;
+    *google-chrome*|*chrome*)
+      select_browser google-chrome-stable "chrome://extensions"
+      select_browser google-chrome "chrome://extensions"
+      ;;
+    *chromium*)
+      select_browser chromium "chrome://extensions"
+      select_browser chromium-browser "chrome://extensions"
+      ;;
+  esac
+
+  # Fallback when the desktop default cannot be resolved or is not Chromium-based.
+  select_browser google-chrome-stable "chrome://extensions"
+  select_browser google-chrome "chrome://extensions"
+  select_browser chromium "chrome://extensions"
+  select_browser chromium-browser "chrome://extensions"
+  select_browser brave-browser "brave://extensions"
+  select_browser brave "brave://extensions"
+  select_browser opera "opera://extensions"
+  select_browser microsoft-edge-stable "edge://extensions"
+  select_browser microsoft-edge "edge://extensions"
+}
+
+copy_extension_path() {
+  if command -v wl-copy >/dev/null 2>&1; then
+    printf '%s' "$EXTENSION_DIR" | wl-copy
+    printf 'Extension path copied to clipboard.\n'
+    return
+  fi
+  if command -v xclip >/dev/null 2>&1; then
+    printf '%s' "$EXTENSION_DIR" | xclip -selection clipboard
+    printf 'Extension path copied to clipboard.\n'
+    return
+  fi
+  if command -v xsel >/dev/null 2>&1; then
+    printf '%s' "$EXTENSION_DIR" | xsel --clipboard --input
+    printf 'Extension path copied to clipboard.\n'
+  fi
+}
+
+open_extension_onboarding() {
+  choose_browser
+
+  printf '\nAlmost done. Chute will now point you at the browser extension.\n'
+  printf 'Extension folder: %s\n' "$EXTENSION_DIR"
+  copy_extension_path
+
+  if command -v xdg-open >/dev/null 2>&1; then
+    xdg-open "$EXTENSION_DIR" >/dev/null 2>&1 &
+  fi
+
+  if [ -n "$BROWSER_CMD" ]; then
+    printf 'Opening your browser Extensions page...\n'
+    "$BROWSER_CMD" "$EXTENSIONS_URL" >/dev/null 2>&1 &
+    printf '\nFINAL BROWSER STEP:\n'
+    printf '  1. Turn on Developer mode.\n'
+    printf '  2. Click Load unpacked.\n'
+    printf '  3. Choose the extension folder that just opened:\n'
+    printf '     %s\n' "$EXTENSION_DIR"
+    printf '\nThen Chute is ready.\n'
+  else
+    printf '\nCould not automatically detect Chrome, Chromium, Brave, Opera, or Edge.\n'
+    printf 'Open your browser Extensions page, enable Developer mode, choose Load unpacked,\n'
+    printf 'and select: %s\n' "$EXTENSION_DIR"
+  fi
+}
+
 make_update_snapshot
 
 printf 'Creating Chute private Python environment...\n'
@@ -118,7 +218,7 @@ Restart=on-failure
 RestartSec=2
 
 [Install]
-WantedBy=default.target
+WantedBy=default.target.target
 EOF
 
 systemctl --user stop chute.service >/dev/null 2>&1 || true
@@ -134,4 +234,5 @@ printf 'Logs:     journalctl --user -u chute.service -f\n'
 printf '\nThe service starts automatically with your user session.\n'
 printf 'For startup at machine boot even before login, enable lingering once:\n'
 printf '  sudo loginctl enable-linger %s\n' "$(id -un)"
-printf '\nLoad the browser extension from:\n  %s/extension\n' "$REPO_DIR"
+
+open_extension_onboarding
