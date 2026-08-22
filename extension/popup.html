@@ -31,6 +31,13 @@
         <option value="context">Right-click only</option>
       </select>
 
+      <div class="setting-label">Floating mascot behavior</div>
+      <select id="floating-behavior" aria-label="Whether the floating Chute mascot hides itself">
+        <option value="auto-hide">Auto-hide after 10 seconds</option>
+        <option value="always">Always visible</option>
+      </select>
+      <div class="settings-note">Auto-hide is the default. Chute stays visible for 10 seconds, then tucks into a small tab at the lower-right edge. Move the mouse near that edge to bring it back.</div>
+
       <div class="setting-label">Drag out as</div>
       <select id="drag-out-mode" aria-label="What dragging an item out of Chute sends">
         <option value="file">Actual file / image</option>
@@ -93,5 +100,6 @@
   <script src="workflow-fixes.js"></script>
   <script src="drag-relay.js"></script>
   <script src="popup.js"></script>
+  <script src="popup-auto-hide.js"></script>
 </body>
 </html>
