@@ -23,7 +23,7 @@ preflight_browser_setup() {
   printf '  2. Turn on Developer mode.\n'
   printf '\n'
   printf 'Do that first. Chute will handle the computer-side setup next.\n'
-  printf 'At the end, you will only need to click Load unpacked in each browser.\n'
+  printf 'At the end, the terminal will give you the exact folder to use with Load unpacked.\n'
   printf '\n'
 
   if [ -t 0 ]; then
@@ -113,68 +113,6 @@ make_update_snapshot() {
   printf 'Safety checkpoint: %s\n' "$snapshot"
 }
 
-copy_extension_path() {
-  if command -v wl-copy >/dev/null 2>&1; then
-    printf '%s' "$EXTENSION_DIR" | wl-copy
-    printf 'Extension folder path copied to clipboard.\n'
-    return
-  fi
-  if command -v xclip >/dev/null 2>&1; then
-    printf '%s' "$EXTENSION_DIR" | xclip -selection clipboard
-    printf 'Extension folder path copied to clipboard.\n'
-    return
-  fi
-  if command -v xsel >/dev/null 2>&1; then
-    printf '%s' "$EXTENSION_DIR" | xsel --clipboard --input
-    printf 'Extension folder path copied to clipboard.\n'
-  fi
-}
-
-open_first_browser_command() {
-  label=$1
-  url=$2
-  shift 2
-
-  for candidate in "$@"; do
-    if command -v "$candidate" >/dev/null 2>&1; then
-      printf 'Opening %s Extensions...\n' "$label"
-      "$candidate" "$url" >/dev/null 2>&1 &
-      return 0
-    fi
-  done
-  return 1
-}
-
-open_extension_onboarding() {
-  printf '\n========================================\n'
-  printf ' CHUTE INSTALLED — LAST STEP\n'
-  printf '========================================\n\n'
-  printf 'Chute extension folder:\n  %s\n\n' "$EXTENSION_DIR"
-
-  copy_extension_path
-
-  if command -v xdg-open >/dev/null 2>&1; then
-    xdg-open "$EXTENSION_DIR" >/dev/null 2>&1 &
-  fi
-
-  opened=0
-  if open_first_browser_command "Google Chrome" "chrome://extensions" google-chrome-stable google-chrome; then opened=1; fi
-  if open_first_browser_command "Chromium" "chrome://extensions" chromium chromium-browser; then opened=1; fi
-  if open_first_browser_command "Brave" "brave://extensions" brave-browser brave; then opened=1; fi
-  if open_first_browser_command "Opera" "opera://extensions" opera; then opened=1; fi
-  if open_first_browser_command "Microsoft Edge" "edge://extensions" microsoft-edge-stable microsoft-edge; then opened=1; fi
-
-  printf '\nIn each browser where you want Chute:\n'
-  printf '  1. Click Load unpacked.\n'
-  printf '  2. Select the Chute extension folder that just opened.\n'
-  printf '\nThat is it. Chute is ready.\n'
-
-  if [ "$opened" -eq 0 ]; then
-    printf '\nNo supported Chromium browser was detected automatically.\n'
-    printf 'Open its Extensions page yourself and click Load unpacked.\n'
-  fi
-}
-
 make_update_snapshot
 
 printf 'Creating Chute private Python environment...\n'
@@ -210,5 +148,10 @@ systemctl --user enable --now chute.service
 printf '\nChute computer-side setup is complete.\n'
 printf 'Data:    %s\n' "$DATA_DIR"
 printf 'Service: systemctl --user status chute.service\n'
-
-open_extension_onboarding
+printf '\n========================================\n'
+printf ' CHUTE INSTALLED — LAST STEP\n'
+printf '========================================\n\n'
+printf 'Now go back to each browser where you enabled Developer mode.\n'
+printf 'Click Load unpacked and use this exact folder:\n\n'
+printf '  %s\n\n' "$EXTENSION_DIR"
+printf 'That is it. Chute is ready.\n'
