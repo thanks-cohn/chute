@@ -1,25 +1,16 @@
 # Chute
 
+> **LICENSE NOTICE — NOT MIT. NON-COMMERCIAL SOURCE-AVAILABLE SOFTWARE.**
+>
+> This branch is provided under the **Chute Source-Available Non-Commercial License v1.0** in [`LICENSE`](LICENSE). Personal, educational, research, evaluation, hobby, and other genuinely non-commercial use is permitted. **Commercial use is prohibited without prior written permission.** You may not sell, monetize, commercially redistribute, bundle into a paid product or service, publish a paid fork or clone, or use this repository or a substantial derivative to create a product or service for financial gain.
+
 **One Chute. Every browser.**
 
-Chute is a lightweight local file basket for the browser. Drop files, images, links, or text into the floating Chute, keep them locally, then drag or attach them somewhere else later.
+Chute is a lightweight local file basket for the browser. Drop files, images, links, or text into the floating Chute, preserve them locally, then drag or attach them somewhere else later.
 
-Chute is intentionally local-first:
+This README describes the **`paid-installer-onboarding`** branch, the current Windows paid-product/onboarding candidate.
 
-- no Chute cloud account
-- no remote Chute storage
-- one local basket shared across supported Chromium browsers
-- preserved local copies and recallable history
-- a tiny Windows companion listening only on `127.0.0.1:17891`
-- a Chromium extension that provides the browser UI
-
-This README describes the **`paid-installer-onboarding`** branch.
-
-> This branch is the Windows paid-product/onboarding candidate. It includes the Google/Yandex direct-drop work, Opera transparency hardening, the self-installing Windows companion, the bundled browser extension, and first-run browser setup assistance. A fresh EXE from this exact branch still needs final physical-machine release testing before it should be treated as a final production build.
-
----
-
-## The product in one picture
+## Product architecture
 
 ```text
 Chrome / Opera / Edge / Brave
@@ -34,65 +25,29 @@ Chrome / Opera / Edge / Brave
       Local Chute data
 ```
 
-Every installed Chute extension talks to the same local Windows companion, so the basket is shared across browsers.
+Every installed Chute extension talks to the same local Windows companion, so one local basket/history can be shared across browsers.
 
-Example:
+Chute is intentionally local-first:
 
-```text
-Opera → Chute → Chrome
-Chrome → Chute → Brave
-Edge → Chute → Opera
-```
+- no required Chute cloud account for the local basket
+- no remote Chute storage backend for normal queue/history behavior
+- preserved local originals and recallable history
+- browser-generated thumbnails
+- a small Windows companion listening only on loopback by default
+- a Chromium extension providing the browser UI
 
-The extension is a browser surface over one shared local Chute, not a separate basket for each browser.
+## Windows customer install plan
 
----
+### Before running Chute
 
-# Windows customer install
-
-## Before running Chute
-
-For the current pre-Web-Store version, turn on **Developer mode** in the browser first.
-
-### Chrome
-
-Open:
+For the current pre-Web-Store version, the customer should first open the Extensions page in the browser they want to use and turn on **Developer mode**.
 
 ```text
-chrome://extensions
+Chrome: chrome://extensions
+Edge:   edge://extensions
+Brave:  brave://extensions
+Opera:  opera://extensions
 ```
-
-Turn on **Developer mode**.
-
-### Edge
-
-Open:
-
-```text
-edge://extensions
-```
-
-Turn on **Developer mode**.
-
-### Brave
-
-Open:
-
-```text
-brave://extensions
-```
-
-Turn on **Developer mode**.
-
-### Opera
-
-Open:
-
-```text
-opera://extensions
-```
-
-Turn on **Developer mode**.
 
 Then run:
 
@@ -100,28 +55,24 @@ Then run:
 Chute-Setup.exe
 ```
 
----
+### What the EXE is designed to do automatically
 
-## What the EXE does automatically
+The Windows build bundles the browser extension and automates everything around Chromium's required unpacked-extension approval step:
 
-The Windows build is designed to make the unpacked-extension stage as painless as Chromium allows.
+1. install Chute for the current Windows user;
+2. require no administrator privileges;
+3. create the local Chute data layout;
+4. install `Chute.exe` under Local AppData;
+5. register Chute to start for that user at sign-in;
+6. launch the loopback bridge quietly in the background;
+7. extract/install the bundled extension beside the application;
+8. detect Chrome, Edge, Brave, and Opera when installed;
+9. open the Extensions page for detected browsers;
+10. open the exact installed Chute extension directory in Windows Explorer;
+11. copy that extension directory path to the clipboard;
+12. display a short Windows setup message describing the final browser step.
 
-When the customer runs the downloaded EXE, Chute:
-
-1. installs itself for the current Windows user;
-2. does not require administrator privileges;
-3. creates the local Chute data layout;
-4. installs `Chute.exe` under the current user's Local AppData program directory;
-5. registers Chute to start automatically when that user signs in;
-6. launches the local Chute bridge quietly in the background;
-7. installs the bundled browser extension files beside the application;
-8. detects supported Chromium browsers installed on the machine;
-9. opens the Extensions page for the detected browsers;
-10. opens the exact Chute extension directory in Windows Explorer;
-11. copies that extension directory path to the clipboard;
-12. displays a small Windows setup message explaining the final browser step.
-
-Default installed application path:
+Default application path:
 
 ```text
 %LOCALAPPDATA%\Programs\Chute\Chute.exe
@@ -133,7 +84,7 @@ Bundled extension path:
 %LOCALAPPDATA%\Programs\Chute\extension
 ```
 
-The only remaining browser-required action is:
+The remaining browser-required action is:
 
 ```text
 Load unpacked
@@ -143,43 +94,37 @@ select the opened Chute extension folder
 done
 ```
 
-Browsers intentionally require user approval for unpacked extensions. Chute does not fake clicks, modify enterprise policy, or try to silently bypass that security boundary.
+Chute intentionally does not fake browser clicks, force enterprise policies, or silently bypass the browser's extension-approval boundary.
 
-Once Chute is distributed through a browser extension store, the intended customer flow becomes even simpler and Developer mode should no longer be part of normal customer onboarding.
+## Intended paid-software delivery
 
----
-
-# The desired paid-software experience
-
-The intended commercial flow is:
+The desired commercial flow is:
 
 ```text
 Buy Chute
     ↓
-Stripe payment succeeds
+Stripe confirms payment
     ↓
-customer receives access to Chute-Setup.exe
+protected download access
     ↓
-Developer mode already enabled
+Chute-Setup.exe
     ↓
-double-click Chute-Setup.exe
+customer already enabled Developer mode
     ↓
-Chute installs itself and opens browser setup
+double-click
     ↓
-Load unpacked → Chute extension folder
+Chute installs and opens browser setup
+    ↓
+Load unpacked → opened Chute folder
     ↓
 Chute is ready
 ```
 
-Stripe is the payment/delivery layer, not part of Chute's local file transport. A simple first launch can redirect successful Stripe buyers to a protected download page. For stronger paid delivery later, the download can be issued through a temporary token or signed URL after payment verification.
+The planned distribution architecture is to keep the customer EXE private in object storage such as Cloudflare R2 and let a Cloudflare Worker verify the paid-session/download entitlement before returning the file or a short-lived download path. A permanently public GitHub Release URL should not be treated as payment enforcement.
 
-Do not rely on a permanently public GitHub Release URL if payment enforcement matters, because a public release asset can be shared directly.
+## What Chute accepts
 
----
-
-# What Chute does
-
-From the browser, Chute can accept:
+The browser Chute can ingest:
 
 - local files
 - images
@@ -187,27 +132,17 @@ From the browser, Chute can accept:
 - links
 - selected text
 
-The floating Chute mascot acts as a physical landing point on normal web pages.
+Items appear in the popup/side shelf and are shared through the local Chute service with the other Chute-enabled browsers on the same computer.
 
-Items placed into Chute appear in the extension popup and side shelf and are available to the other Chute-enabled browsers on the same computer.
+## Dragging out
 
-Chute can also preserve items after they are removed from the current live basket so they can be recalled later from history.
+Chute builds a browser `File` from the preserved local item and delivers it to compatible browser destinations.
 
----
+The general drag workflow is designed to coexist with sites such as ChatGPT and other file-drop targets without exposing Chute's private drag token as ordinary text.
 
-# Dragging out of Chute
+### Google and Yandex direct image drop
 
-Chute supports dragging stored files back out toward browser destinations.
-
-The current browser delivery system builds an in-memory browser `File` from the preserved local Chute copy and delivers it to compatible targets.
-
-This includes the already-tested general drag workflow used with sites such as ChatGPT.
-
-## Google and Yandex direct image drop
-
-This branch includes a dedicated Google/Yandex direct-drop compatibility layer.
-
-The goal is:
+This branch inherits the dedicated direct-drop adapter developed in `direct-drop-google-yandex`:
 
 ```text
 image in Chute
@@ -216,28 +151,20 @@ Google / Yandex image-search area
       ↓
 Chute identifies or opens the site's image uploader
       ↓
-Chute feeds the real image file into it
+real image File is delivered
 ```
 
-This removes the previous need to manually open the small image-upload expansion box before dropping the image.
+That adapter is isolated from the general drag path so Google/Yandex special handling does not unnecessarily disturb sites that already work normally.
 
-The Google/Yandex adapter is isolated from the normal drag path so special-case search-engine behavior does not unnecessarily disturb sites whose native Chute drag behavior already works.
+## Opera transparency compatibility
 
----
+The branch also inherits transparency hardening added after normal Opera could paint a white rectangle behind the otherwise transparent floating extension frame while private Opera rendered it correctly.
 
-# Opera appearance compatibility
+The intended appearance is the mascot by itself, with the surrounding iframe/document canvas transparent.
 
-This branch includes a transparency compatibility layer for the floating browser Chute.
+## Browser access modes
 
-Some Opera profile/rendering combinations could paint the otherwise transparent extension iframe as a white rectangle around Chute. The branch hardens transparency at the extension document level so the floating mascot can composite cleanly over the page.
-
-The intended appearance is the mascot by itself, not a white rectangular iframe background.
-
----
-
-# Browser access modes
-
-The extension supports browser-side access modes including:
+The extension lineage supports browser-side access such as:
 
 ```text
 Floating mascot
@@ -245,95 +172,39 @@ Mascot + right-click
 Right-click only
 ```
 
-The floating mascot remains anchored near the lower-right corner of normal webpages.
+The floating mascot remains anchored near the lower-right corner of ordinary web pages.
 
-The support card appears on hover and contains:
+## Windows companion
 
-**Please donate, anything helps!**
+The Windows companion deliberately avoids heavyweight desktop architecture.
 
-with the support action:
-
-**Buy the Creator a Coffee**
-
----
-
-# Supported browsers
-
-The current Chromium extension is intended for:
-
-- Google Chrome
-- Microsoft Edge
-- Brave
-- Opera
-- other compatible Chromium browsers
-
-The Windows installer currently has explicit browser detection/onboarding paths for Chrome, Edge, Brave, and Opera.
-
-Protected browser pages such as `chrome://...`, `edge://...`, and equivalent internal pages do not allow ordinary extension content scripts. That is normal browser behavior.
-
----
-
-# Local Windows architecture
-
-The Windows companion is deliberately small and quiet.
-
-It does **not** use:
+It does **not** require:
 
 - Electron
-- a Windows Service
+- a machine-wide Windows Service
 - administrator installation
-- a cloud Chute backend
-- a required Python installation on the customer's machine
+- a customer-installed Python runtime
+- a remote Chute cloud backend for the local basket
 
-The distributed build is packaged as a standalone PyInstaller executable.
+The customer-facing build is a standalone PyInstaller executable.
 
-The customer downloads one EXE and double-clicks it.
-
-The installed copy runs in the background and serves the local bridge at:
-
-```text
-http://127.0.0.1:17891
-```
-
-Health check:
+Local health endpoint:
 
 ```text
 http://127.0.0.1:17891/health
 ```
 
----
+Windows startup registration uses the current-user Run key and launches the installed executable with `--background`.
 
-# Windows startup behavior
+## Local data
 
-Chute installs per user and registers:
-
-```text
-HKCU\Software\Microsoft\Windows\CurrentVersion\Run
-```
-
-The startup entry launches the installed Chute executable with:
-
-```text
---background
-```
-
-This avoids administrator privileges and avoids installing a machine-wide Windows Service.
-
----
-
-# Local data
-
-By default, Windows Chute data lives at:
+Default Windows data root:
 
 ```text
 C:\Users\<you>\Chute
 ```
 
-Internally this is derived from the user's home directory. No Windows username is hard-coded.
-
-If `CHUTE_HOME` is explicitly defined, that location can override the default.
-
-Current layout:
+Representative layout:
 
 ```text
 Chute\
@@ -345,133 +216,64 @@ Chute\
 ├── image-provenance.txt
 ├── .update-safety\
 └── history\
-    ├── YYYY-MM-DD.tsv
-    └── ...
+    └── YYYY-MM-DD.tsv
 ```
 
-### `queue.json`
+### Originals
 
-The current live basket.
+`files/` contains preserved Chute copies. Chute does not replace the preserved original with a thumbnail.
 
-### `files/`
+### UI thumbnails
 
-Preserved originals stored by Chute.
+`thumbs/` contains tiny recognition thumbnails (approximately 48px). They are UI aids only and are never substituted for the outgoing original attachment payload.
 
-### `thumbs/`
+### Custom derivatives
 
-Tiny UI thumbnails. These are recognition aids only and are never substituted for the actual payload being dragged or uploaded.
+`custom-thumbnails/` stores optional user-sized derivatives separately from the original.
 
-### `custom-thumbnails/`
+### History
 
-Optional user-sized browser-generated image derivatives.
+History is append-only and split by UTC day. Events include `add`, `remove`, `clear`, and `recall`. Clearing the live basket does not silently erase the preserved history system.
 
-### `history/`
+### Provenance
 
-Append-only daily history files.
-
-### provenance files
-
-Image capture provenance is stored in both machine-friendly JSONL and a human-readable text companion.
-
----
-
-# History and Recall
-
-Removing something from the live basket does not automatically destroy its preserved Chute copy or erase history.
-
-History records events such as:
-
-```text
-add
-remove
-clear
-recall
-```
-
-History files are split by UTC day and use a stable UTF-8 TSV format.
-
-A removed historical item can be recalled into the live basket when the preserved file still exists.
-
-Clear empties the live basket. It does not silently wipe the entire preserved history system.
-
----
-
-# Thumbnails
-
-Chute keeps image thumbnails intentionally tiny.
-
-The normal UI thumbnail is approximately 48px and exists only to help recognize an item in the interface.
-
-The original file remains the original file.
-
-The thumbnail is never used as the outgoing attachment payload.
-
-Optional custom-size derivatives are stored separately under `custom-thumbnails/` so they do not overwrite the preserved original.
-
----
-
-# Image provenance
-
-Chute records browser image-capture provenance locally.
-
-Canonical machine-readable file:
+Browser image captures can record provenance in:
 
 ```text
 image-provenance.jsonl
-```
-
-Human-readable companion:
-
-```text
 image-provenance.txt
 ```
 
-The text format uses the capture marker:
+The human-readable capture marker is:
 
 ```text
 # CHUTE-IMAGE-CAPTURE\t1
 ```
 
-This is intended to make it possible to understand where a captured browser image came from without relying on a remote service.
+## Privacy/security model
 
----
+- localhost bridge binds to loopback by default
+- browser-selected content is handed to the local Chute companion
+- no Chute cloud account is necessary for local queue/history operation
+- preserved files remain on the user's machine
+- browser access exists because page-level drag/drop and webpage-image capture are core features
+- item IDs are used rather than exposing arbitrary filesystem paths to pages
 
-# Privacy model
+## Logs
 
-Chute is local-first.
-
-Core behavior:
-
-- the bridge binds to loopback by default;
-- Chute does not run a remote Chute storage server;
-- preserved files live on the user's computer;
-- browser captures are handed to the local companion;
-- browser access exists so user-selected webpage images/files can be captured and moved through Chute;
-- the same local basket can be exposed through multiple browsers on the same computer.
-
-The extension requires normal `http://` and `https://` access because the floating browser interface and webpage-image capture are core product features.
-
----
-
-# Windows logs
-
-The Windows companion writes its local log under Local AppData:
+Windows log:
 
 ```text
 %LOCALAPPDATA%\Chute\logs\chute.log
 ```
 
-If the mascot says `OFF` or the browser cannot reach Chute, check:
+If Chute appears offline, first check:
 
 ```text
 http://127.0.0.1:17891/health
 ```
 
-and then inspect the log.
-
----
-
-# Building the Windows executable
+## Building the Windows EXE
 
 From a Windows checkout of this branch:
 
@@ -479,33 +281,19 @@ From a Windows checkout of this branch:
 powershell -ExecutionPolicy Bypass -File scripts\build-windows.ps1
 ```
 
-The build script:
-
-- creates an isolated build virtual environment;
-- installs PyInstaller and this package into that environment;
-- verifies the extension contains `manifest.json`;
-- embeds the entire `extension` directory into the executable;
-- produces the standalone Windows executable under `dist\windows`.
-
-Expected build output:
+The build script creates an isolated build environment, installs PyInstaller, verifies the extension bundle, embeds the entire extension directory, and produces the standalone Windows executable under:
 
 ```text
 dist\windows\Chute-Windows.exe
 ```
 
-For customer-facing distribution it can be renamed to:
+The customer-facing file can be named:
 
 ```text
 Chute-Setup.exe
 ```
 
-The EXE is intended to require neither Python nor administrator privileges on the customer machine.
-
----
-
-# Development checkout on Windows
-
-Example:
+## Development checkout
 
 ```bat
 mkdir C:\Users\YOURNAME\dev
@@ -515,108 +303,58 @@ cd chute
 git switch paid-installer-onboarding
 ```
 
-If you are testing the extension directly from the checkout, load:
+For live extension development, load:
 
 ```text
 C:\Users\YOURNAME\dev\chute\extension
 ```
 
-Do not accidentally keep testing an old extracted copy from Downloads while editing the Git checkout.
+Do not accidentally keep testing an old extracted Downloads copy while modifying the Git checkout. After extension changes, reload Chute from the browser Extensions page and refresh the page being tested.
 
-After changing extension code:
-
-1. open the browser's Extensions page;
-2. press Reload on Chute;
-3. refresh the webpage being tested.
-
----
-
-# Linux
-
-Chute also has Linux history and installation work in earlier branches.
-
-The Linux installer uses a private Python virtual environment and a user-level systemd service rather than modifying the system Python environment.
-
-Typical Linux install from a compatible branch:
-
-```bash
-sh scripts/install-user.sh
-```
-
-The Windows paid-product branch documented here is focused on the standalone Windows customer experience. Do not assume Windows installation instructions apply to Linux or vice versa.
-
----
-
-# Branch map
-
-The repository intentionally keeps major product milestones isolated instead of rewriting old working states.
+## Branch map
 
 | Branch / tag | Purpose |
 | --- | --- |
-| `main` / `v1` | Frozen original baseline. Do not use as the active paid-product branch. |
-| `premium-v2` | Premium local-history/browser work and Linux-oriented development lineage. |
-| `windows-v2.3-chromium` | Known-good Windows/Chromium packaging baseline. |
-| `direct-drop-google-yandex` | Adds the tested direct Google/Yandex image-drop behavior and Opera transparency work while keeping the previous Windows branch intact. |
-| `paid-installer-onboarding` | Current paid-product candidate. Adds the bundled extension and assisted first-run Windows browser onboarding on top of the direct-drop branch. |
+| `main` / `v1` | Frozen original historical baseline. |
+| `agent/love-chute-layer-systemd` | Earlier browser sticky/support-layer/systemd milestone. |
+| `premium-v2` | Local history/browser/Linux milestone. |
+| `windows-chrome-store` | Earlier Windows and browser-store packaging milestone. |
+| `windows-v2.3-chromium` | Known-good Windows/Chromium baseline. |
+| `cross-platform-chromium` | Cross-platform Chromium/companion work. |
+| `direct-drop-google-yandex` | Google/Yandex direct-drop plus Opera transparency milestone. |
+| `paid-installer-onboarding` | Current paid Windows installer/onboarding candidate. |
 
-Because Git branches contain their own file snapshots, **each branch has its own `README.md` state**. Documentation can therefore describe that exact milestone without rewriting older branch history.
-
----
-
-# Current paid-product branch status
-
-Branch:
-
-```text
-paid-installer-onboarding
-```
+## Current status
 
 Included in this branch:
 
 - shared local Chute basket
 - Chromium extension
-- browser floating mascot
+- floating mascot
 - popup and side shelf
-- preserved local files
-- recallable history
+- preserved files and recallable history
 - tiny UI thumbnails
 - image provenance
-- direct Google image-search drop compatibility
-- direct Yandex image-search drop compatibility
-- Opera transparent floating-frame compatibility
+- Google/Yandex direct-drop compatibility
+- Opera transparency compatibility
 - standalone Windows packaging
 - per-user self-install
 - Windows autostart registration
-- bundled extension files inside the EXE
+- extension bundled inside the EXE
 - Chrome / Edge / Brave / Opera detection
 - automatic opening of browser Extensions pages
-- automatic opening of the exact bundled extension folder
-- automatic clipboard copy of that folder path
+- automatic opening of the installed extension folder
+- clipboard copy of that folder path
 - first-run setup message
 
-Still required before calling a build final production software:
+Before treating a build as final production software, build a fresh EXE from this exact branch and test the complete download → installation → browser-onboarding → direct-drop flow on normal Windows/browser profiles.
 
-- build a fresh EXE from **this exact branch**;
-- test that EXE on a normal Windows machine from download through first launch;
-- verify browser onboarding in each supported browser intended for sale;
-- verify the Opera transparency fix in the normal Opera profile;
-- verify Google/Yandex direct drop remains intact in the packaged build;
-- decide final signing/reputation strategy for Windows SmartScreen;
-- decide final paid-download delivery method behind Stripe;
-- eventually replace unpacked-extension onboarding with browser-store distribution where practical.
+## License
 
----
+**This branch is not MIT licensed.** It is distributed under the **Chute Source-Available Non-Commercial License v1.0**. See [`LICENSE`](LICENSE) for the complete terms.
 
-# Product philosophy
+Commercial use, resale, paid redistribution, commercial forks/clones, commercial derivatives, or using this source/repository to create a revenue-generating product or service requires separate written permission from the applicable Chute rights holder.
 
-Chute is intentionally small.
-
-**Linux has the power. The problem is making the power feel effortless.**
-
-**Keep Linux underneath. Replace the friction on top.**
-
-**Good defaults. Maximum optional control.**
-
-And for the browser side:
+Historical snapshots that were validly distributed under an earlier license are not retroactively relicensed; the license in this branch applies to the branch state distributed with it to the extent the applicable rights holders have authority over the material.
 
 **One Chute. Every browser.**
