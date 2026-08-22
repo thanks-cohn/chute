@@ -7,6 +7,7 @@ $Repo = Split-Path -Parent (Split-Path -Parent $MyInvocation.MyCommand.Path)
 $BuildRoot = Join-Path $Repo ".build\windows"
 $Venv = Join-Path $BuildRoot "venv"
 $Dist = Join-Path $Repo "dist\windows"
+$Extension = Join-Path $Repo "extension"
 
 New-Item -ItemType Directory -Force -Path $BuildRoot, $Dist | Out-Null
 if (Test-Path $Venv) { Remove-Item -Recurse -Force $Venv }
@@ -16,6 +17,10 @@ $Py = Join-Path $Venv "Scripts\python.exe"
 & $Py -m pip install --upgrade pip
 & $Py -m pip install pyinstaller $Repo
 
+if (-not (Test-Path (Join-Path $Extension "manifest.json"))) {
+    throw "Extension bundle is missing manifest.json: $Extension"
+}
+
 Push-Location $Repo
 try {
     & $Py -m PyInstaller `
@@ -24,6 +29,7 @@ try {
         --onefile `
         --windowed `
         --name Chute-Windows `
+        --add-data "$Extension;extension" `
         --distpath $Dist `
         --workpath (Join-Path $BuildRoot "work") `
         --specpath $BuildRoot `
@@ -36,5 +42,6 @@ finally {
 $Exe = Join-Path $Dist "Chute-Windows.exe"
 if (-not (Test-Path $Exe)) { throw "Build completed without producing $Exe" }
 Write-Host "Built: $Exe"
+Write-Host "Bundled extension: $Extension"
 Write-Host "Customer flow: download Chute-Windows.exe and double-click once."
 Write-Host "It self-installs per-user; no admin, service, or Python required."
