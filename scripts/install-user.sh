@@ -12,6 +12,14 @@ DATA_DIR="${CHUTE_HOME:-$HOME/Chute}"
 SAFETY_DIR="$DATA_DIR/.update-safety"
 EXTENSION_DIR="$REPO_DIR/extension"
 
+print_extension_addresses() {
+  printf 'Browser Extensions addresses:\n'
+  printf '  Google Chrome / Chromium: chrome://extensions\n'
+  printf '  Brave:                    brave://extensions\n'
+  printf '  Opera:                    opera://extensions\n'
+  printf '  Microsoft Edge:           edge://extensions\n'
+}
+
 preflight_browser_setup() {
   printf '\n'
   printf '========================================\n'
@@ -19,8 +27,12 @@ preflight_browser_setup() {
   printf '========================================\n'
   printf '\n'
   printf 'In every Chromium browser where you want Chute to work:\n'
-  printf '  1. Open the browser Extensions page.\n'
+  printf '  1. Go to its Extensions page using the address below.\n'
   printf '  2. Turn on Developer mode.\n'
+  printf '\n'
+  print_extension_addresses
+  printf '\n'
+  printf 'If your terminal does not make these browser addresses clickable, copy one into the browser address bar.\n'
   printf '\n'
   printf 'Do that first. Chute will handle the computer-side setup next.\n'
   printf 'At the end, the terminal will give you the exact folder to use with Load unpacked.\n'
@@ -151,7 +163,9 @@ printf 'Service: systemctl --user status chute.service\n'
 printf '\n========================================\n'
 printf ' CHUTE INSTALLED — LAST STEP\n'
 printf '========================================\n\n'
-printf 'Now go back to each browser where you enabled Developer mode.\n'
-printf 'Click Load unpacked and use this exact folder:\n\n'
+printf 'Go back to each browser where you enabled Developer mode.\n'
+printf 'If you need the Extensions page again:\n\n'
+print_extension_addresses
+printf '\nClick Load unpacked and use this exact folder:\n\n'
 printf '  %s\n\n' "$EXTENSION_DIR"
 printf 'That is it. Chute is ready.\n'
