@@ -14,6 +14,7 @@
   let accessMode = "floating";
   let hidden = false;
   let hostHovered = false;
+  let pointerNearZone = false;
   let supportActive = false;
   let dragActive = false;
   let hideTimer = null;
@@ -41,6 +42,7 @@
       autoHide &&
       floatingEnabled(accessMode) &&
       !hostHovered &&
+      !pointerNearZone &&
       !supportActive &&
       !dragActive
     );
@@ -128,8 +130,16 @@
   }
 
   document.addEventListener("mousemove", (event) => {
-    if (!host || !autoHide || !floatingEnabled(accessMode) || !hidden) return;
-    if (nearRevealZone(event.clientX, event.clientY)) reveal();
+    if (!host || !autoHide || !floatingEnabled(accessMode)) return;
+    const nextNear = nearRevealZone(event.clientX, event.clientY);
+    const changed = nextNear !== pointerNearZone;
+    pointerNearZone = nextNear;
+
+    if (pointerNearZone) {
+      reveal();
+      return;
+    }
+    if (changed && !hidden) scheduleHide();
   }, true);
 
   document.addEventListener("dragstart", () => {
@@ -146,24 +156,28 @@
     if (!host || !autoHide || !floatingEnabled(accessMode)) return;
     dragActive = true;
     clearHideTimer();
-    if (hidden && nearRevealZone(event.clientX, event.clientY)) reveal();
+    pointerNearZone = nearRevealZone(event.clientX, event.clientY);
+    if (pointerNearZone) reveal();
   }, true);
 
   function finishDrag() {
     dragActive = false;
+    pointerNearZone = false;
     scheduleHide(DRAG_HIDE_DELAY_MS);
   }
 
   document.addEventListener("drop", finishDrag, true);
   document.addEventListener("dragend", finishDrag, true);
+  document.addEventListener("dragleave", (event) => {
+    const outsideViewport = event.clientX <= 0 ||
+      event.clientY <= 0 ||
+      event.clientX >= window.innerWidth ||
+      event.clientY >= window.innerHeight;
+    if (outsideViewport) finishDrag();
+  }, true);
 
   window.addEventListener("message", (event) => {
-    if (!host) return;
-    if (event.source !== host.querySelector?.("iframe")?.contentWindow && event.data?.type !== "chute-support-hover") {
-      // The host uses a closed shadow root, so the iframe cannot be queried here.
-      // The message type is specific to Chute and is sufficient for this small UI state.
-    }
-    if (event.data?.type !== "chute-support-hover") return;
+    if (!host || event.data?.type !== "chute-support-hover") return;
     supportActive = Boolean(event.data.active);
     if (supportActive) reveal();
     else scheduleHide();
