@@ -24,7 +24,7 @@
   "content_scripts": [
     {
       "matches": ["http://*/*", "https://*/*"],
-      "js": ["content.js", "content-image-resolver.js", "drop-lifecycle.js"],
+      "js": ["content.js", "content-image-resolver.js", "direct-drop-google-yandex.js", "drop-lifecycle.js"],
       "run_at": "document_idle",
       "all_frames": false
     }
