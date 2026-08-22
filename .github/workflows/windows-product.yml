@@ -5,6 +5,7 @@ on:
   push:
     branches:
       - windows-v2.3-chromium
+      - paid-installer-onboarding
     paths:
       - .github/workflows/windows-product.yml
 
