@@ -1,11 +1,14 @@
 #include <QApplication>
 #include <QAction>
+#include <QContextMenuEvent>
 #include <QCursor>
 #include <QDir>
 #include <QDrag>
 #include <QDragEnterEvent>
 #include <QDragLeaveEvent>
 #include <QDropEvent>
+#include <QEnterEvent>
+#include <QEvent>
 #include <QFile>
 #include <QFileInfo>
 #include <QFileSystemWatcher>
