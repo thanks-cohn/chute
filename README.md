@@ -27,21 +27,20 @@ Compatible browsers talk to the same local Chute service, so one browser can pla
 
 ## Linux quick install
 
-The intended Linux setup is deliberately simple.
+The intended Linux setup is deliberately simple and stays entirely in the terminal. Chute does not unexpectedly open browser or file-manager windows during installation.
 
 ### 1. Before installing: enable Developer mode
 
-In every Chromium browser where you want Chute to work, open its Extensions page and turn on **Developer mode**.
+In every Chromium browser where you want Chute to work, go to its Extensions page and turn on **Developer mode**.
 
 ```text
-Chrome:   chrome://extensions
-Chromium: chrome://extensions
-Edge:     edge://extensions
-Brave:    brave://extensions
-Opera:    opera://extensions
+Google Chrome / Chromium: chrome://extensions
+Brave:                    brave://extensions
+Opera:                    opera://extensions
+Microsoft Edge:           edge://extensions
 ```
 
-Do this once before running the installer.
+If your terminal does not make these internal browser addresses clickable, copy the appropriate address into the browser address bar.
 
 ### 2. Run Chute
 
@@ -57,16 +56,16 @@ The installer:
 - installs the local bridge
 - enables and starts Chute as a user service
 - preserves existing Chute data during updates
-- opens the Chute `extension/` folder
-- copies the extension-folder path when a supported clipboard helper is available
-- opens the Extensions page in detected Chrome, Chromium, Brave, Opera, and Edge installations
+- prints the browser Extensions addresses in the terminal
+- prints the exact local `extension/` folder to select
 
 ### 3. Load unpacked
 
 In each browser where you want Chute:
 
-1. Click **Load unpacked**.
-2. Select the Chute `extension/` folder that the installer opened.
+1. Return to the Extensions page.
+2. Click **Load unpacked**.
+3. Select the exact Chute `extension/` folder printed by the installer.
 
 That's it. The same local Chute is then available to every browser in which you loaded the extension.
 
