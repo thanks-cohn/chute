@@ -25,6 +25,51 @@ Desktop / CLI
 
 Compatible browsers talk to the same local Chute service, so one browser can place something into Chute and another can use it.
 
+## Linux quick install
+
+The intended Linux setup is deliberately simple.
+
+### 1. Before installing: enable Developer mode
+
+In every Chromium browser where you want Chute to work, open its Extensions page and turn on **Developer mode**.
+
+```text
+Chrome:   chrome://extensions
+Chromium: chrome://extensions
+Edge:     edge://extensions
+Brave:    brave://extensions
+Opera:    opera://extensions
+```
+
+Do this once before running the installer.
+
+### 2. Run Chute
+
+From the extracted Chute folder:
+
+```bash
+sh install.sh
+```
+
+The installer:
+
+- creates Chute's private Python runtime
+- installs the local bridge
+- enables and starts Chute as a user service
+- preserves existing Chute data during updates
+- opens the Chute `extension/` folder
+- copies the extension-folder path when a supported clipboard helper is available
+- opens the Extensions page in detected Chrome, Chromium, Brave, Opera, and Edge installations
+
+### 3. Load unpacked
+
+In each browser where you want Chute:
+
+1. Click **Load unpacked**.
+2. Select the Chute `extension/` folder that the installer opened.
+
+That's it. The same local Chute is then available to every browser in which you loaded the extension.
+
 ## What this branch represents
 
 Premium v2 introduced or stabilized:
@@ -43,6 +88,8 @@ Premium v2 introduced or stabilized:
 - support/donation UI
 - drag-out and attach behavior for browser destinations
 - local-only bridge architecture
+
+This experimental Linux branch also includes the floating-mascot auto-hide option and the Google/Yandex direct image-drop helper.
 
 ## Local storage
 
@@ -84,30 +131,21 @@ recall
 
 Removing or clearing the live basket does not silently erase the entire preserved-history system. Historical items can be recalled when their preserved file remains available.
 
-## Browser extension development
+## Linux runtime
 
-Load this branch's `extension` directory as an unpacked extension:
+The Linux installation path uses a private Python virtual environment and a user-level systemd service rather than modifying the system Python installation. The service binds to loopback and starts for the current user.
 
-```text
-Chrome: chrome://extensions
-Edge:   edge://extensions
-Brave:  brave://extensions
-Opera:  opera://extensions
-```
-
-Enable Developer mode, choose **Load unpacked**, and select the `extension` directory.
-
-## Linux-oriented installer lineage
-
-This branch contains the Linux-oriented installation path using a private Python virtual environment and a user-level systemd service rather than modifying the system Python installation.
-
-Typical install:
+The underlying installer remains available directly as:
 
 ```bash
 sh scripts/install-user.sh
 ```
 
-The service is designed to bind to loopback and start for the current user.
+but normal users should use:
+
+```bash
+sh install.sh
+```
 
 ## Security/privacy model
 
@@ -120,7 +158,7 @@ The service is designed to bind to loopback and start for the current user.
 
 ## Branch lineage
 
-This is an important historical milestone, but later Windows/product work lives in:
+This branch descends from the Linux-oriented `premium-v2` line. Later Windows/product work lives separately in:
 
 - `windows-v2.3-chromium`
 - `cross-platform-chromium`
