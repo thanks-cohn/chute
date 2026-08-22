@@ -1,325 +1,138 @@
-# Chute
+# Chute — Premium v2
 
-**Pick up a file from your terminal, or feed one to the little bin following you around the browser.**
+> **LICENSE NOTICE — NOT MIT. NON-COMMERCIAL SOURCE-AVAILABLE SOFTWARE.**
+>
+> This branch is provided under the **Chute Source-Available Non-Commercial License v1.0** in [`LICENSE`](LICENSE). Personal, educational, research, evaluation, hobby, and other genuinely non-commercial use is permitted. **Commercial use is prohibited without prior written permission.** You may not sell, monetize, commercially redistribute, bundle into a paid product or service, publish a paid fork or clone, or use this repository or a substantial derivative to create a product or service for financial gain.
 
-Chute is a lightweight localhost file bridge plus a Chrome/Chromium extension. Premium v2 adds a recallable, bottomless local history without adding a database or image-processing dependency to Python.
+**One local Chute, recallable history, browser drag-and-drop.**
 
-The original working release is preserved by the Git tag `v1`. Current v2 work lives on the `premium-v2` branch.
+`premium-v2` is the major local-history/browser milestone in Chute's development lineage. It combines a lightweight localhost service with a Chromium extension and keeps the basket and preserved history on the user's own computer.
 
-## What Chute does
-
-From a terminal:
-
-```bash
-chute ./report.pdf
-chute ./screenshot.png
-chute ./whole-directory
-```
-
-From the browser, drop a file, link, selected text, or a webpage image into the sticky Chute mascot. Items appear in the extension popup and side shelf, ready to attach or drag elsewhere.
-
-Directories sent from the CLI are zipped automatically. The Python service never uploads your files to the internet.
-
-## One Chute, many browsers
-
-Chute is meant to be more than a browser extension. The local Chute service is a **shared handoff interface** between your desktop tools and every browser that has the Chute extension installed.
-
-There is one local basket and one local history:
+## Core idea
 
 ```text
-                 ┌── Chrome
-Desktop / CLI ── Chute ── Opera
-                 ├── Brave
-                 ├── Edge
-                 └── Chromium
+Desktop / CLI
+      │
+      ▼
+127.0.0.1:17891
+      │
+      ├── Chrome
+      ├── Opera
+      ├── Edge
+      ├── Brave
+      └── Chromium
 ```
 
-That means a file or image added through one browser is immediately available through the others on the same computer. For example:
+Compatible browsers talk to the same local Chute service, so one browser can place something into Chute and another can use it.
 
-```text
-Opera → Chute → Chrome
-Chrome → Chute → Brave
-terminal → Chute → any installed browser
-```
+## What this branch represents
 
-The browser extension is therefore a view into the same local Chute, not a separate per-browser storage system.
+Premium v2 introduced or stabilized:
 
-A future native desktop sticky will be a second surface onto that same basket. Browser sticky and desktop sticky are intentionally separate concepts so users will be able to choose **browser only, desktop only, both, or neither**. The current Premium v2 implementation includes the browser sticky; the native desktop overlay is future work and is not silently emulated by the browser extension.
-
-## Browser sticky behavior
-
-The browser sticky is designed as a physical landing point between a webpage and the local computer:
-
-- it is visible by default on ordinary `http://` and `https://` pages;
-- its bottom-right landing point stays physically fixed while you drag;
-- only the Chute itself reacts when the pointer is actually over the drop target;
-- dragging a local file onto it sends the file to the shared Chute basket;
-- dragging a webpage image onto it tries to capture the actual image bytes;
-- if a site prevents Chute from retrieving the image bytes, Chute visibly falls back to saving the source link instead of silently doing nothing;
-- the small supporter card is deliberately restrained so accidental pointer passes do not keep making the sticky jump around.
-
-Chute requests normal `http://` and `https://` host access because capturing arbitrary dragged webpage images is part of the core browser-bridge behavior. The captured bytes are sent only to the local Chute service at `127.0.0.1`; Chute does not upload them to a remote Chute server.
-
-## Premium v2
-
-Premium v2 adds:
-
-- default history view of 50 entries
-- any positive history count you choose
-- `∞` bottomless history that lazily loads older days
-- direct browsing by calendar day
-- generated 48px image thumbnails
-- thumbnail generation in the browser, so Python stays dependency-free
-- recall of removed historical items
-- preserved local Chute copies after Remove or Clear
-- a stable browser sticky that accepts files and webpage images
-- optional browser right-click **Send to Chute** access
-- a mascot supporter popout on hover
-- a **Buy the Creator a Coffee** entry in Settings
-- a frozen, C-friendly history format documented in `HISTORY_FORMAT.md`
+- floating browser Chute mascot
+- local files, webpage images, links, and selected-text intake
+- shared local basket across compatible Chromium browsers
+- side shelf and extension popup
+- preserved Chute copies after live-basket removal
+- recallable append-only history
+- daily UTC TSV history files
+- 48px browser-generated thumbnails
+- optional custom-size image derivatives stored separately from originals
+- browser image provenance in JSONL and human-readable text
+- right-click browser access
+- support/donation UI
+- drag-out and attach behavior for browser destinations
+- local-only bridge architecture
 
 ## Local storage
 
-Everything lives under:
+Default data root:
 
 ```text
 ~/Chute/
 ```
 
-unless `CHUTE_HOME` is explicitly set.
+unless `CHUTE_HOME` is set.
+
+Representative layout:
 
 ```text
 ~/Chute/
-├── queue.json          current live basket
-├── files/              preserved Chute copies
-├── thumbs/             tiny generated WebP thumbnails
+├── queue.json
+├── files/
+├── thumbs/
+├── custom-thumbnails/
+├── image-provenance.jsonl
+├── image-provenance.txt
+├── .update-safety/
 └── history/
-    ├── 2026-08-21.tsv
-    ├── 2026-08-22.tsv
-    └── ...
+    └── YYYY-MM-DD.tsv
 ```
 
-History is split by UTC day instead of being stored in one ever-growing database. Each daily file is append-only UTF-8 TSV with percent-encoded fields. See `HISTORY_FORMAT.md` for the frozen v1 format.
+`files/` contains preserved originals. `thumbs/` contains tiny UI-only derivatives. `custom-thumbnails/` contains optional user-sized derivatives and does not replace the original.
 
 ## History and Recall
 
-Removing an item now means **remove it from the live Chute basket**. It does not erase the preserved Chute copy or its history record.
-
-Historical entries therefore show a **Recall** action. Recall puts the preserved item back into the live basket so it can be attached or dragged again.
-
-The history records `add`, `remove`, `clear`, and `recall` events with UTC timestamps.
-
-## Generated thumbnails
-
-Chute does not ask Python to decode images and does not require Pillow, ImageMagick, SQLite, or another heavyweight runtime dependency.
-
-When an image row approaches the visible extension area:
-
-1. the extension looks for an existing tiny thumbnail under `~/Chute/thumbs/`;
-2. if none exists, Chromium decodes the original image once;
-3. Chute draws it into a 48px canvas;
-4. Chromium compresses that derivative as a small WebP;
-5. the derivative is stored locally and reused thereafter.
-
-The thumbnail is a recognition aid, not a full preview. The original is never recompressed or replaced.
-
-## Bottomless history
-
-Settings allow:
+History is append-only and split by UTC day. Events include:
 
 ```text
-History shown
-[ 50 ] [ ∞ ]
+add
+remove
+clear
+recall
 ```
 
-The number field accepts any positive integer. `∞` does not load every historical item into the browser at once. The extension loads history by day as the user approaches the bottom of the list.
+Removing or clearing the live basket does not silently erase the entire preserved-history system. Historical items can be recalled when their preserved file remains available.
 
-A date picker also allows jumping directly to a specific day.
+## Browser extension development
 
-## Install the computer side
+Load this branch's `extension` directory as an unpacked extension:
 
-Chute requires Python 3.10 or newer and systemd for automatic startup.
+```text
+Chrome: chrome://extensions
+Edge:   edge://extensions
+Brave:  brave://extensions
+Opera:  opera://extensions
+```
 
-Run the user installer from the repository root or from anywhere inside the checkout:
+Enable Developer mode, choose **Load unpacked**, and select the `extension` directory.
+
+## Linux-oriented installer lineage
+
+This branch contains the Linux-oriented installation path using a private Python virtual environment and a user-level systemd service rather than modifying the system Python installation.
+
+Typical install:
 
 ```bash
 sh scripts/install-user.sh
 ```
 
-The installer:
+The service is designed to bind to loopback and start for the current user.
 
-- creates a private runtime under `${XDG_DATA_HOME:-$HOME/.local/share}/chute-runtime/venv`;
-- exposes the `chute` command through `$HOME/.local/bin/chute`;
-- creates the user service under `${XDG_CONFIG_HOME:-$HOME/.config}/systemd/user/chute.service`;
-- enables and starts the service immediately;
-- keeps Chute data under `$HOME/Chute` by default.
+## Security/privacy model
 
-No virtual-environment activation is required after installation. Chute does **not** install packages into the system Python environment.
+- bridge binds to `127.0.0.1` by default
+- no Chute cloud account is required for the local basket
+- preserved files remain on the local computer
+- browser image capture is sent to the local Chute service
+- tiny thumbnails are recognition aids and are never substituted for outgoing original payloads
+- file reads use Chute item identifiers rather than exposing arbitrary filesystem paths
 
-Confirm it works:
+## Branch lineage
 
-```bash
-chute --version
-chute path
-systemctl --user status chute.service
-```
+This is an important historical milestone, but later Windows/product work lives in:
 
-The service starts automatically with the user's systemd session. For startup at machine boot even before login, enable lingering once:
+- `windows-v2.3-chromium`
+- `cross-platform-chromium`
+- `direct-drop-google-yandex`
+- `paid-installer-onboarding`
 
-```bash
-sudo loginctl enable-linger "$USER"
-```
+The frozen original baseline remains separately addressable in the repository's earlier history/tag lineage.
 
-Useful service commands:
+## License
 
-```bash
-systemctl --user restart chute.service
-systemctl --user stop chute.service
-systemctl --user start chute.service
-journalctl --user -u chute.service -f
-```
+**This branch is not MIT licensed.** It is distributed under the **Chute Source-Available Non-Commercial License v1.0**. See [`LICENSE`](LICENSE).
 
-To upgrade after pulling a new Chute version, rerun:
+Commercial use, resale, paid redistribution, commercial forks/clones, commercial derivatives, or use of this code as the basis of a revenue-generating product or service requires separate written permission from the applicable Chute rights holder.
 
-```bash
-sh scripts/install-user.sh
-```
-
-### Arch / Garuda and `externally-managed-environment`
-
-Modern Arch-family systems protect the system Python installation through PEP 668. If an **older Chute installer** prints:
-
-```text
-error: externally-managed-environment
-```
-
-**Do not use `--break-system-packages`.** Premium v2's current installer creates its own private virtual environment and therefore does not need to modify the system Python installation.
-
-If `git pull` refuses to update `scripts/install-user.sh` because an earlier `chmod` or local edit changed it, restore that one file and pull again:
-
-```bash
-cd /path/to/chute
-git restore scripts/install-user.sh
-git pull --ff-only
-sh scripts/install-user.sh
-```
-
-On Arch/Garuda the package named `pip` does not exist as such (`python-pip` is the distro package), but the normal Chute Premium v2 installation should not require installing system pip at all.
-
-## Portability
-
-Chute does not contain a hard-coded username or a hard-coded clone location.
-
-The installer discovers its own repository location from the script path and derives per-user locations from standard environment variables:
-
-```text
-$HOME
-$XDG_DATA_HOME
-$XDG_CONFIG_HOME
-```
-
-Therefore all of these are valid examples without modifying Chute:
-
-```text
-/home/alice/dev/chute
-/home/bob/Downloads/chute
-/home/someone/projects/chute
-```
-
-Each user receives their own corresponding data and runtime directories. Nothing depends on `/home/emmadoku` or another specific account name.
-
-The current automatic installer is portable across **Linux distributions that provide Python 3.10+ with `venv` support and systemd user services**. A distribution may package the Python `venv` component separately; if `python3 -m venv` is unavailable, install that distribution's Python-venv package first.
-
-The browser extension targets Chromium-family browsers such as Chrome, Opera, Brave, Edge, and Chromium. Browser-specific side-panel behavior can vary, but the localhost queue/history is browser-independent and shared by all installed Chute extensions for that user.
-
-Windows and macOS use different background-service systems, so the current `install-user.sh` is not their installer. The Python storage code already avoids embedding a Linux username, but proper native Windows/macOS installers would be separate future work.
-
-If `$HOME/.local/bin` is not already on a user's `PATH`, add it once in the shell configuration or invoke the installed command by its full path. Most modern Linux desktop distributions include it automatically.
-
-## Install the browser extension
-
-### Chrome
-
-1. Open `chrome://extensions`.
-2. Enable **Developer mode**.
-3. Click **Load unpacked**.
-4. Select this repository's `extension` directory.
-5. Pin **Chute** to the toolbar.
-
-### Opera
-
-1. Open `opera://extensions`.
-2. Enable developer mode.
-3. Load the same `extension` directory as an unpacked extension.
-
-Reload a normal webpage after loading or reloading Chute. The taped Chute mascot appears near the lower-right corner. Drop something onto it to add it to the shared local Chute. Click it to open the shelf.
-
-Chrome and Opera do not allow ordinary content scripts on their protected internal browser pages.
-
-## Commands
-
-```text
-chute FILE [FILE ...]      shorthand for chute send
-chute send PATH [...]      queue files or directories
-chute list                 list live queued files
-chute remove ID            remove one item from the live basket
-chute clear                empty the live basket
-chute path                 print Chute's data directory
-chute serve                run the localhost bridge manually
-```
-
-Normal installs do not need `chute serve`; the systemd user service runs the bridge automatically.
-
-The server binds only to `127.0.0.1:17891` by default. Browser drops are limited to 8 GiB by default; set `CHUTE_MAX_UPLOAD_BYTES` to change that limit.
-
-## Drag-out behavior
-
-Chute uses two drag representations:
-
-1. a browser `File` object for permissive and same-document targets;
-2. Chrome's `DownloadURL` virtual-file drag format for crossing out of an extension page.
-
-The **Attach** button remains available for sites that expose a usable file input.
-
-Only the first small live items are prepared eagerly. Older or larger rows prepare when hovered or clicked so bottomless history does not become bottomless RAM usage.
-
-## Browser access modes
-
-The current browser extension exposes three browser-side access modes:
-
-```text
-Floating mascot
-Mascot + right-click
-Right-click only
-```
-
-These settings affect the browser surface only. The future native desktop sticky is deliberately a separate surface rather than being coupled to this browser setting.
-
-## Development
-
-```bash
-python -m unittest discover -s tests -v
-python -m compileall src
-node --check extension/background.js
-node --check extension/content.js
-node --check extension/bin.js
-node --check extension/shelf.js
-node --check extension/popup.js
-```
-
-After editing extension files, open the browser's extension-management page and reload Chute.
-
-## Security model
-
-- the bridge listens on loopback only by default;
-- queue listings, browser ingestion, recall, thumbnail writes, and live-basket changes accept only Chrome-extension or local-service origins;
-- individual preserved-file reads use unguessable Chute IDs;
-- browser uploads are streamed to disk rather than buffered fully in Python memory;
-- Chute copies files into its private local store instead of exposing arbitrary filesystem paths;
-- the browser extension can read `http://` and `https://` resources so a user can drag webpage images into Chute;
-- captured browser files are sent to the local loopback Chute service, not uploaded to a remote Chute server;
-- Remove and Clear affect the live basket, while preserved copies remain available for history/Recall.
-
-## Status
-
-`premium-v2` is the active development branch. The storage/history core is versioned as `2.0.0`, while the original pre-history implementation remains permanently addressable through tag `v1`.
+Historical snapshots that were validly distributed under an earlier license are not retroactively relicensed; the license in this branch applies to the branch state distributed with it to the extent the applicable rights holders have authority over the material.
