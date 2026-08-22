@@ -1,0 +1,20 @@
+/*
+ * Some Chromium-family browsers (notably Opera profile configurations) can
+ * paint an extension iframe's root canvas with the declared color-scheme
+ * even when html/body are otherwise transparent. Chute is a floating widget,
+ * so the iframe canvas itself must never become visible.
+ */
+:root,
+html,
+body {
+  background: transparent !important;
+  background-color: transparent !important;
+  background-image: none !important;
+  color-scheme: normal !important;
+}
+
+html,
+body {
+  margin: 0 !important;
+  padding: 0 !important;
+}
