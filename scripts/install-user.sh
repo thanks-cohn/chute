@@ -64,15 +64,10 @@ make_update_snapshot() {
 
   printf 'Creating pre-update Chute safety checkpoint...\n'
 
-  # Immutable artifact trees use hard links: deleting a live pathname later
-  # cannot destroy the bytes owned by this checkpoint, and large collections
-  # do not get duplicated on disk merely because Chute was updated.
   checkpoint_tree files "$snapshot"
   checkpoint_tree thumbs "$snapshot"
   checkpoint_tree custom-thumbnails "$snapshot"
 
-  # Mutable logs/manifests are copied by value so later appends/replacements do
-  # not mutate the checkpointed version.
   if [ -d "$DATA_DIR/history" ]; then
     cp -a "$DATA_DIR/history" "$snapshot/history"
   fi
@@ -137,7 +132,6 @@ choose_browser() {
       ;;
   esac
 
-  # Fallback when the desktop default cannot be resolved or is not Chromium-based.
   select_browser google-chrome-stable "chrome://extensions"
   select_browser google-chrome "chrome://extensions"
   select_browser chromium "chrome://extensions"
@@ -218,7 +212,7 @@ Restart=on-failure
 RestartSec=2
 
 [Install]
-WantedBy=default.target.target
+WantedBy=default.target
 EOF
 
 systemctl --user stop chute.service >/dev/null 2>&1 || true
