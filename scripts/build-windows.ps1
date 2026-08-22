@@ -1,5 +1,5 @@
 param(
-    [string]$Python = "py"
+    [string]$Python = "python"
 )
 
 $ErrorActionPreference = "Stop"
@@ -11,7 +11,7 @@ $Dist = Join-Path $Repo "dist\windows"
 New-Item -ItemType Directory -Force -Path $BuildRoot, $Dist | Out-Null
 if (Test-Path $Venv) { Remove-Item -Recurse -Force $Venv }
 
-& $Python -3 -m venv $Venv
+& $Python -m venv $Venv
 $Py = Join-Path $Venv "Scripts\python.exe"
 & $Py -m pip install --upgrade pip
 & $Py -m pip install pyinstaller $Repo
