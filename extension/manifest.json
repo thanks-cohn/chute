@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Chute",
-  "version": "2.0.0",
+  "version": "2.0.1",
   "description": "A persistent browser chute with local recallable history and generated image thumbnails.",
   "minimum_chrome_version": "116",
   "permissions": ["activeTab", "contextMenus", "scripting", "sidePanel", "storage"],
@@ -24,7 +24,7 @@
   "content_scripts": [
     {
       "matches": ["http://*/*", "https://*/*"],
-      "js": ["content.js", "content-image-resolver.js", "drop-lifecycle.js"],
+      "js": ["content.js", "content-auto-hide.js", "content-image-resolver.js", "drop-lifecycle.js"],
       "run_at": "document_idle",
       "all_frames": false
     }
