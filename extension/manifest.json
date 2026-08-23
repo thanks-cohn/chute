@@ -35,6 +35,7 @@
         "bin.html",
         "bin.css",
         "bin.js",
+        "bin-sidepanel.js",
         "bin-capture-settings.js",
         "bin-provenance.js"
       ],
