@@ -36,8 +36,7 @@
         "bin.css",
         "bin.js",
         "bin-capture-settings.js",
-        "bin-provenance.js",
-        "bin-drag-support.js"
+        "bin-provenance.js"
       ],
       "matches": ["http://*/*", "https://*/*"]
     }
