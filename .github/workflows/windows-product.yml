@@ -9,7 +9,6 @@ on:
       - src/chute/windows_app.py
       - scripts/windows-entry.py
       - scripts/build-windows.ps1
-      - extension/**
       - .github/workflows/windows-product.yml
 
 permissions:
@@ -95,13 +94,13 @@ jobs:
           @"
           # Chute for Windows v2.5.0 RC1
 
-          Windows companion for Chute 2.5.0 and the Chrome Web Store extension candidate.
+          Windows localhost companion for the Chute 2.5.0 Chrome Web Store extension candidate.
 
           Download `Chute-Setup.exe` and double-click once. Chute installs for the current Windows user, registers normal per-user startup, creates `%USERPROFILE%\Chute`, and starts the local bridge on `127.0.0.1:17891`.
 
-          No Python installation, administrator account, or Windows Service is required.
+          No Python installation, administrator account, Windows Service, Developer Mode, or unpacked browser-extension install is required by this companion.
 
-          This build includes the current v2.5 extension bundle for pre-Store/manual testing. Once the Chrome Web Store version is installed, the same localhost companion services the Store extension.
+          Install the Chute browser extension separately through the Chrome Web Store (or load the candidate unpacked only while testing before publication).
 
           This executable is currently unsigned, so Windows SmartScreen may display an Unknown Publisher warning.
           "@ | Out-File release-notes.md -Encoding utf8
