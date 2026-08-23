@@ -73,9 +73,10 @@
       </label>
 
       <div class="settings-note">Browser captures are independent: keep the full original, save a custom-size derivative, or save both. The custom copy preserves aspect ratio inside the width × height box and may upscale or downscale to honor the requested box. If both are off, Chute saves the source link instead.</div>
-      <div class="settings-note">Generated menu thumbnails are separate 48px recognition previews stored under <code>~/Chute/thumbs/</code>. They are on by default and are never used as the dragged file.</div>
+      <div class="settings-note">Generated menu thumbnails are separate 48px recognition previews stored in your local Chute data folder. They are on by default and are never used as the dragged file.</div>
       <div class="settings-note">Actual file / image is the default drag-out mode. Source address is available when you explicitly want Chute's served location instead.</div>
       <div class="settings-note">The browser sticky and right-click menu feed the same local Chute used by your other installed Chromium browsers.</div>
+      <div class="settings-note"><strong>Privacy:</strong> Chute saves only the files, images, links, selected text, and source page/image addresses you choose to send to it. They go to the Chute companion on your own computer, not to a Chute cloud server.</div>
 
       <button id="clear-chute" class="secondary-button" type="button">Clear Chute</button>
       <div class="settings-note">Clear Chute empties this live working basket. Nothing is deleted from dated history; the Shelf keeps the archive available for Recall.</div>
@@ -97,6 +98,7 @@
   <div class="popup-note">Latest is your live working Chute. Dated history stays on disk and remains available in the Shelf or by choosing a date.</div>
 
   <script src="shelf.js"></script>
+  <script src="companion-help.js"></script>
   <script src="workflow-fixes.js"></script>
   <script src="drag-relay.js"></script>
   <script src="popup.js"></script>
