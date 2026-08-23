@@ -1,0 +1,25 @@
+CHUTE
+
+Summary
+Drag files, images, links, and text through one local Chute basket with recallable history.
+
+Detailed description
+Chute is a persistent local handoff basket for the browser. Pick something up once and drop it where you need it.
+
+• Drag files and images into Chute and drag the real file back out later.
+• Capture webpage images, links, and selected text.
+• Keep one local basket across supported Chromium browsers.
+• Preserve the full original image, create an optional custom-size WebP copy, or keep both.
+• Use separate 48px recognition thumbnails that never replace the real outgoing file.
+• Browse dated local history and Recall preserved items.
+• Choose a floating Chute, right-click access, or both.
+• Auto-hide the floating Chute after 10 seconds or keep it always visible.
+• Drop Chute images directly into supported Google and Yandex image-search flows.
+
+Chute is local-first. A Windows companion running on your computer holds the basket and history at the loopback address 127.0.0.1:17891. A Chute cloud account is not required.
+
+Privacy disclosure: when you explicitly send or capture an item, Chute may store the user-chosen file, image, link, or selected text and the associated source page URL/image URL locally on your computer for the requested basket, provenance, history, and recall features. Chute does not send this basket content or browsing information to a Chute developer-controlled cloud server, advertisers, analytics providers, or data brokers.
+
+Windows companion required: install and run the Chute Windows companion before using the extension. If it is not running, the Chute popup and Shelf provide a setup link.
+
+Chute's single purpose is to make moving and recalling user-chosen files, images, links, and text between webpages and a local computer basket fast and direct.
