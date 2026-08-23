@@ -8,6 +8,7 @@ let busy = false;
 let supportHover = false;
 let supportTimer = null;
 let supportCloseTimer = null;
+let successFeedbackTimer = null;
 let pageDragSource = null;
 let serverCount = 0;
 let pendingSignals = 0;
@@ -219,6 +220,25 @@ function animate(kind) {
   setTimeout(() => bin.classList.remove(kind), 420);
 }
 
+function showSuccessFeedback() {
+  if (successFeedbackTimer) clearTimeout(successFeedbackTimer);
+  animate("success");
+  label.textContent = "YUMMY";
+  face.textContent = "^ ^";
+  count.animate([
+    { transform: "scale(1)" },
+    { transform: "scale(1.28)" },
+    { transform: "scale(1)" }
+  ], { duration: 420, easing: "ease-out" });
+  successFeedbackTimer = setTimeout(() => {
+    successFeedbackTimer = null;
+    if (lastSyncOkay) {
+      label.textContent = "CHUTE";
+      face.textContent = "•ᴗ•";
+    }
+  }, 850);
+}
+
 function renderCount() {
   const total = pendingSignals > 0 ? Math.max(serverCount, optimisticFloor) : serverCount;
   count.hidden = total === 0;
@@ -251,14 +271,14 @@ async function refreshCount() {
     serverCount = payload.files?.length || 0;
     lastSyncOkay = true;
     renderCount();
-    if (!busy && pendingSignals === 0) {
+    if (!busy && pendingSignals === 0 && !successFeedbackTimer) {
       label.textContent = "CHUTE";
       face.textContent = "•ᴗ•";
     }
   } catch {
     lastSyncOkay = false;
     renderCount();
-    if (!busy && pendingSignals === 0) {
+    if (!busy && pendingSignals === 0 && !successFeedbackTimer) {
       count.hidden = true;
       label.textContent = "OFF";
       face.textContent = "•︵•";
@@ -267,6 +287,7 @@ async function refreshCount() {
 }
 
 function setSupportHover(next) {
+  if (!supportCard) return;
   if (supportHover === next) return;
   supportHover = next;
   supportCard.classList.toggle("visible", next);
@@ -281,6 +302,7 @@ function cancelSupportClose() {
 }
 
 function scheduleSupportClose() {
+  if (!supportCard) return;
   cancelSupportClose();
   supportCloseTimer = setTimeout(() => {
     supportCloseTimer = null;
@@ -293,6 +315,7 @@ function setDragVisual(active) {
 }
 
 bin.addEventListener("pointerenter", () => {
+  if (!supportCard) return;
   cancelSupportClose();
   if (supportHover || supportTimer) return;
   supportTimer = setTimeout(() => {
@@ -302,6 +325,7 @@ bin.addEventListener("pointerenter", () => {
 });
 
 bin.addEventListener("pointerleave", () => {
+  if (!supportCard) return;
   if (supportTimer) {
     clearTimeout(supportTimer);
     supportTimer = null;
@@ -309,12 +333,12 @@ bin.addEventListener("pointerleave", () => {
   if (supportHover) scheduleSupportClose();
 });
 
-supportCard.addEventListener("pointerenter", () => {
+supportCard?.addEventListener("pointerenter", () => {
   cancelSupportClose();
   setSupportHover(true);
 });
-supportCard.addEventListener("pointerleave", () => scheduleSupportClose());
-supportCard.addEventListener("click", (event) => event.stopPropagation());
+supportCard?.addEventListener("pointerleave", () => scheduleSupportClose());
+supportCard?.addEventListener("click", (event) => event.stopPropagation());
 
 async function consumePayloadsNow(payloadPromise, expected) {
   busy = true;
@@ -331,19 +355,15 @@ async function consumePayloadsNow(payloadPromise, expected) {
 
     label.textContent = payloads.length > 1 ? `0/${payloads.length}` : "EATING";
     let completed = 0;
-    let usedImageFallback = false;
     for (const payload of payloads) {
       await uploadBlob(payload.blob, payload.name, payload.source);
       completed += 1;
-      usedImageFallback ||= payload.kind === "image-link";
       if (payloads.length > 1) label.textContent = `${completed}/${payloads.length}`;
     }
 
     await refreshCount();
     succeeded = true;
-    animate("success");
-    label.textContent = usedImageFallback ? "LINK SAVED" : "GOT IT";
-    face.textContent = "^ᴗ^";
+    showSuccessFeedback();
     chrome.runtime.sendMessage({ type: "badge-refresh" });
   } catch (error) {
     animate("failure");
