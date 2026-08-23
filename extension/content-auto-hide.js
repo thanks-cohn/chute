@@ -7,6 +7,7 @@
   const DRAG_HIDE_DELAY_MS = 1200;
   const EDGE_TRIGGER_WIDTH = 32;
   const EDGE_TRIGGER_HEIGHT = 150;
+  const EDGE_HOLD_MS = 1400;
   const HIDDEN_TRANSFORM = "translateX(calc(100% + 8px))";
 
   let host = null;
@@ -19,6 +20,7 @@
   let dragActive = false;
   let hideTimer = null;
   let initialTimer = null;
+  let edgeHoldTimer = null;
   let lastPointerX = null;
   let lastPointerY = null;
 
@@ -36,6 +38,22 @@
     if (!initialTimer) return;
     clearTimeout(initialTimer);
     initialTimer = null;
+  }
+
+  function clearEdgeHoldTimer() {
+    if (!edgeHoldTimer) return;
+    clearTimeout(edgeHoldTimer);
+    edgeHoldTimer = null;
+  }
+
+  function armEdgeHoldTimer() {
+    clearEdgeHoldTimer();
+    if (!pointerNearZone || !autoHide || !floatingEnabled(accessMode)) return;
+    edgeHoldTimer = setTimeout(() => {
+      edgeHoldTimer = null;
+      pointerNearZone = false;
+      if (!hostHovered && !supportActive && !dragActive) scheduleHide(0);
+    }, EDGE_HOLD_MS);
   }
 
   function canHide() {
@@ -99,12 +117,15 @@
     lastPointerY = y;
     pointerNearZone = nearRevealZone(x, y);
     hostHovered = pointerInsideHost(x, y);
+    if (pointerNearZone) armEdgeHoldTimer();
+    else clearEdgeHoldTimer();
   }
 
   function clearTransientInteraction({ clearDrag = false } = {}) {
     hostHovered = false;
     pointerNearZone = false;
     supportActive = false;
+    clearEdgeHoldTimer();
     if (clearDrag) dragActive = false;
   }
 
@@ -114,9 +135,12 @@
     if (Number.isFinite(lastPointerX) && Number.isFinite(lastPointerY)) {
       pointerNearZone = nearRevealZone(lastPointerX, lastPointerY);
       hostHovered = pointerInsideHost(lastPointerX, lastPointerY);
+      if (pointerNearZone) armEdgeHoldTimer();
+      else clearEdgeHoldTimer();
     } else {
       hostHovered = false;
       pointerNearZone = false;
+      clearEdgeHoldTimer();
     }
 
     if (hostHovered || pointerNearZone || supportActive || dragActive) {
@@ -131,12 +155,14 @@
     if (!floatingEnabled(accessMode)) {
       clearHideTimer();
       clearInitialTimer();
+      clearEdgeHoldTimer();
       reveal();
       return;
     }
     if (!autoHide) {
       clearHideTimer();
       clearInitialTimer();
+      clearEdgeHoldTimer();
       reveal();
       return;
     }
@@ -162,7 +188,8 @@
     host.addEventListener("mouseleave", (event) => {
       rememberPointer(event.clientX, event.clientY);
       hostHovered = false;
-      scheduleHide();
+      if (pointerNearZone) armEdgeHoldTimer();
+      else scheduleHide();
     });
 
     applyPolicy({ freshWindow: true });
@@ -201,12 +228,18 @@
     lastPointerX = event.clientX;
     lastPointerY = event.clientY;
     pointerNearZone = nearRevealZone(event.clientX, event.clientY);
-    if (pointerNearZone) reveal();
+    if (pointerNearZone) {
+      armEdgeHoldTimer();
+      reveal();
+    } else {
+      clearEdgeHoldTimer();
+    }
   }, true);
 
   function finishDrag() {
     dragActive = false;
     pointerNearZone = false;
+    clearEdgeHoldTimer();
     scheduleHide(DRAG_HIDE_DELAY_MS);
   }
 
