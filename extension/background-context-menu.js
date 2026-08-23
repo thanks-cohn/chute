@@ -1,23 +1,31 @@
 // Keep the image action available even when the floating mascot is the user's
 // preferred browser access mode. Link/page/selection actions still respect the
 // broader context-menu setting.
-syncContextMenu = async function(mode) {
-  await chrome.contextMenus.removeAll();
-  const contexts = mode === "context" || mode === "both"
-    ? ["image", "link", "selection", "page"]
-    : ["image"];
+let chuteContextMenuSync = Promise.resolve();
 
-  await new Promise((resolve, reject) => {
-    chrome.contextMenus.create({
-      id: "chute-send",
-      title: contexts.length === 1 ? "Send image to Chute" : "Send to Chute",
-      contexts
-    }, () => {
-      const error = chrome.runtime.lastError;
-      if (error) reject(new Error(error.message));
-      else resolve();
+syncContextMenu = function(mode) {
+  chuteContextMenuSync = chuteContextMenuSync
+    .catch(() => {})
+    .then(async () => {
+      await chrome.contextMenus.removeAll();
+      const contexts = mode === "context" || mode === "both"
+        ? ["image", "link", "selection", "page"]
+        : ["image"];
+
+      await new Promise((resolve, reject) => {
+        chrome.contextMenus.create({
+          id: "chute-send",
+          title: contexts.length === 1 ? "Send image to Chute" : "Send to Chute",
+          contexts
+        }, () => {
+          const error = chrome.runtime.lastError;
+          if (error) reject(new Error(error.message));
+          else resolve();
+        });
+      });
     });
-  });
+
+  return chuteContextMenuSync;
 };
 
 // A development extension reload does not necessarily emit onInstalled or a
