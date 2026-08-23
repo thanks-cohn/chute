@@ -56,6 +56,7 @@ button, input, select { font: inherit; }
   cursor: pointer;
   user-select: none;
 }
+.settings-panel:not([open]) > .settings { display: none; }
 .settings {
   display: grid;
   grid-template-columns: 1fr auto;
