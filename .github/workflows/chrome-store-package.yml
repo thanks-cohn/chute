@@ -1,0 +1,58 @@
+name: Build Chrome Web Store package
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - chrome_extension_windows_version
+    paths:
+      - extension/**
+      - scripts/build-chrome-store.py
+      - .github/workflows/chrome-store-package.yml
+
+permissions:
+  contents: read
+
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out Chute
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Build Chrome Web Store package
+        run: python scripts/build-chrome-store.py
+
+      - name: Inspect packaged manifest
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          manifest = json.loads(Path('dist/chrome-store/chute-extension-2.5.0/manifest.json').read_text())
+          assert manifest['manifest_version'] == 3
+          assert manifest['version'] == '2.5.0'
+          assert len(manifest['description']) <= 132
+          assert 'activeTab' not in manifest.get('permissions', [])
+          assert 'scripting' not in manifest.get('permissions', [])
+          assert Path('dist/chrome-store/chute-chrome-2.5.0.zip').is_file()
+          for size in ('16', '32', '48', '128'):
+              assert Path('dist/chrome-store/chute-extension-2.5.0', manifest['icons'][size]).is_file()
+          print(json.dumps(manifest, indent=2))
+          PY
+
+      - name: Upload Chrome Web Store package
+        uses: actions/upload-artifact@v4
+        with:
+          name: Chute-Chrome-Web-Store-v2.5.0
+          path: |
+            dist/chrome-store/chute-chrome-2.5.0.zip
+            dist/chrome-store/store-assets/store-icon-128.png
+            dist/chrome-store/store-assets/small-promo-440x280.png
+            dist/chrome-store/store-assets/marquee-1400x560.png
+            CHROME_WEB_STORE_SUBMISSION.md
+            PRIVACY.md
