@@ -1,0 +1,119 @@
+name: Build Windows product binary
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - chrome_extension_windows_version
+    paths:
+      - src/chute/windows_app.py
+      - scripts/windows-entry.py
+      - scripts/build-windows.ps1
+      - extension/**
+      - .github/workflows/windows-product.yml
+
+permissions:
+  contents: write
+
+jobs:
+  windows-product:
+    runs-on: windows-latest
+    steps:
+      - name: Check out Chute
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Build single-file Windows binary
+        shell: powershell
+        run: powershell -ExecutionPolicy Bypass -File scripts\build-windows.ps1
+
+      - name: Rename as customer setup binary
+        shell: powershell
+        run: |
+          Copy-Item dist\windows\Chute-Windows.exe dist\windows\Chute-Setup.exe -Force
+
+      - name: Smoke-test self-install and localhost bridge
+        shell: powershell
+        run: |
+          $ErrorActionPreference = "Stop"
+          $setup = (Resolve-Path "dist\windows\Chute-Setup.exe").Path
+          & $setup
+
+          $healthy = $false
+          for ($i = 0; $i -lt 40; $i++) {
+            try {
+              $response = Invoke-WebRequest -UseBasicParsing -Uri "http://127.0.0.1:17891/health" -TimeoutSec 1
+              if ($response.StatusCode -eq 200) {
+                $healthy = $true
+                break
+              }
+            } catch {}
+            Start-Sleep -Milliseconds 250
+          }
+          if (-not $healthy) { throw "Chute localhost bridge did not become healthy" }
+
+          $installed = Join-Path $env:LOCALAPPDATA "Programs\Chute\Chute.exe"
+          if (-not (Test-Path $installed)) { throw "Self-installed Chute.exe was not found at $installed" }
+
+          $data = Join-Path $env:USERPROFILE "Chute"
+          if (-not (Test-Path $data)) { throw "Windows Chute data directory was not created at $data" }
+
+          $startup = (Get-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Run" -Name "Chute" -ErrorAction Stop).Chute
+          if (-not $startup) { throw "Chute per-user startup registration was not created" }
+
+          Write-Host "PASS: setup executable self-installed"
+          Write-Host "PASS: localhost bridge healthy on 127.0.0.1:17891"
+          Write-Host "PASS: data directory = $data"
+          Write-Host "PASS: startup registration = $startup"
+
+      - name: Create SHA-256 checksum
+        shell: powershell
+        run: |
+          $hash = (Get-FileHash "dist\windows\Chute-Setup.exe" -Algorithm SHA256).Hash.ToLowerInvariant()
+          "$hash  Chute-Setup.exe" | Out-File "dist\windows\Chute-Setup.exe.sha256" -Encoding ascii
+          Write-Host "SHA256: $hash"
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Chute-Windows-v2.5.0-rc1
+          path: |
+            dist/windows/Chute-Setup.exe
+            dist/windows/Chute-Setup.exe.sha256
+
+      - name: Publish GitHub prerelease
+        shell: powershell
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $ErrorActionPreference = "Stop"
+          $tag = "chute-windows-v2.5.0-rc1"
+          @"
+          # Chute for Windows v2.5.0 RC1
+
+          Windows companion for Chute 2.5.0 and the Chrome Web Store extension candidate.
+
+          Download `Chute-Setup.exe` and double-click once. Chute installs for the current Windows user, registers normal per-user startup, creates `%USERPROFILE%\Chute`, and starts the local bridge on `127.0.0.1:17891`.
+
+          No Python installation, administrator account, or Windows Service is required.
+
+          This build includes the current v2.5 extension bundle for pre-Store/manual testing. Once the Chrome Web Store version is installed, the same localhost companion services the Store extension.
+
+          This executable is currently unsigned, so Windows SmartScreen may display an Unknown Publisher warning.
+          "@ | Out-File release-notes.md -Encoding utf8
+
+          $savedPreference = $ErrorActionPreference
+          $ErrorActionPreference = "SilentlyContinue"
+          gh release view $tag *> $null
+          $releaseExists = $LASTEXITCODE -eq 0
+          $ErrorActionPreference = $savedPreference
+
+          if ($releaseExists) {
+            gh release upload $tag dist\windows\Chute-Setup.exe dist\windows\Chute-Setup.exe.sha256 --clobber
+          } else {
+            gh release create $tag dist\windows\Chute-Setup.exe dist\windows\Chute-Setup.exe.sha256 --target $env:GITHUB_SHA --title "Chute for Windows v2.5.0 RC1" --notes-file release-notes.md --prerelease
+          }
