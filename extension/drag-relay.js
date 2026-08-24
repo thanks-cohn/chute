@@ -67,6 +67,13 @@ document.addEventListener("dragstart", (event) => {
   const item = decodeChuteRelayToken(token);
   if (!item) return;
 
+  // Chromium can strip or hide private drag MIME values when a drag crosses
+  // extension-window boundaries. Mirror the same harmless Chute reference into
+  // text/plain so FileChute can still recover the original through Chute's local
+  // bridge. Image drags replace this with their normal localhost URL fallback
+  // below, while retaining the private token as well.
+  try { event.dataTransfer.setData("text/plain", token); } catch {}
+
   addImageDragFallback(event.dataTransfer, item);
   chrome.runtime.sendMessage({ type: "chute-drag-out-start", file: item }).catch(() => {});
 }, false);
