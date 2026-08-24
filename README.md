@@ -6,9 +6,33 @@ Chute is a tiny local browser basket for files, images, links, and text.
 
 Drag something into Chute. Drag it back out wherever you need it. No upload ritual, no hunting through folders, no cloud account.
 
+## Chute + FrameChute
+
+Chute and [FrameChute](https://github.com/thanks-cohn/framechute) are designed to work together.
+
+**Chute catches things. FrameChute arranges them.**
+
+Use Chute as the quick, shared basket between Chromium browsers, then throw what you collected onto a persistent FrameChute workspace when you want to actually work with it.
+
+```text
+webpage / file / image
+        ↓
+      Chute
+        ↓ drag from popup or Shelf
+    FrameChute
+        ↓
+move · resize · layer · save · return later
+```
+
+For images, Chute exposes normal browser drag formats alongside its own richer drag data. That means an image in Chute can be dragged directly from the Chute popup or Shelf onto the FrameChute canvas and become an image block there.
+
+Neither project depends on the other. Chute still works as a standalone local basket, and FrameChute still works as a standalone spatial workspace. Together they remove another little piece of distance between finding something and putting it where you actually want it.
+
+### [Get FrameChute](https://github.com/thanks-cohn/framechute)
+
 ## Why Chute is different
 
-- **Pick up and drop anywhere** — drag files and images into the floating Chute, then drag them straight back into websites, chats, upload boxes, and other supported targets.
+- **Pick up and drop anywhere** — drag files and images into the floating Chute, then drag them straight back into websites, chats, upload boxes, FrameChute, and other supported targets.
 - **One basket across browsers** — Chrome, Chromium, Brave, Opera, and Edge can share the same local Chute.
 - **Keep the original** — Chute can preserve a full local copy of a browser image.
 - **Make custom-size copies too** — optionally create a separate image copy at the width × height you choose while preserving aspect ratio. Keep the original, the resized copy, or both.
