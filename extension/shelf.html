@@ -8,14 +8,17 @@
   <style>
     body { min-height: 100vh; }
     .topbar { position: sticky; top: 0; z-index: 5; }
-    .folder-bar { display:flex; gap:8px; align-items:center; padding:8px 12px; border-bottom:1px solid rgba(127,127,127,.22); }
-    .folder-label { min-width:0; flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; opacity:.82; }
+    .folder-bar { display:flex; gap:8px; align-items:center; padding:8px 12px; border-bottom:1px solid rgba(127,127,127,.22); flex-wrap:wrap; }
+    .folder-label { min-width:120px; flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; opacity:.82; }
+    .thumb-option { display:flex; align-items:center; gap:6px; font-size:12px; opacity:.88; user-select:none; white-space:nowrap; }
+    .thumb-option input { margin:0; }
     .drop-zone { margin:10px 12px; padding:14px; border:1px dashed rgba(127,127,127,.45); border-radius:12px; text-align:center; transition:transform .12s ease, box-shadow .12s ease; }
     .drop-zone.dragging { transform:scale(1.01); box-shadow:0 0 0 3px rgba(160,220,80,.18); }
     .file-list { padding:0 12px 64px; display:flex; flex-direction:column; gap:8px; }
     .file-row { display:grid; grid-template-columns:52px minmax(0,1fr) auto; gap:10px; align-items:center; }
-    .file-thumb { width:48px; height:48px; object-fit:cover; border-radius:8px; }
-    .file-fallback { width:48px; height:48px; display:grid; place-items:center; }
+    .thumb-shell { width:48px; height:48px; position:relative; display:grid; place-items:center; overflow:hidden; border-radius:8px; }
+    .file-thumb { width:48px; height:48px; object-fit:cover; border-radius:8px; display:block; }
+    .file-fallback { position:absolute; inset:0; display:grid; place-items:center; font-size:18px; opacity:.65; }
     .file-name { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
     .file-meta { opacity:.72; font-size:12px; }
     .file-tools { display:flex; gap:6px; }
@@ -38,6 +41,10 @@
   <div class="folder-bar">
     <button id="choose-folder" class="secondary-button" type="button">Choose Chute folder</button>
     <div id="folder-label" class="folder-label">Browser storage only</div>
+    <label class="thumb-option" title="Store small browser-local preview images for the shelf">
+      <input id="thumbnail-toggle" type="checkbox" checked>
+      Save thumbnails
+    </label>
   </div>
 
   <div id="drop-zone" class="drop-zone">
