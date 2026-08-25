@@ -3,6 +3,9 @@ const MAX_CAPTURE_AGE_MS = 12000;
 const DB_NAME = "chute-browser-shelf-v1";
 const DB_VERSION = 1;
 const ITEMS = "items";
+const KV = "kv";
+const FOLDER_KEY = "chute-folder";
+const AUTO_MIRROR_SETTING = "chuteAutoMirrorFolder";
 const MAX_BYTES = 48 * 1024 * 1024;
 
 function openDb() {
@@ -14,7 +17,7 @@ function openDb() {
         const store = db.createObjectStore(ITEMS, { keyPath: "id" });
         store.createIndex("createdAt", "createdAt");
       }
-      if (!db.objectStoreNames.contains("kv")) db.createObjectStore("kv");
+      if (!db.objectStoreNames.contains(KV)) db.createObjectStore(KV);
     };
     request.onsuccess = () => resolve(request.result);
     request.onerror = () => reject(request.error);
@@ -101,7 +104,57 @@ async function storePayload({ base64, name, type, lastModified, source, sourceUr
     blob
   };
   await putItem(item);
-  return { id: item.id, name: item.name, mime: item.mime, size: item.size };
+  const mirrored = await mirrorItemIfAllowed(item).catch(() => ({ saved: false }));
+  try { new BroadcastChannel("chute-shelf-events-v1").postMessage({ type: "changed" }); } catch {}
+  return { id: item.id, name: item.name, mime: item.mime, size: item.size, mirrored };
+}
+
+async function readKv(key) {
+  const db = await openDb();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(KV, "readonly");
+    const request = tx.objectStore(KV).get(key);
+    request.onsuccess = () => resolve(request.result ?? null);
+    request.onerror = () => reject(request.error);
+  });
+}
+
+async function fileExists(directory, name) {
+  try { await directory.getFileHandle(name); return true; } catch { return false; }
+}
+
+function splitName(name) {
+  const value = safeName(name, timestampName("application/octet-stream"));
+  const index = value.lastIndexOf(".");
+  if (index <= 0 || index === value.length - 1) return { stem: value, ext: "" };
+  return { stem: value.slice(0, index), ext: value.slice(index) };
+}
+
+async function uniqueFolderName(directory, requested) {
+  const { stem, ext } = splitName(requested);
+  let candidate = `${stem}${ext}`;
+  if (!(await fileExists(directory, candidate))) return candidate;
+  for (let number = 2; number < 10000; number += 1) {
+    candidate = `${stem} (${number})${ext}`;
+    if (!(await fileExists(directory, candidate))) return candidate;
+  }
+  return `${stem}-${Date.now()}${ext}`;
+}
+
+async function mirrorItemIfAllowed(item) {
+  const settings = await chrome.storage.local.get({ [AUTO_MIRROR_SETTING]: true });
+  if (settings[AUTO_MIRROR_SETTING] === false) return { saved: false, reason: "disabled" };
+  const handle = await readKv(FOLDER_KEY);
+  if (!handle || handle.kind !== "directory") return { saved: false, reason: "no-folder" };
+  let permission = "none";
+  try { permission = await handle.queryPermission({ mode: "readwrite" }); } catch {}
+  if (permission !== "granted") return { saved: false, reason: "permission" };
+  const name = await uniqueFolderName(handle, item.name);
+  const fileHandle = await handle.getFileHandle(name, { create: true });
+  const writable = await fileHandle.createWritable();
+  await writable.write(item.blob);
+  await writable.close();
+  return { saved: true, name, folder: handle.name };
 }
 
 async function configureSidePanel() {
