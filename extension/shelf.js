@@ -1,482 +1,353 @@
-const BASE_URL = "http://127.0.0.1:17891";
-const THUMB_SIZE = 48;
-const CHUTE_DRAG_TYPE = "application/x-chute-item";
-const CHUTE_DRAG_PREFIX = "CHUTE_ITEM:";
-const generatedThumbs = new Set();
-
-let displayLimit = 50;
-let showThumbnails = true;
-let dragOutMode = "file";
-let selectedDay = "";
-let loadedCount = 0;
-let previousDate = null;
-let nextDate = null;
-let currentDate = null;
-let loadingHistory = false;
-let dragOutActive = false;
-let dragGeometrySnapshot = null;
+const DB_NAME = "chute-browser-shelf-v1";
+const DB_VERSION = 1;
+const ITEMS = "items";
+const KV = "kv";
+const FOLDER_KEY = "chute-folder";
+const MAX_BROWSER_ITEM_BYTES = 48 * 1024 * 1024;
 
 const listElement = document.querySelector("#files");
 const statusElement = document.querySelector("#status");
 const clearButton = document.querySelector("#clear");
-const refreshButton = document.querySelector("#refresh");
-const historyDateInput = document.querySelector("#history-date");
-const historyPrevButton = document.querySelector("#history-prev");
-const historyNextButton = document.querySelector("#history-next");
-const historyLatestButton = document.querySelector("#history-latest");
-const sentinel = document.querySelector("#history-sentinel");
+const chooseFolderButton = document.querySelector("#choose-folder");
+const folderLabel = document.querySelector("#folder-label");
+const dropZone = document.querySelector("#drop-zone");
 
-function formatSize(bytes) {
-  const units = ["B", "KB", "MB", "GB"];
-  let value = bytes;
-  let unit = units[0];
-  for (const candidate of units) {
-    unit = candidate;
-    if (value < 1024 || candidate === units.at(-1)) break;
-    value /= 1024;
-  }
-  return `${value < 10 && unit !== "B" ? value.toFixed(1) : Math.round(value)} ${unit}`;
-}
+let objectUrls = [];
+let busy = false;
 
-function formatWhen(value) {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "";
-  return date.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
-}
-
-function iconFor(file) {
-  if (file.mime?.startsWith("image/")) return "🖼️";
-  if (file.mime === "application/pdf") return "📕";
-  if (file.name?.endsWith(".zip")) return "📦";
-  if (file.name?.endsWith(".url")) return "🔗";
-  if (file.mime?.startsWith("text/")) return "📝";
-  return "📄";
-}
-
-function fileUrl(file) {
-  return `${BASE_URL}/api/files/${encodeURIComponent(file.id)}`;
-}
-
-function thumbnailUrl(file) {
-  return `${BASE_URL}/api/thumbnails/${encodeURIComponent(file.id)}`;
-}
-
-function dragFilename(name) {
-  return String(name || "file").replace(/[:\r\n]/g, "_");
-}
-
-function chuteToken(file) {
-  return `${CHUTE_DRAG_PREFIX}${encodeURIComponent(JSON.stringify({
-    id: file.id,
-    name: file.name,
-    mime: file.mime || "application/octet-stream"
-  }))}`;
-}
-
-async function api(path, options = {}) {
-  const response = await fetch(`${BASE_URL}${path}`, { cache: "no-store", ...options });
-  if (!response.ok) {
-    let detail = "";
-    try {
-      const payload = await response.json();
-      detail = payload.error || "";
-    } catch {}
-    throw new Error(detail || `Local bridge returned ${response.status}`);
-  }
-  return response;
-}
-
-function canvasThumbnail(blob) {
-  return createImageBitmap(blob).then((bitmap) => {
-    const scale = Math.min(THUMB_SIZE / bitmap.width, THUMB_SIZE / bitmap.height, 1);
-    const width = Math.max(1, Math.round(bitmap.width * scale));
-    const height = Math.max(1, Math.round(bitmap.height * scale));
-    const canvas = document.createElement("canvas");
-    canvas.width = THUMB_SIZE;
-    canvas.height = THUMB_SIZE;
-    const context = canvas.getContext("2d", { alpha: true });
-    context.clearRect(0, 0, THUMB_SIZE, THUMB_SIZE);
-    context.drawImage(
-      bitmap,
-      Math.floor((THUMB_SIZE - width) / 2),
-      Math.floor((THUMB_SIZE - height) / 2),
-      width,
-      height
-    );
-    bitmap.close();
-    return new Promise((resolve, reject) => {
-      canvas.toBlob(
-        (thumb) => thumb ? resolve(thumb) : reject(new Error("Could not generate thumbnail")),
-        "image/webp",
-        0.42
-      );
-    });
+function openDb() {
+  return new Promise((resolve, reject) => {
+    const request = indexedDB.open(DB_NAME, DB_VERSION);
+    request.onupgradeneeded = () => {
+      const db = request.result;
+      if (!db.objectStoreNames.contains(ITEMS)) {
+        const store = db.createObjectStore(ITEMS, { keyPath: "id" });
+        store.createIndex("createdAt", "createdAt");
+      }
+      if (!db.objectStoreNames.contains(KV)) db.createObjectStore(KV);
+    };
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error);
   });
 }
 
-async function ensureThumbnail(file, img) {
-  if (!showThumbnails || !file.mime?.startsWith("image/") || generatedThumbs.has(file.id)) return;
-
-  try {
-    const cached = await fetch(thumbnailUrl(file), { cache: "force-cache" });
-    if (cached.ok) {
-      const blob = await cached.blob();
-      if (blob.size) {
-        img.src = URL.createObjectURL(blob);
-        img.hidden = false;
-        generatedThumbs.add(file.id);
-        return;
-      }
-    }
-
-    const response = await api(`/api/files/${encodeURIComponent(file.id)}`);
-    const source = await response.blob();
-    const thumbnail = await canvasThumbnail(source);
-    img.src = URL.createObjectURL(thumbnail);
-    img.hidden = false;
-
-    await fetch(thumbnailUrl(file), {
-      method: "POST",
-      headers: { "Content-Type": "image/webp" },
-      body: thumbnail
-    });
-    generatedThumbs.add(file.id);
-  } catch (error) {
-    img.hidden = true;
-    console.warn("Chute thumbnail generation failed:", error);
-  }
+async function withStore(name, mode, work) {
+  const db = await openDb();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(name, mode);
+    const store = tx.objectStore(name);
+    let result;
+    try { result = work(store); } catch (error) { reject(error); return; }
+    tx.oncomplete = () => resolve(result);
+    tx.onerror = () => reject(tx.error);
+    tx.onabort = () => reject(tx.error || new Error("Storage transaction aborted."));
+  });
 }
 
-const thumbObserver = new IntersectionObserver((entries) => {
-  for (const entry of entries) {
-    if (!entry.isIntersecting) continue;
-    const img = entry.target;
-    thumbObserver.unobserve(img);
-    const file = img.__chuteFile;
-    if (file) ensureThumbnail(file, img);
-  }
-}, { rootMargin: "180px" });
-
-function lockPopupGeometry() {
-  if (!location.pathname.endsWith("/popup.html") || dragGeometrySnapshot) return;
-  const root = document.documentElement;
-  const body = document.body;
-  const rect = root.getBoundingClientRect();
-  dragGeometrySnapshot = {
-    rootStyle: root.getAttribute("style"),
-    bodyStyle: body.getAttribute("style")
-  };
-  const width = Math.ceil(rect.width);
-  const height = Math.ceil(rect.height);
-  root.style.width = `${width}px`;
-  root.style.minWidth = `${width}px`;
-  root.style.maxWidth = `${width}px`;
-  root.style.height = `${height}px`;
-  root.style.minHeight = `${height}px`;
-  root.style.maxHeight = `${height}px`;
-  body.style.width = `${width}px`;
-  body.style.minWidth = `${width}px`;
-  body.style.maxWidth = `${width}px`;
-  body.style.height = `${height}px`;
-  body.style.minHeight = `${height}px`;
-  body.style.maxHeight = `${height}px`;
-  body.style.overflow = "auto";
+async function putItem(item) {
+  await withStore(ITEMS, "readwrite", (store) => store.put(item));
 }
 
-function unlockPopupGeometry() {
-  if (!dragGeometrySnapshot) return;
-  const root = document.documentElement;
-  const body = document.body;
-  if (dragGeometrySnapshot.rootStyle === null) root.removeAttribute("style");
-  else root.setAttribute("style", dragGeometrySnapshot.rootStyle);
-  if (dragGeometrySnapshot.bodyStyle === null) body.removeAttribute("style");
-  else body.setAttribute("style", dragGeometrySnapshot.bodyStyle);
-  dragGeometrySnapshot = null;
+async function deleteItem(id) {
+  await withStore(ITEMS, "readwrite", (store) => store.delete(id));
 }
 
-function beginDragOut() {
-  dragOutActive = true;
-  lockPopupGeometry();
+async function clearItems() {
+  await withStore(ITEMS, "readwrite", (store) => store.clear());
 }
 
-function endDragOut() {
-  dragOutActive = false;
-  setTimeout(unlockPopupGeometry, 120);
+async function allItems() {
+  const db = await openDb();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(ITEMS, "readonly");
+    const request = tx.objectStore(ITEMS).getAll();
+    request.onsuccess = () => resolve((request.result || []).sort((a, b) => Number(b.createdAt) - Number(a.createdAt)));
+    request.onerror = () => reject(request.error);
+  });
 }
 
-function createRow(file, index) {
-  const row = document.createElement("article");
-  row.className = `file-row${file.active ? "" : " archived"}`;
-  row.dataset.chuteId = file.id;
-  const state = file.active
-    ? dragOutMode === "source" ? "Drag address" : "Drag original"
-    : "In history";
-
-  row.innerHTML = `
-    <div class="file-icon">
-      <span class="file-fallback">${iconFor(file)}</span>
-    </div>
-    <div class="file-info">
-      <div class="file-name" title="${escapeHtml(file.name)}">${escapeHtml(file.name)}</div>
-      <div class="file-meta">${formatSize(file.size)} · ${formatWhen(file.created_at)} · <span class="file-state">${state}</span></div>
-    </div>
-    <div class="file-tools"></div>`;
-
-  const icon = row.querySelector(".file-icon");
-  let thumb = null;
-  if (showThumbnails && file.mime?.startsWith("image/")) {
-    thumb = document.createElement("img");
-    thumb.className = "file-thumb";
-    thumb.alt = "";
-    thumb.hidden = true;
-    thumb.draggable = false;
-    thumb.__chuteFile = file;
-    icon.append(thumb);
-    thumbObserver.observe(thumb);
-  }
-
-  const tools = row.querySelector(".file-tools");
-
-  if (file.active) {
-    row.draggable = true;
-    row.classList.add("ready");
-
-    const attach = document.createElement("button");
-    attach.className = "secondary-button attach";
-    attach.title = "Attach the original file to the active tab";
-    attach.textContent = "Attach";
-
-    const remove = document.createElement("button");
-    remove.className = "icon-button remove";
-    remove.title = "Remove from the live chute";
-    remove.textContent = "×";
-    tools.append(attach, remove);
-
-    row.addEventListener("dragstart", (event) => {
-      const transfer = event.dataTransfer;
-      if (!transfer) return;
-      beginDragOut();
-
-      if (dragOutMode === "source") {
-        const url = fileUrl(file);
-        const mime = file.mime || "application/octet-stream";
-        transfer.effectAllowed = "copyLink";
-        transfer.setData("text/uri-list", url);
-        transfer.setData("text/plain", url);
-        transfer.setData("DownloadURL", `${mime}:${dragFilename(file.name)}:${url}`);
-      } else {
-        const token = chuteToken(file);
-        transfer.effectAllowed = "copy";
-        transfer.setData(CHUTE_DRAG_TYPE, token);
-      }
-
-      if (thumb && !thumb.hidden) {
-        try { transfer.setDragImage(thumb, THUMB_SIZE / 2, THUMB_SIZE / 2); } catch {}
-      }
-    });
-
-    row.addEventListener("dragend", endDragOut);
-
-    attach.addEventListener("click", async () => {
-      const result = await chrome.runtime.sendMessage({ type: "attach-file", file });
-      setStatus(result?.ok ? `Attached ${file.name}` : result?.error || "Could not attach.", !result?.ok);
-    });
-
-    remove.addEventListener("click", async () => {
-      await api(`/api/files/${encodeURIComponent(file.id)}`, { method: "DELETE" });
-      await resetHistory();
-    });
-  } else {
-    const recall = document.createElement("button");
-    recall.className = "secondary-button recall";
-    recall.title = "Put this item back into the live Chute";
-    recall.textContent = "Recall";
-    tools.append(recall);
-    recall.addEventListener("click", async () => {
-      try {
-        await api(`/api/recall/${encodeURIComponent(file.id)}`, { method: "POST" });
-        await resetHistory();
-        setStatus(`Recalled ${file.name}`);
-      } catch (error) {
-        setStatus(error.message, true);
-      }
-    });
-  }
-
-  return row;
+async function readKv(key) {
+  const db = await openDb();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(KV, "readonly");
+    const request = tx.objectStore(KV).get(key);
+    request.onsuccess = () => resolve(request.result ?? null);
+    request.onerror = () => reject(request.error);
+  });
 }
 
-function escapeHtml(value) {
-  const node = document.createElement("span");
-  node.textContent = value;
-  return node.innerHTML;
+async function writeKv(key, value) {
+  await withStore(KV, "readwrite", (store) => store.put(value, key));
 }
 
 function setStatus(message, error = false) {
-  if (!statusElement || dragOutActive) return;
   statusElement.textContent = message;
   statusElement.classList.toggle("error", error);
 }
 
-async function loadSettings() {
-  const settings = await chrome.storage.sync.get({
-    chuteDisplayLimit: 50,
-    chuteThumbnails: true,
-    chuteDragOutMode: "file"
+function safeName(value, fallback = "image") {
+  const text = String(value || fallback)
+    .replace(/[\\/:*?"<>|\r\n]+/g, "_")
+    .replace(/^\.+/, "")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 160);
+  return text || fallback;
+}
+
+function formatSize(bytes) {
+  let value = Number(bytes) || 0;
+  for (const unit of ["B", "KB", "MB", "GB"]) {
+    if (value < 1024 || unit === "GB") return `${value < 10 && unit !== "B" ? value.toFixed(1) : Math.round(value)} ${unit}`;
+    value /= 1024;
+  }
+  return `${bytes} B`;
+}
+
+function base64ToBlob(base64, type) {
+  const binary = atob(String(base64 || ""));
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i += 1) bytes[i] = binary.charCodeAt(i);
+  return new Blob([bytes], { type: type || "application/octet-stream" });
+}
+
+async function folderHandle() {
+  const handle = await readKv(FOLDER_KEY);
+  return handle?.kind === "directory" ? handle : null;
+}
+
+async function folderPermission(handle) {
+  if (!handle) return "none";
+  try { return await handle.queryPermission({ mode: "readwrite" }); } catch { return "none"; }
+}
+
+async function refreshFolderLabel() {
+  const handle = await folderHandle();
+  if (!handle) {
+    folderLabel.textContent = "Browser storage only";
+    chooseFolderButton.textContent = "Choose Chute folder";
+    return;
+  }
+  const permission = await folderPermission(handle);
+  folderLabel.textContent = permission === "granted"
+    ? `Saving to: ${handle.name}`
+    : `Folder selected: ${handle.name} · reconnect to save`;
+  chooseFolderButton.textContent = permission === "granted" ? "Change folder" : "Reconnect folder";
+}
+
+async function fileExists(directory, name) {
+  try {
+    await directory.getFileHandle(name);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function splitName(name) {
+  const value = safeName(name, "image");
+  const index = value.lastIndexOf(".");
+  if (index <= 0 || index === value.length - 1) return { stem: value, ext: "" };
+  return { stem: value.slice(0, index), ext: value.slice(index) };
+}
+
+async function uniqueFolderName(directory, requested) {
+  const { stem, ext } = splitName(requested);
+  let candidate = `${stem}${ext}`;
+  if (!(await fileExists(directory, candidate))) return candidate;
+  for (let number = 2; number < 10000; number += 1) {
+    candidate = `${stem} (${number})${ext}`;
+    if (!(await fileExists(directory, candidate))) return candidate;
+  }
+  return `${stem}-${Date.now()}${ext}`;
+}
+
+async function writeBlobToFolder(item, allowPicker = false) {
+  let handle = await folderHandle();
+  if (!handle && allowPicker) handle = await chooseFolder();
+  if (!handle) return { saved: false, reason: "no-folder" };
+
+  let permission = await folderPermission(handle);
+  if (permission !== "granted" && allowPicker) {
+    try { permission = await handle.requestPermission({ mode: "readwrite" }); } catch {}
+  }
+  if (permission !== "granted") return { saved: false, reason: "permission" };
+
+  const name = await uniqueFolderName(handle, item.name);
+  const fileHandle = await handle.getFileHandle(name, { create: true });
+  const writable = await fileHandle.createWritable();
+  await writable.write(item.blob);
+  await writable.close();
+  return { saved: true, name, folder: handle.name };
+}
+
+async function chooseFolder() {
+  if (typeof window.showDirectoryPicker !== "function") {
+    setStatus("This Chrome build does not expose the folder picker here.", true);
+    return null;
+  }
+  try {
+    const handle = await window.showDirectoryPicker({ mode: "readwrite", id: "chute-output" });
+    await writeKv(FOLDER_KEY, handle);
+    await refreshFolderLabel();
+    setStatus(`Chute will mirror new items to ${handle.name}.`);
+    return handle;
+  } catch (error) {
+    if (error?.name !== "AbortError") setStatus(error?.message || "Could not select a folder.", true);
+    return null;
+  }
+}
+
+async function addBlob(blob, name, meta = {}) {
+  if (!(blob instanceof Blob) || !blob.size) throw new Error("The dropped image was empty.");
+  if (blob.size > MAX_BROWSER_ITEM_BYTES) throw new Error("This image is larger than the current 48 MB Chute shelf limit.");
+
+  const item = {
+    id: crypto.randomUUID(),
+    name: safeName(name, "image"),
+    mime: blob.type || "application/octet-stream",
+    size: blob.size,
+    createdAt: Date.now(),
+    source: String(meta.source || "local"),
+    sourceUrl: String(meta.sourceUrl || ""),
+    parentPageUrl: String(meta.parentPageUrl || ""),
+    blob
+  };
+
+  await putItem(item);
+  const mirrored = await writeBlobToFolder(item, false).catch(() => ({ saved: false }));
+  await render();
+
+  if (mirrored.saved) setStatus(`Saved ${item.name} to Chute and ${mirrored.folder}.`);
+  else setStatus(`Saved ${item.name} to the private Chute shelf.`);
+  return item;
+}
+
+async function resolveBrowserDrag() {
+  const result = await chrome.runtime.sendMessage({ type: "chute-resolve-recent-drag-v2" });
+  if (!result?.ok) throw new Error(result?.error || "Chute could not recover that browser image.");
+  const blob = base64ToBlob(result.base64, result.type);
+  return addBlob(blob, result.name, {
+    source: result.source,
+    sourceUrl: result.sourceUrl,
+    parentPageUrl: result.parentPageUrl
   });
-  const next = Number(settings.chuteDisplayLimit);
-  displayLimit = Number.isFinite(next) && next >= 0 ? Math.trunc(next) : 50;
-  showThumbnails = settings.chuteThumbnails !== false;
-  dragOutMode = settings.chuteDragOutMode === "source" ? "source" : "file";
 }
 
-async function fetchHistoryDay(day = null) {
-  const suffix = day ? `?date=${encodeURIComponent(day)}` : "";
-  const response = await api(`/api/history${suffix}`);
-  return response.json();
-}
+async function handleDrop(event) {
+  event.preventDefault();
+  event.stopPropagation();
+  dropZone.classList.remove("dragging");
+  if (busy) return;
+  busy = true;
 
-function updateHistoryNavigation(payload) {
-  currentDate = payload.date;
-  previousDate = payload.previous_date;
-  nextDate = payload.next_date;
-  if (historyDateInput && currentDate && selectedDay) historyDateInput.value = currentDate;
-  if (historyPrevButton) historyPrevButton.disabled = !previousDate;
-  if (historyNextButton) historyNextButton.disabled = !nextDate;
-}
-
-async function appendDay(day = null) {
-  if (loadingHistory || dragOutActive) return false;
-  loadingHistory = true;
   try {
-    const payload = await fetchHistoryDay(day);
-    updateHistoryNavigation(payload);
-    if (!payload.date) return false;
-
-    for (const file of payload.files) {
-      if (displayLimit > 0 && loadedCount >= displayLimit) break;
-      listElement.append(createRow(file, loadedCount));
-      loadedCount += 1;
-    }
-    previousDate = payload.previous_date;
-    return Boolean(payload.files.length || payload.previous_date);
-  } finally {
-    loadingHistory = false;
-  }
-}
-
-async function fillNumericLimit() {
-  while (displayLimit > 0 && loadedCount < displayLimit && previousDate) {
-    const day = previousDate;
-    await appendDay(day);
-  }
-}
-
-async function resetHistory(day = selectedDay || null) {
-  if (dragOutActive) return;
-  try {
-    loadedCount = 0;
-    previousDate = null;
-    nextDate = null;
-    currentDate = null;
-    generatedThumbs.clear();
-    thumbObserver.disconnect();
-    listElement.replaceChildren();
-
-    const payload = await fetchHistoryDay(day);
-    updateHistoryNavigation(payload);
-
-    if (!payload.date || !payload.files.length) {
-      if (day) {
-        listElement.innerHTML = `<div class="empty"><strong>No Chute history for ${escapeHtml(day)}.</strong>Choose another day or return to Latest.</div>`;
-        setStatus("No history for that day");
-      } else {
-        listElement.innerHTML = `<div class="empty"><strong>Nothing in Chute history yet.</strong>Drop an image or run <code>chute ./some-file</code>.</div>`;
-        setStatus("Local bridge connected");
-      }
+    const files = Array.from(event.dataTransfer?.files || []).filter((file) => file instanceof File && file.size > 0);
+    if (files.length) {
+      for (const file of files) await addBlob(file, file.name, { source: "local" });
       return;
     }
-
-    for (const file of payload.files) {
-      if (displayLimit > 0 && !selectedDay && loadedCount >= displayLimit) break;
-      listElement.append(createRow(file, loadedCount));
-      loadedCount += 1;
-    }
-    previousDate = payload.previous_date;
-
-    if (!selectedDay && displayLimit > 0) await fillNumericLimit();
-
-    const mode = selectedDay
-      ? currentDate
-      : displayLimit === 0
-        ? "bottomless"
-        : `latest ${displayLimit}`;
-    setStatus(`${loadedCount} item${loadedCount === 1 ? "" : "s"} shown · ${mode}`);
-    chrome.runtime.sendMessage({ type: "badge-refresh" });
-  } catch {
-    listElement.innerHTML = `<div class="empty"><strong>Chute is not running.</strong>Run <code>chute serve</code>, or send a file.</div>`;
-    setStatus("Cannot reach 127.0.0.1:17891", true);
+    await resolveBrowserDrag();
+  } catch (error) {
+    setStatus(error?.message || "That drag did not contain an image Chute could save.", true);
+  } finally {
+    busy = false;
   }
 }
 
-const historyObserver = new IntersectionObserver(async (entries) => {
-  if (!entries.some((entry) => entry.isIntersecting)) return;
-  if (selectedDay || displayLimit !== 0 || !previousDate || loadingHistory || dragOutActive) return;
-  const day = previousDate;
-  await appendDay(day);
-  setStatus(`${loadedCount} history items loaded · ∞`);
-}, { rootMargin: "300px" });
+async function render() {
+  for (const url of objectUrls) URL.revokeObjectURL(url);
+  objectUrls = [];
+  const items = await allItems();
+  listElement.replaceChildren();
 
-if (sentinel) historyObserver.observe(sentinel);
-
-historyDateInput?.addEventListener("change", async () => {
-  selectedDay = historyDateInput.value || "";
-  await resetHistory(selectedDay || null);
-});
-
-historyPrevButton?.addEventListener("click", async () => {
-  if (!previousDate) return;
-  selectedDay = previousDate;
-  if (historyDateInput) historyDateInput.value = selectedDay;
-  await resetHistory(selectedDay);
-});
-
-historyNextButton?.addEventListener("click", async () => {
-  if (!nextDate) return;
-  selectedDay = nextDate;
-  if (historyDateInput) historyDateInput.value = selectedDay;
-  await resetHistory(selectedDay);
-});
-
-historyLatestButton?.addEventListener("click", async () => {
-  selectedDay = "";
-  if (historyDateInput) historyDateInput.value = "";
-  await resetHistory();
-});
-
-clearButton?.addEventListener("click", async () => {
-  try {
-    const response = await api("/api/clear", { method: "POST" });
-    const result = await response.json();
-    await resetHistory();
-    setStatus(`Cleared ${result.removed} item${result.removed === 1 ? "" : "s"} · preserved for Recall`);
-  } catch (error) {
-    setStatus(error.message, true);
+  if (!items.length) {
+    listElement.innerHTML = `<div class="empty"><strong>Nothing in Chute yet.</strong><br>Drag an image from Google Images, Yandex Images, ChatGPT, or your computer.</div>`;
+    return;
   }
-});
 
-refreshButton?.addEventListener("click", () => resetHistory());
+  for (const item of items) {
+    const row = document.createElement("article");
+    row.className = "file-row";
 
-chrome.storage.onChanged.addListener(async (changes, area) => {
-  if (area !== "sync") return;
-  if (changes.chuteDisplayLimit || changes.chuteThumbnails || changes.chuteDragOutMode) {
-    await loadSettings();
-    await resetHistory();
+    const icon = document.createElement("div");
+    if (String(item.mime || "").startsWith("image/")) {
+      const img = document.createElement("img");
+      img.className = "file-thumb";
+      img.alt = "";
+      const url = URL.createObjectURL(item.blob);
+      objectUrls.push(url);
+      img.src = url;
+      icon.append(img);
+    } else {
+      icon.className = "file-fallback";
+      icon.textContent = "📄";
+    }
+
+    const info = document.createElement("div");
+    info.className = "file-info";
+    const name = document.createElement("div");
+    name.className = "file-name";
+    name.textContent = item.name;
+    name.title = item.name;
+    const meta = document.createElement("div");
+    meta.className = "file-meta";
+    meta.textContent = `${formatSize(item.size)} · ${item.source || "local"}`;
+    info.append(name, meta);
+
+    const tools = document.createElement("div");
+    tools.className = "file-tools";
+
+    const save = document.createElement("button");
+    save.className = "secondary-button";
+    save.type = "button";
+    save.textContent = "Save";
+    save.title = "Save this item to your chosen Chute folder";
+    save.addEventListener("click", async () => {
+      try {
+        const result = await writeBlobToFolder(item, true);
+        if (result.saved) setStatus(`Saved ${result.name} to ${result.folder}.`);
+      } catch (error) {
+        setStatus(error?.message || "Could not save that item.", true);
+      }
+      await refreshFolderLabel();
+    });
+
+    const remove = document.createElement("button");
+    remove.className = "icon-button";
+    remove.type = "button";
+    remove.textContent = "×";
+    remove.title = "Remove from browser shelf";
+    remove.addEventListener("click", async () => {
+      await deleteItem(item.id);
+      await render();
+      setStatus(`Removed ${item.name} from the browser shelf.`);
+    });
+
+    tools.append(save, remove);
+    row.append(icon, info, tools);
+    listElement.append(row);
   }
+}
+
+for (const target of [document.documentElement, document.body, dropZone]) {
+  target.addEventListener("dragover", (event) => {
+    event.preventDefault();
+    if (event.dataTransfer) event.dataTransfer.dropEffect = "copy";
+    dropZone.classList.add("dragging");
+  });
+  target.addEventListener("dragleave", (event) => {
+    if (!event.relatedTarget) dropZone.classList.remove("dragging");
+  });
+}
+
+document.addEventListener("drop", handleDrop, true);
+chooseFolderButton.addEventListener("click", () => void chooseFolder());
+clearButton.addEventListener("click", async () => {
+  await clearItems();
+  await render();
+  setStatus("Cleared the private browser shelf. Files already written to your chosen folder were not deleted.");
 });
 
-loadSettings().then(() => resetHistory());
-
-setInterval(() => {
-  if (!dragOutActive && !selectedDay && window.scrollY < 8) resetHistory();
-}, 5000);
+void refreshFolderLabel();
+void render();

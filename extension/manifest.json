@@ -2,44 +2,45 @@
   "manifest_version": 3,
   "name": "Chute",
   "short_name": "Chute",
-  "version": "2.5.0",
-  "description": "Drag files, images, links, and text through one local Chute basket with recallable history.",
+  "version": "2.6.0",
+  "description": "Drop images from Google, Yandex, and ChatGPT into a private browser shelf and optionally one folder you choose.",
   "minimum_chrome_version": "116",
   "homepage_url": "https://github.com/thanks-cohn/chute",
-  "permissions": ["contextMenus", "sidePanel", "storage"],
-  "host_permissions": [
-    "http://*/*",
-    "https://*/*"
-  ],
+  "permissions": ["sidePanel", "storage"],
   "background": {
-    "service_worker": "background-entry.js"
+    "service_worker": "store-background.js"
   },
   "action": {
-    "default_title": "Chute",
-    "default_popup": "popup.html"
+    "default_title": "Open Chute Shelf"
   },
   "side_panel": {
     "default_path": "shelf.html"
   },
   "content_scripts": [
     {
-      "matches": ["http://*/*", "https://*/*"],
-      "js": ["content.js", "content-auto-hide.js", "content-image-resolver.js", "direct-drop-google-yandex.js", "drop-lifecycle.js"],
-      "run_at": "document_idle",
+      "matches": ["https://chatgpt.com/*", "https://chat.openai.com/*"],
+      "js": ["source-resource.js", "image-source-capture.js"],
+      "run_at": "document_start",
       "all_frames": false
-    }
-  ],
-  "web_accessible_resources": [
+    },
     {
-      "resources": [
-        "bin.html",
-        "bin.css",
-        "bin.js",
-        "bin-sidepanel.js",
-        "bin-capture-settings.js",
-        "bin-provenance.js"
+      "matches": ["https://*.google.com/*"],
+      "js": ["source-resource.js", "image-source-capture.js"],
+      "run_at": "document_start",
+      "all_frames": false
+    },
+    {
+      "matches": [
+        "https://*.yandex.com/*",
+        "https://*.yandex.ru/*",
+        "https://*.yandex.kz/*",
+        "https://*.yandex.by/*",
+        "https://*.yandex.uz/*",
+        "https://*.yandex.com.tr/*"
       ],
-      "matches": ["http://*/*", "https://*/*"]
+      "js": ["source-resource.js", "image-source-capture.js"],
+      "run_at": "document_start",
+      "all_frames": false
     }
   ]
 }

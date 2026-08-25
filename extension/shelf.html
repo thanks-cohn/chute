@@ -5,33 +5,49 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Chute Shelf</title>
   <link rel="stylesheet" href="shared.css">
+  <style>
+    body { min-height: 100vh; }
+    .topbar { position: sticky; top: 0; z-index: 5; }
+    .folder-bar { display:flex; gap:8px; align-items:center; padding:8px 12px; border-bottom:1px solid rgba(127,127,127,.22); }
+    .folder-label { min-width:0; flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; opacity:.82; }
+    .drop-zone { margin:10px 12px; padding:14px; border:1px dashed rgba(127,127,127,.45); border-radius:12px; text-align:center; transition:transform .12s ease, box-shadow .12s ease; }
+    .drop-zone.dragging { transform:scale(1.01); box-shadow:0 0 0 3px rgba(160,220,80,.18); }
+    .file-list { padding:0 12px 64px; display:flex; flex-direction:column; gap:8px; }
+    .file-row { display:grid; grid-template-columns:52px minmax(0,1fr) auto; gap:10px; align-items:center; }
+    .file-thumb { width:48px; height:48px; object-fit:cover; border-radius:8px; }
+    .file-fallback { width:48px; height:48px; display:grid; place-items:center; }
+    .file-name { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .file-meta { opacity:.72; font-size:12px; }
+    .file-tools { display:flex; gap:6px; }
+    .empty { padding:28px 16px; text-align:center; opacity:.78; }
+    .status.error { color:#ff7a7a; }
+    .footer { position:fixed; bottom:0; left:0; right:0; backdrop-filter:blur(10px); }
+  </style>
 </head>
 <body>
   <header class="topbar">
     <div class="brand">
       <div class="logo">↓</div>
-      <div><div class="title">Chute Shelf</div><div class="subtitle">Your bottomless local history.</div></div>
+      <div><div class="title">Chute Shelf</div><div class="subtitle">Private browser shelf. One folder only if you choose it.</div></div>
     </div>
     <div class="actions">
-      <button id="refresh" class="icon-button" title="Refresh">↻</button>
-      <button id="clear" class="secondary-button">Clear live chute</button>
+      <button id="clear" class="secondary-button" type="button">Clear shelf</button>
     </div>
   </header>
 
-  <div class="history-nav">
-    <button id="history-prev" class="icon-button" type="button" title="Older day">‹</button>
-    <input id="history-date" type="date" aria-label="Browse Chute history by day">
-    <button id="history-latest" class="secondary-button" type="button">Latest</button>
-    <button id="history-next" class="icon-button" type="button" title="Newer day">›</button>
+  <div class="folder-bar">
+    <button id="choose-folder" class="secondary-button" type="button">Choose Chute folder</button>
+    <div id="folder-label" class="folder-label">Browser storage only</div>
   </div>
 
-  <div id="status" class="status">Connecting…</div>
+  <div id="drop-zone" class="drop-zone">
+    Drop an image here from Google Images, Yandex Images, ChatGPT, or your computer.
+  </div>
+
+  <div id="status" class="status">Ready.</div>
   <main id="files" class="file-list"></main>
-  <div id="history-sentinel" class="history-sentinel" aria-hidden="true"></div>
-  <footer class="footer">Clearing the live Chute never deletes history. Browse any recorded day and Recall preserved items whenever you need them.</footer>
+
+  <footer class="footer">Nothing is uploaded to a Chute server. Items stay in browser storage and are mirrored only to the folder you explicitly choose.</footer>
   <script src="shelf.js"></script>
-  <script src="companion-help.js"></script>
-  <script src="workflow-fixes.js"></script>
-  <script src="drag-relay.js"></script>
 </body>
 </html>
