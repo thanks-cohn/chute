@@ -142,6 +142,8 @@
     if (root && !host.isConnected) root.append(host);
   };
   mount();
+  document.addEventListener("DOMContentLoaded", mount, { once: true });
+  document.addEventListener("readystatechange", mount);
   if (document.documentElement) new MutationObserver(mount).observe(document.documentElement, { childList: true });
   void refreshCount();
   setInterval(refreshCount, 2500);
