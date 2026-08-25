@@ -3,6 +3,9 @@ const DB_VERSION = 1;
 const ITEMS = "items";
 const KV = "kv";
 const FOLDER_KEY = "chute-folder";
+const THUMBNAIL_SETTING = "chuteSaveThumbnails";
+const DEFAULT_SHELF_IMAGE = "assets/default-shelf.png";
+const THUMB_SIZE = 96;
 const MAX_BROWSER_ITEM_BYTES = 48 * 1024 * 1024;
 
 const listElement = document.querySelector("#files");
@@ -11,9 +14,11 @@ const clearButton = document.querySelector("#clear");
 const chooseFolderButton = document.querySelector("#choose-folder");
 const folderLabel = document.querySelector("#folder-label");
 const dropZone = document.querySelector("#drop-zone");
+const thumbnailToggle = document.querySelector("#thumbnail-toggle");
 
 let objectUrls = [];
 let busy = false;
+let saveThumbnails = true;
 
 function openDb() {
   return new Promise((resolve, reject) => {
@@ -85,14 +90,52 @@ function setStatus(message, error = false) {
   statusElement.classList.toggle("error", error);
 }
 
-function safeName(value, fallback = "image") {
-  const text = String(value || fallback)
+function safeName(value, fallback = "") {
+  const text = String(value || "")
     .replace(/[\\/:*?"<>|\r\n]+/g, "_")
     .replace(/^\.+/, "")
     .replace(/\s+/g, " ")
     .trim()
     .slice(0, 160);
   return text || fallback;
+}
+
+function extensionForMime(type) {
+  const mime = String(type || "").toLowerCase().split(";")[0];
+  return {
+    "image/jpeg": "jpg",
+    "image/png": "png",
+    "image/webp": "webp",
+    "image/gif": "gif",
+    "image/avif": "avif",
+    "image/svg+xml": "svg",
+    "image/bmp": "bmp",
+    "image/apng": "apng"
+  }[mime] || "img";
+}
+
+function timestampName(type, when = Date.now()) {
+  const date = new Date(when);
+  const pad = (value, width = 2) => String(value).padStart(width, "0");
+  const stamp = [
+    date.getFullYear(),
+    pad(date.getMonth() + 1),
+    pad(date.getDate()),
+    "-",
+    pad(date.getHours()),
+    pad(date.getMinutes()),
+    pad(date.getSeconds()),
+    "-",
+    pad(date.getMilliseconds(), 3)
+  ].join("");
+  return `chute-${stamp}.${extensionForMime(type)}`;
+}
+
+function finalName(value, type, when = Date.now()) {
+  const cleaned = safeName(value);
+  if (!cleaned) return timestampName(type, when);
+  if (/\.[a-z0-9]{2,8}$/i.test(cleaned)) return cleaned;
+  return `${cleaned}.${extensionForMime(type)}`;
 }
 
 function formatSize(bytes) {
@@ -109,6 +152,38 @@ function base64ToBlob(base64, type) {
   const bytes = new Uint8Array(binary.length);
   for (let i = 0; i < binary.length; i += 1) bytes[i] = binary.charCodeAt(i);
   return new Blob([bytes], { type: type || "application/octet-stream" });
+}
+
+async function makeThumbnail(blob) {
+  if (!(blob instanceof Blob) || !String(blob.type || "").startsWith("image/")) return null;
+  try {
+    const bitmap = await createImageBitmap(blob);
+    const scale = Math.min(THUMB_SIZE / bitmap.width, THUMB_SIZE / bitmap.height, 1);
+    const width = Math.max(1, Math.round(bitmap.width * scale));
+    const height = Math.max(1, Math.round(bitmap.height * scale));
+    const canvas = document.createElement("canvas");
+    canvas.width = THUMB_SIZE;
+    canvas.height = THUMB_SIZE;
+    const context = canvas.getContext("2d", { alpha: true });
+    context.clearRect(0, 0, THUMB_SIZE, THUMB_SIZE);
+    context.drawImage(
+      bitmap,
+      Math.floor((THUMB_SIZE - width) / 2),
+      Math.floor((THUMB_SIZE - height) / 2),
+      width,
+      height
+    );
+    bitmap.close();
+    return await new Promise((resolve) => canvas.toBlob(resolve, "image/webp", 0.72));
+  } catch {
+    return null;
+  }
+}
+
+async function loadThumbnailPreference() {
+  const stored = await chrome.storage.local.get({ [THUMBNAIL_SETTING]: true });
+  saveThumbnails = stored?.[THUMBNAIL_SETTING] !== false;
+  if (thumbnailToggle) thumbnailToggle.checked = saveThumbnails;
 }
 
 async function folderHandle() {
@@ -145,7 +220,7 @@ async function fileExists(directory, name) {
 }
 
 function splitName(name) {
-  const value = safeName(name, "image");
+  const value = safeName(name, timestampName("image/png"));
   const index = value.lastIndexOf(".");
   if (index <= 0 || index === value.length - 1) return { stem: value, ext: "" };
   return { stem: value.slice(0, index), ext: value.slice(index) };
@@ -202,15 +277,17 @@ async function addBlob(blob, name, meta = {}) {
   if (!(blob instanceof Blob) || !blob.size) throw new Error("The dropped image was empty.");
   if (blob.size > MAX_BROWSER_ITEM_BYTES) throw new Error("This image is larger than the current 48 MB Chute shelf limit.");
 
+  const createdAt = Date.now();
   const item = {
     id: crypto.randomUUID(),
-    name: safeName(name, "image"),
+    name: finalName(name, blob.type, createdAt),
     mime: blob.type || "application/octet-stream",
     size: blob.size,
-    createdAt: Date.now(),
+    createdAt,
     source: String(meta.source || "local"),
     sourceUrl: String(meta.sourceUrl || ""),
     parentPageUrl: String(meta.parentPageUrl || ""),
+    thumbnail: saveThumbnails ? await makeThumbnail(blob) : null,
     blob
   };
 
@@ -255,6 +332,38 @@ async function handleDrop(event) {
   }
 }
 
+function placeholderThumb(shell) {
+  const fallback = document.createElement("span");
+  fallback.className = "file-fallback";
+  fallback.textContent = "↓";
+
+  const img = document.createElement("img");
+  img.className = "file-thumb";
+  img.alt = "";
+  img.src = DEFAULT_SHELF_IMAGE;
+  img.addEventListener("load", () => { fallback.hidden = true; }, { once: true });
+  img.addEventListener("error", () => { img.hidden = true; fallback.hidden = false; }, { once: true });
+  shell.append(fallback, img);
+  return img;
+}
+
+async function ensureThumbnail(item, img) {
+  if (!saveThumbnails || !String(item.mime || "").startsWith("image/")) return;
+  let thumbnail = item.thumbnail instanceof Blob && item.thumbnail.size ? item.thumbnail : null;
+  if (!thumbnail) {
+    thumbnail = await makeThumbnail(item.blob);
+    if (thumbnail) {
+      item.thumbnail = thumbnail;
+      await putItem(item).catch(() => {});
+    }
+  }
+  if (!thumbnail) return;
+  const url = URL.createObjectURL(thumbnail);
+  objectUrls.push(url);
+  img.hidden = false;
+  img.src = url;
+}
+
 async function render() {
   for (const url of objectUrls) URL.revokeObjectURL(url);
   objectUrls = [];
@@ -271,18 +380,9 @@ async function render() {
     row.className = "file-row";
 
     const icon = document.createElement("div");
-    if (String(item.mime || "").startsWith("image/")) {
-      const img = document.createElement("img");
-      img.className = "file-thumb";
-      img.alt = "";
-      const url = URL.createObjectURL(item.blob);
-      objectUrls.push(url);
-      img.src = url;
-      icon.append(img);
-    } else {
-      icon.className = "file-fallback";
-      icon.textContent = "📄";
-    }
+    icon.className = "thumb-shell";
+    const img = placeholderThumb(icon);
+    if (saveThumbnails && String(item.mime || "").startsWith("image/")) void ensureThumbnail(item, img);
 
     const info = document.createElement("div");
     info.className = "file-info";
@@ -343,11 +443,20 @@ for (const target of [document.documentElement, document.body, dropZone]) {
 
 document.addEventListener("drop", handleDrop, true);
 chooseFolderButton.addEventListener("click", () => void chooseFolder());
+thumbnailToggle?.addEventListener("change", async () => {
+  saveThumbnails = thumbnailToggle.checked;
+  await chrome.storage.local.set({ [THUMBNAIL_SETTING]: saveThumbnails });
+  await render();
+  setStatus(saveThumbnails ? "Small shelf thumbnails are enabled." : "Thumbnail saving is disabled. Chute will use the default shelf image.");
+});
 clearButton.addEventListener("click", async () => {
   await clearItems();
   await render();
   setStatus("Cleared the private browser shelf. Files already written to your chosen folder were not deleted.");
 });
 
-void refreshFolderLabel();
-void render();
+void (async () => {
+  await loadThumbnailPreference();
+  await refreshFolderLabel();
+  await render();
+})();
