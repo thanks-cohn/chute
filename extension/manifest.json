@@ -19,13 +19,13 @@
   "content_scripts": [
     {
       "matches": ["https://chatgpt.com/*", "https://chat.openai.com/*"],
-      "js": ["source-resource.js", "image-source-capture.js"],
+      "js": ["source-resource.js", "image-source-capture.js", "store-mascot.js"],
       "run_at": "document_start",
       "all_frames": false
     },
     {
       "matches": ["https://*.google.com/*"],
-      "js": ["source-resource.js", "image-source-capture.js"],
+      "js": ["source-resource.js", "image-source-capture.js", "store-mascot.js"],
       "run_at": "document_start",
       "all_frames": false
     },
@@ -38,7 +38,7 @@
         "https://*.yandex.uz/*",
         "https://*.yandex.com.tr/*"
       ],
-      "js": ["source-resource.js", "image-source-capture.js"],
+      "js": ["source-resource.js", "image-source-capture.js", "store-mascot.js"],
       "run_at": "document_start",
       "all_frames": false
     }
