@@ -13,6 +13,7 @@ RUNTIME_FILES = {
     "manifest.json",
     "shelf.html",
     "shelf.js",
+    "shelf-live-refresh.js",
     "shared.css",
     "store-background.js",
     "source-resource.js",
