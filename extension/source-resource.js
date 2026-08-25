@@ -11,9 +11,10 @@
     return btoa(binary);
   }
 
-  function safeName(value, fallback = "browser-image") {
-    const text = String(value || fallback)
+  function safeName(value, fallback = "") {
+    const text = String(value || "")
       .replace(/[\\/:*?"<>|\r\n]+/g, "_")
+      .replace(/^\.+/, "")
       .replace(/\s+/g, " ")
       .trim()
       .slice(0, 140);
@@ -29,22 +30,72 @@
       "image/gif": "gif",
       "image/avif": "avif",
       "image/svg+xml": "svg",
-      "image/bmp": "bmp"
+      "image/bmp": "bmp",
+      "image/apng": "apng"
     };
     return map[mime] || "img";
   }
 
-  function nameFor(url, suggestedName, type) {
-    let name = safeName(suggestedName, "browser-image");
+  function timestampName(type) {
+    const date = new Date();
+    const pad = (value, width = 2) => String(value).padStart(width, "0");
+    const stamp = [
+      date.getFullYear(),
+      pad(date.getMonth() + 1),
+      pad(date.getDate()),
+      "-",
+      pad(date.getHours()),
+      pad(date.getMinutes()),
+      pad(date.getSeconds()),
+      "-",
+      pad(date.getMilliseconds(), 3)
+    ].join("");
+    return `chute-${stamp}.${extensionForMime(type)}`;
+  }
+
+  function dispositionName(value) {
+    const text = String(value || "");
+    const utf = text.match(/filename\*=UTF-8''([^;]+)/i);
+    if (utf?.[1]) {
+      try { return safeName(decodeURIComponent(utf[1].trim().replace(/^"|"$/g, ""))); } catch {}
+    }
+    const plain = text.match(/filename\s*=\s*(?:"([^"]+)"|([^;]+))/i);
+    return safeName(plain?.[1] || plain?.[2] || "");
+  }
+
+  function urlName(url) {
+    if (!/^https?:/i.test(String(url || ""))) return "";
     try {
-      if (!suggestedName) {
-        const parsed = new URL(url, location.href);
-        const last = decodeURIComponent(parsed.pathname.split("/").filter(Boolean).at(-1) || "");
-        if (last) name = safeName(last, name);
-      }
-    } catch {}
-    if (!/\.[a-z0-9]{2,8}$/i.test(name)) name += `.${extensionForMime(type)}`;
-    return name;
+      const parsed = new URL(url, location.href);
+      const last = decodeURIComponent(parsed.pathname.split("/").filter(Boolean).at(-1) || "");
+      if (!last || /^\d+$/.test(last)) return "";
+      return safeName(last);
+    } catch {
+      return "";
+    }
+  }
+
+  function withExtension(name, type) {
+    const cleaned = safeName(name);
+    if (!cleaned) return "";
+    if (/\.[a-z0-9]{2,8}$/i.test(cleaned)) return cleaned;
+    return `${cleaned}.${extensionForMime(type)}`;
+  }
+
+  function nameFor(url, suggestedName, type, disposition) {
+    const fromHeader = dispositionName(disposition);
+    if (fromHeader) return withExtension(fromHeader, type);
+
+    const fromUrl = urlName(url);
+    if (fromUrl) return withExtension(fromUrl, type);
+
+    // Preserve a supplied name only when it already looks like a real filename.
+    const supplied = safeName(suggestedName);
+    if (/\.[a-z0-9]{2,8}$/i.test(supplied)) return supplied;
+
+    // If the source exposes no usable filename, use a deterministic timestamp
+    // instead of inventing a title-derived filename.
+    return timestampName(type);
   }
 
   async function readResource(message) {
@@ -60,7 +111,7 @@
 
     return {
       ok: true,
-      name: nameFor(url, message?.suggestedName, blob.type),
+      name: nameFor(url, message?.suggestedName, blob.type, response.headers.get("content-disposition")),
       type: blob.type,
       size: blob.size,
       base64: bytesToBase64(await blob.arrayBuffer())
