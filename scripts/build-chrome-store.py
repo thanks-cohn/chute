@@ -18,6 +18,9 @@ RUNTIME_FILES = {
     "source-resource.js",
     "image-source-capture.js",
 }
+OPTIONAL_RUNTIME_FILES = {
+    "assets/default-shelf.png",
+}
 
 
 def png_chunk(kind: bytes, data: bytes) -> bytes:
@@ -72,6 +75,13 @@ def validate_manifest(manifest: dict) -> None:
         raise SystemExit("Store build must not declare optional host permissions")
 
 
+def copy_runtime_file(relative: str, package_dir: Path) -> None:
+    source = EXTENSION / relative
+    target = package_dir / relative
+    target.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(source, target)
+
+
 def main() -> int:
     manifest = json.loads((EXTENSION / "manifest.json").read_text(encoding="utf-8"))
     validate_manifest(manifest)
@@ -88,7 +98,13 @@ def main() -> int:
         raise SystemExit("Missing Store runtime files: " + ", ".join(missing))
 
     for name in sorted(RUNTIME_FILES):
-        shutil.copy2(EXTENSION / name, package_dir / name)
+        copy_runtime_file(name, package_dir)
+
+    for name in sorted(OPTIONAL_RUNTIME_FILES):
+        if (EXTENSION / name).exists():
+            copy_runtime_file(name, package_dir)
+        else:
+            print(f"Optional shelf artwork not found: {name} (built-in arrow fallback will be used)")
 
     icons = {}
     for size in (16, 32, 48, 128):
