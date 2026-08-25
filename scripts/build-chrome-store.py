@@ -17,6 +17,7 @@ RUNTIME_FILES = {
     "store-background.js",
     "source-resource.js",
     "image-source-capture.js",
+    "store-mascot.js",
 }
 OPTIONAL_RUNTIME_FILES = {
     "assets/default-shelf.png",
@@ -123,7 +124,7 @@ def main() -> int:
     shutil.make_archive(str(zip_base), "zip", package_dir)
 
     print(f"Chrome Web Store ZIP: {zip_path}")
-    print("Packaged only the browser-only Chute runtime; legacy localhost/desktop code is excluded.")
+    print("Packaged only the browser-only Chute runtime, including the supported-site mascot; legacy localhost/desktop code is excluded.")
     print("Still required before submission: real screenshots, final listing copy, and privacy-policy review.")
     return 0
 
