@@ -36,14 +36,20 @@
   });
   bin.append(image);
 
+  const count = bin.querySelector(".count");
+  if (count) {
+    count.style.position = "relative";
+    count.style.zIndex = "12";
+  }
+
   function currentState() {
     if (bin.classList.contains("dragover")) return "grab";
     if (pointerOver) return "hover";
     return "default";
   }
 
-  function setFallbackVisible(visible) {
-    for (const selector of [".tape", ".paper", ".mouth"]) {
+  function setFallbackArtVisible(visible) {
+    for (const selector of [".tape", ".mouth", ".face", ".label"]) {
       const node = bin.querySelector(selector);
       if (node) node.style.opacity = visible ? "" : "0";
     }
@@ -58,13 +64,13 @@
       if (token !== imageLoadToken) return;
       image.src = src;
       image.style.display = "block";
-      setFallbackVisible(false);
+      setFallbackArtVisible(false);
     };
     probe.onerror = () => {
       if (token !== imageLoadToken) return;
       image.removeAttribute("src");
       image.style.display = "none";
-      setFallbackVisible(true);
+      setFallbackArtVisible(true);
     };
     probe.src = src;
   }
