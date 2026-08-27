@@ -2,11 +2,11 @@
   "manifest_version": 3,
   "name": "Chute",
   "short_name": "Chute",
-  "version": "2.5.0",
+  "version": "2.6.0",
   "description": "Drag files, images, links, and text through one local Chute basket with recallable history.",
   "minimum_chrome_version": "116",
   "homepage_url": "https://github.com/thanks-cohn/chute",
-  "permissions": ["contextMenus", "sidePanel", "storage"],
+  "permissions": ["contextMenus", "sidePanel", "storage", "nativeMessaging"],
   "host_permissions": [
     "http://*/*",
     "https://*/*"
@@ -37,7 +37,11 @@
         "bin.js",
         "bin-capture-settings.js",
         "bin-provenance.js",
-        "bin-drag-support.js"
+        "bin-drag-support.js",
+        "mascot-theme.js",
+        "assets/grab/default.png",
+        "assets/grab/hover.png",
+        "assets/grab/grab.png"
       ],
       "matches": ["http://*/*", "https://*/*"]
     }
