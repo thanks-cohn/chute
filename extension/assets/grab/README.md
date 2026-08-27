@@ -8,7 +8,7 @@ Use these exact filenames in `extension/assets/grab/`:
 
 - `default.png` — normal resting Chutey when nothing special is happening.
 - `hover.png` — fallback pointer-over state when no randomized hover deck is present.
-- `grab.png` — shown immediately when a dragged file enters Chutey's inbound drop zone. This image is also used as the small Grab button icon.
+- `grab.png` — shown immediately when a dragged file is directly over Chutey's normal drop target. This image is also used as the small Grab button icon.
 
 When a bundled state image loads successfully, it replaces the old CSS-drawn Chutey completely. The live count badge remains above the artwork. If an image is missing or cannot be decoded, Chute falls back to the built-in CSS mascot.
 
@@ -40,27 +40,27 @@ Keep the numbering continuous. Discovery stops at the first missing number.
 Hover behavior:
 
 1. Pointer enters Chutey.
-2. If a local custom hover image is configured in Settings, that custom image wins.
+2. If a local custom hover image is configured in Settings, that custom image wins for the normal hover state.
 3. Otherwise, if `hover/` contains a deck, Chutey immediately chooses a random expression.
 4. While the pointer stays over Chutey, another expression is chosen after a randomized roughly 0.8-2.2 seconds.
 5. Chutey avoids intentionally choosing the same hover expression twice in a row.
 6. When the pointer leaves, the hover deck stops immediately.
 7. If no hover deck exists, Chutey falls back to `hover.png`.
 
-## Holding expression deck
+## Linger expression deck
 
-`holding` is a randomized multi-image state for when somebody keeps a file in Chutey's inbound drop zone without releasing it.
+The old drag-and-hold reaction has been repurposed into a prolonged-hover personality reaction called `linger`.
 
-Create this folder:
+Preferred folder:
 
 ```text
-extension/assets/grab/holding/
+extension/assets/grab/linger/
 ```
 
-Then add consecutively numbered images beginning with `1`:
+Number images consecutively:
 
 ```text
-holding/
+linger/
   1.png
   2.png
   3.png
@@ -68,29 +68,35 @@ holding/
   ...
 ```
 
-Supported holding formats are `.png`, `.webp`, and `.gif`. A deck may contain up to 32 images.
+Supported formats are `.png`, `.webp`, and `.gif`, up to 32 images. Keep numbering continuous.
 
-Keep the numbering continuous. For example, if `1.png` and `2.png` exist but `3.png` does not, discovery stops at `2`.
+Linger behavior:
 
-Holding behavior:
+1. Pointer enters Chutey and the normal hover state/deck begins.
+2. If the pointer stays on Chutey, he waits a randomized 2-3 seconds.
+3. The `linger/` deck activates.
+4. Chutey randomly chooses an expression from the deck.
+5. While the pointer continues hovering, another linger expression is chosen after a randomized roughly 0.65-1.8 seconds.
+6. Chutey avoids intentionally choosing the same linger expression twice in a row.
+7. Pointer leave or a drag directly over Chutey cancels the linger state immediately.
 
-1. A file enters Chutey's inbound drop zone -> `grab.png` appears immediately.
-2. If the file remains there without being released, Chutey waits a randomized 2-3 seconds.
-3. The `holding/` deck then activates.
-4. Chutey randomly chooses an image from the deck.
-5. While the file remains there, another expression is chosen after a randomized roughly 0.65-1.8 seconds.
-6. Chutey avoids intentionally choosing the same holding expression twice in a row.
-7. If the file leaves or is dropped, the holding timers stop immediately.
+### Existing `holding/` artwork still works
 
-The irregular start and swap timing is intentional so the mascot does not feel like a mechanical repeating GIF.
+To avoid wasting or renaming existing artwork, Chute treats this older folder as a fallback:
 
-## Expanded inbound drag zone
+```text
+extension/assets/grab/holding/
+```
 
-Chutey stays in his normal visual position at the lower-right. During inbound page or desktop drags, Chute also accepts the drop from an invisible catch area extending 160px to Chutey's left.
+If `linger/` is empty or absent, the numbered images already inside `holding/` automatically become the linger deck.
 
-This is intentional: Chromium may reveal right-edge browser UI when a dragged image is held directly against the extreme right edge. The wider left-side catch area lets the cursor remain away from that browser edge while Chutey still switches to `grab` / `holding` and accepts the drop.
+This means existing `holding/1.png`, `holding/2.png`, etc. can stay exactly where they are for now.
 
-Files being dragged OUT of Chute do not use the expanded catch area; they keep Chutey's original exact hitbox so normal page delivery is not swallowed.
+## Drag behavior
+
+Chutey is again using his normal exact drop target. The experimental 160px invisible catch area to his left was removed because Chromium can still reveal right-edge browser UI during a dragged image gesture.
+
+Chutey has also been nudged closer to the right edge visually. Dragging directly over him still shows `grab.png`, but prolonged drag-hover is no longer used for a special expression deck.
 
 ## Future/static state names
 
@@ -145,13 +151,19 @@ The unpacked extension folder is:
 C:\Users\mahan\dev\debug\extension
 ```
 
-For the hover deck on this Windows checkout, place artwork in:
+Hover deck:
 
 ```text
 C:\Users\mahan\dev\debug\extension\assets\grab\hover\
 ```
 
-For the holding deck, place artwork in:
+Preferred linger deck:
+
+```text
+C:\Users\mahan\dev\debug\extension\assets\grab\linger\
+```
+
+Existing holding artwork may remain here and will be used automatically when `linger/` is absent:
 
 ```text
 C:\Users\mahan\dev\debug\extension\assets\grab\holding\
