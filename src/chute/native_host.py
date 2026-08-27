@@ -289,12 +289,32 @@ def native_main() -> int:
         _write_message({"ok": False, "error": "Unsupported Chute native action"})
 
 
+def _same_file_shape(source: Path, target: Path) -> bool:
+    try:
+        source_stat = source.stat()
+        target_stat = target.stat()
+        return source_stat.st_size == target_stat.st_size
+    except OSError:
+        return False
+
+
 def install_bundled_native_host(bundle_root: Path) -> Path:
     source = bundle_root / "Chute-NativeHost.exe"
     target = native_host_exe()
     if not source.is_file():
         raise FileNotFoundError(f"Bundled native host missing: {source}")
     target.parent.mkdir(parents=True, exist_ok=True)
-    shutil.copy2(source, target)
+
+    # A normal bridge wake happens while Chute-NativeHost.exe itself is still
+    # running. Windows locks running executables, so do not rewrite the same
+    # installed helper on every Chute.exe startup. During a real version update
+    # the bundled helper normally differs in size; try to replace it then.
+    if not target.is_file() or not _same_file_shape(source, target):
+        try:
+            shutil.copy2(source, target)
+        except PermissionError:
+            if not target.is_file():
+                raise
+
     register_native_host(target)
     return target
