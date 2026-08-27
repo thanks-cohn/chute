@@ -367,8 +367,6 @@ function enqueuePayloads(payloadPromise, expected = 1) {
   );
 }
 
-// Keep direct iframe drops as a fallback. The primary path is routed by
-// content.js so Chromium cannot lose the drop at the page/extension boundary.
 bin.addEventListener("dragenter", (event) => {
   event.preventDefault();
   setDragVisual(true);
@@ -391,7 +389,9 @@ bin.addEventListener("drop", (event) => {
   enqueuePayloads(droppedPayloads(event.dataTransfer), expected);
 });
 
-bin.addEventListener("click", () => {
+// A normal click is reserved for cycling Chutey's idle/default expression.
+// Double-click keeps the established shortcut for opening the Shelf.
+bin.addEventListener("dblclick", () => {
   window.parent.postMessage({ type: "chute-open-side-panel" }, "*");
 });
 
