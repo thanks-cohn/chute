@@ -1,6 +1,7 @@
 importScripts(
   "background-native.js",
   "background.js",
+  "background-action-icon.js",
   "background-custom-size.js",
   "background-provenance.js",
   "background-custom-storage-compat.js",
