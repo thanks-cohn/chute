@@ -75,36 +75,8 @@
     probe.src = src;
   }
 
-  function applyColors({ chuteMascotBoxColor, chuteMascotTextColor }) {
-    const box = chuteMascotBoxColor || "#ffe87a";
-    const text = chuteMascotTextColor || "#4a3a13";
-    const paper = bin.querySelector(".paper");
-    const face = bin.querySelector(".face");
-    const label = bin.querySelector(".label");
-    const mouth = bin.querySelector(".mouth");
-    if (paper) {
-      paper.style.backgroundColor = box;
-      paper.style.color = text;
-      paper.style.borderColor = text;
-    }
-    if (face) face.style.color = text;
-    if (label) label.style.color = text;
-    if (mouth) {
-      mouth.style.borderColor = text;
-      mouth.style.backgroundColor = text;
-    }
-  }
-
   async function loadTheme() {
-    const [local, sync] = await Promise.all([
-      chrome.storage.local.get(Object.values(IMAGE_KEYS)),
-      chrome.storage.sync.get({
-        chuteMascotBoxColor: "#ffe87a",
-        chuteMascotTextColor: "#4a3a13"
-      })
-    ]);
-    customImages = local || {};
-    applyColors(sync);
+    customImages = await chrome.storage.local.get(Object.values(IMAGE_KEYS));
     showState();
   }
 
@@ -123,22 +95,14 @@
   });
 
   chrome.storage.onChanged.addListener((changes, area) => {
-    if (area === "local") {
-      let changed = false;
-      for (const key of Object.values(IMAGE_KEYS)) {
-        if (!changes[key]) continue;
-        customImages[key] = changes[key].newValue;
-        changed = true;
-      }
-      if (changed) showState();
-      return;
+    if (area !== "local") return;
+    let changed = false;
+    for (const key of Object.values(IMAGE_KEYS)) {
+      if (!changes[key]) continue;
+      customImages[key] = changes[key].newValue;
+      changed = true;
     }
-    if (area === "sync" && (changes.chuteMascotBoxColor || changes.chuteMascotTextColor)) {
-      chrome.storage.sync.get({
-        chuteMascotBoxColor: "#ffe87a",
-        chuteMascotTextColor: "#4a3a13"
-      }).then(applyColors);
-    }
+    if (changed) showState();
   });
 
   loadTheme();
