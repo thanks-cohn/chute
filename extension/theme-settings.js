@@ -12,6 +12,12 @@
     chuteMenuTextColor: "#f4f5ee",
     chuteMenuAccentColor: "#d7ff3f"
   };
+  const REACTION_DEFAULTS = {
+    chuteDefaultSwapMinutes: 5,
+    chuteHoverSwapSeconds: 1.4,
+    chuteHoldingDelaySeconds: 2.5,
+    chuteHoldingSwapSeconds: 1.2
+  };
 
   const settingsRoot = document.querySelector(".settings");
   const floatingBehavior = document.querySelector("#floating-behavior");
@@ -36,7 +42,7 @@
     const input = document.createElement("input");
     input.id = id;
     input.type = "file";
-    input.accept = "image/png,image/webp,image/jpeg";
+    input.accept = "image/png,image/webp,image/gif,image/jpeg";
     input.dataset.state = state;
     input.setAttribute("aria-label", `${state} mascot image`);
     input.style.maxWidth = "190px";
@@ -55,6 +61,32 @@
     input.setAttribute("aria-label", `${labelText} color`);
     label.append(text, input);
     return { label, input };
+  }
+
+  function makeTiming(labelText, id, key, value, min, max, step, suffix) {
+    const wrap = document.createElement("div");
+    wrap.style.display = "flex";
+    wrap.style.alignItems = "center";
+    wrap.style.gap = "6px";
+
+    const input = document.createElement("input");
+    input.id = id;
+    input.type = "number";
+    input.min = String(min);
+    input.max = String(max);
+    input.step = String(step);
+    input.value = String(value);
+    input.dataset.key = key;
+    input.style.width = "76px";
+    input.setAttribute("aria-label", labelText);
+
+    const unit = document.createElement("span");
+    unit.textContent = suffix;
+    unit.style.opacity = "0.75";
+    unit.style.fontSize = "11px";
+    wrap.append(input, unit);
+
+    return { label: makeLabel(labelText, wrap), input };
   }
 
   const themeMarker = document.createElement("div");
@@ -89,7 +121,7 @@
 
   const mascotMarker = document.createElement("div");
   mascotMarker.className = "settings-note";
-  mascotMarker.innerHTML = "<strong>Chutey images</strong> — bundled states come from <code>assets/grab/default.png</code>, <code>hover.png</code>, and <code>grab.png</code>. Optional local images override those files on this browser only.";
+  mascotMarker.innerHTML = "<strong>Chutey images</strong> — bundled static states come from <code>assets/grab/</code>. Numbered <code>default/</code>, <code>hover/</code>, and <code>holding/</code> folders become randomized expression decks.";
 
   const defaultImage = makeFile("mascot-image-default", "default");
   const hoverImage = makeFile("mascot-image-hover", "hover");
@@ -99,6 +131,16 @@
   resetImages.type = "button";
   resetImages.className = "secondary-button";
   resetImages.textContent = "Use bundled mascot images";
+
+  const timingMarker = document.createElement("div");
+  timingMarker.className = "settings-note";
+  timingMarker.innerHTML = "<strong>Chutey reaction timing</strong> — timings are intentionally randomized slightly around the values below so reactions do not feel mechanical.";
+
+  const defaultSwap = makeTiming("Idle expression change", "chutey-default-swap", "chuteDefaultSwapMinutes", REACTION_DEFAULTS.chuteDefaultSwapMinutes, 0.1, 1440, 0.1, "min");
+  const hoverSwap = makeTiming("Hover expression change", "chutey-hover-swap", "chuteHoverSwapSeconds", REACTION_DEFAULTS.chuteHoverSwapSeconds, 0.1, 60, 0.1, "sec");
+  const holdingDelay = makeTiming("Holding reaction delay", "chutey-holding-delay", "chuteHoldingDelaySeconds", REACTION_DEFAULTS.chuteHoldingDelaySeconds, 0.1, 60, 0.1, "sec");
+  const holdingSwap = makeTiming("Holding expression change", "chutey-holding-swap", "chuteHoldingSwapSeconds", REACTION_DEFAULTS.chuteHoldingSwapSeconds, 0.1, 60, 0.1, "sec");
+  const timingInputs = [defaultSwap.input, hoverSwap.input, holdingDelay.input, holdingSwap.input];
 
   const deleteHistory = document.createElement("input");
   deleteHistory.type = "checkbox";
@@ -124,6 +166,11 @@
     makeLabel("Hover image", hoverImage),
     makeLabel("Grab image", grabImage),
     resetImages,
+    timingMarker,
+    defaultSwap.label,
+    hoverSwap.label,
+    holdingDelay.label,
+    holdingSwap.label,
     makeLabel("Delete local Chute history", deleteHistory),
     uninstall,
     uninstallNote
@@ -147,12 +194,16 @@
   }
 
   async function loadSettings() {
-    const sync = await chrome.storage.sync.get({ chuteAutoHide: true, ...MENU_DEFAULTS });
+    const sync = await chrome.storage.sync.get({ chuteAutoHide: true, ...MENU_DEFAULTS, ...REACTION_DEFAULTS });
     if (floatingBehavior) floatingBehavior.value = sync.chuteAutoHide === false ? "always" : "auto-hide";
     backgroundColor.input.value = sync.chuteMenuBackgroundColor || MENU_DEFAULTS.chuteMenuBackgroundColor;
     menuTextColor.input.value = sync.chuteMenuTextColor || MENU_DEFAULTS.chuteMenuTextColor;
     accentColor.input.value = sync.chuteMenuAccentColor || MENU_DEFAULTS.chuteMenuAccentColor;
     markTheme(sync.chuteMenuTheme || "original");
+    for (const input of timingInputs) {
+      const key = input.dataset.key;
+      input.value = String(sync[key] ?? REACTION_DEFAULTS[key]);
+    }
   }
 
   floatingBehavior?.addEventListener("change", async () => {
@@ -191,6 +242,20 @@
   backgroundColor.input.addEventListener("input", saveCustomTheme);
   menuTextColor.input.addEventListener("input", saveCustomTheme);
   accentColor.input.addEventListener("input", saveCustomTheme);
+
+  for (const input of timingInputs) {
+    input.addEventListener("change", async () => {
+      const key = input.dataset.key;
+      const min = Number(input.min);
+      const max = Number(input.max);
+      let value = Number(input.value);
+      if (!Number.isFinite(value)) value = REACTION_DEFAULTS[key];
+      value = Math.min(max, Math.max(min, value));
+      input.value = String(value);
+      await chrome.storage.sync.set({ [key]: value });
+      status("Chutey reaction timing updated");
+    });
+  }
 
   for (const input of [defaultImage, hoverImage, grabImage]) {
     input.addEventListener("change", async () => {
