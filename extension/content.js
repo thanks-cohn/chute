@@ -6,14 +6,13 @@
   const CHUTE_DRAG_PREFIX = "CHUTE_ITEM:";
   const BASE_WIDTH = 92;
   const BASE_HEIGHT = 104;
-  const INBOUND_DRAG_REACH_LEFT = 160;
 
   const host = document.createElement("div");
   host.id = "__chute_sticky_host";
   Object.assign(host.style, {
     all: "initial",
     position: "fixed",
-    right: "18px",
+    right: "8px",
     bottom: "18px",
     width: `${BASE_WIDTH}px`,
     height: `${BASE_HEIGHT}px`,
@@ -72,20 +71,19 @@
     host.style.height = supportHover ? "174px" : `${BASE_HEIGHT}px`;
   }
 
-  function stableLandingRect(extraLeft = 0) {
+  function stableLandingRect() {
     const rect = host.getBoundingClientRect();
-    const reach = Math.max(0, Number(extraLeft) || 0);
     return {
-      left: rect.right - BASE_WIDTH - reach,
+      left: rect.right - BASE_WIDTH,
       right: rect.right,
       top: rect.bottom - BASE_HEIGHT,
       bottom: rect.bottom
     };
   }
 
-  function pointInLandingZone(x, y, extraLeft = 0) {
+  function pointInLandingZone(x, y) {
     if (!floatingEnabled(accessMode) || host.style.display === "none") return false;
-    const rect = stableLandingRect(extraLeft);
+    const rect = stableLandingRect();
     return x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom;
   }
 
@@ -298,12 +296,7 @@
     if (!dragRouting) beginDragRouting();
 
     const chuteItem = chuteTokenFromTransfer(event.dataTransfer) || externalChuteDragItem;
-    // Inbound page/desktop drags get a generous invisible catch area to the
-    // LEFT of Chutey. This lets large image previews overlap the mascot without
-    // forcing the actual cursor against Chrome's right-edge shelf gesture.
-    // Chute-originated outbound drags keep the original exact mascot hitbox.
-    const reachLeft = chuteItem ? 0 : INBOUND_DRAG_REACH_LEFT;
-    const overChute = pointInLandingZone(event.clientX, event.clientY, reachLeft);
+    const overChute = pointInLandingZone(event.clientX, event.clientY);
     const imageDrag = transferHasImage(event.dataTransfer);
     setDropActive(overChute, imageDrag);
 
@@ -327,8 +320,7 @@
     if (deliveringChuteFile) return;
 
     const chuteItem = chuteTokenFromTransfer(event.dataTransfer) || externalChuteDragItem;
-    const reachLeft = chuteItem ? 0 : INBOUND_DRAG_REACH_LEFT;
-    const overChute = pointInLandingZone(event.clientX, event.clientY, reachLeft);
+    const overChute = pointInLandingZone(event.clientX, event.clientY);
 
     if (chuteItem && !overChute) {
       event.preventDefault();
