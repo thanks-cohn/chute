@@ -5,10 +5,18 @@ import os
 import shutil
 import subprocess
 import sys
+import time
 import urllib.error
 import urllib.request
 from pathlib import Path
 
+from .native_host import (
+    allow_extension,
+    install_bundled_native_host,
+    register_native_host,
+    register_windows_uninstaller,
+    schedule_uninstall,
+)
 from .server import DEFAULT_HOST, DEFAULT_PORT, serve
 
 _APP_NAME = "Chute"
@@ -89,12 +97,14 @@ def _launch_quiet(target: Path) -> None:
     )
 
 
-def _bundled_extension_dir() -> Path:
+def _bundled_root() -> Path:
     if getattr(sys, "frozen", False):
-        root = Path(getattr(sys, "_MEIPASS", Path(sys.executable).parent))
-    else:
-        root = Path(__file__).resolve().parents[2]
-    return root / "extension"
+        return Path(getattr(sys, "_MEIPASS", Path(sys.executable).parent))
+    return Path(__file__).resolve().parents[2]
+
+
+def _bundled_extension_dir() -> Path:
+    return _bundled_root() / "extension"
 
 
 def _install_extension_bundle() -> Path | None:
@@ -107,6 +117,10 @@ def _install_extension_bundle() -> Path | None:
     target.parent.mkdir(parents=True, exist_ok=True)
     shutil.copytree(source, target, dirs_exist_ok=True)
     return target
+
+
+def _install_native_host_bundle() -> Path:
+    return install_bundled_native_host(_bundled_root())
 
 
 def _browser_candidates() -> list[tuple[str, str, list[Path]]]:
@@ -236,6 +250,31 @@ def _open_extension_onboarding(path: Path) -> None:
         pass
 
 
+def _stop_old_installed_copy() -> None:
+    if os.name != "nt" or not already_running():
+        return
+    try:
+        subprocess.run(
+            ["taskkill", "/IM", "Chute.exe", "/F"],
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            check=False,
+            creationflags=subprocess.CREATE_NO_WINDOW,
+        )
+        time.sleep(0.45)
+    except OSError:
+        pass
+
+
+def _refresh_windows_registration(target: Path) -> None:
+    _register_startup(target)
+    _install_extension_bundle()
+    _install_native_host_bundle()
+    register_native_host()
+    register_windows_uninstaller(target, version="2.6.0")
+
+
 def self_install_if_needed() -> bool:
     """Install a downloaded frozen Chute.exe for the current user and relaunch it.
 
@@ -249,22 +288,19 @@ def self_install_if_needed() -> bool:
     source = _current_exe()
     target = installed_exe()
     if _same_path(source, target):
-        _register_startup(target)
-        _install_extension_bundle()
+        _refresh_windows_registration(target)
         return False
 
     target.parent.mkdir(parents=True, exist_ok=True)
     _ensure_data_layout()
-
-    try:
-        shutil.copy2(source, target)
-    except PermissionError:
-        if already_running():
-            return True
-        raise
+    _stop_old_installed_copy()
+    shutil.copy2(source, target)
 
     extension = _install_extension_bundle()
     _register_startup(target)
+    _install_native_host_bundle()
+    register_native_host()
+    register_windows_uninstaller(target, version="2.6.0")
     _launch_quiet(target)
     if extension is not None:
         _open_extension_onboarding(extension)
@@ -275,6 +311,21 @@ def main() -> int:
     if os.name != "nt":
         print("This Chute desktop build is for Windows.", file=sys.stderr)
         return 2
+
+    args = sys.argv[1:]
+    if "--uninstall" in args:
+        schedule_uninstall(delete_data="--delete-data" in args)
+        return 0
+
+    if "--allow-extension" in args:
+        try:
+            index = args.index("--allow-extension")
+            allow_extension(args[index + 1])
+            return 0
+        except (IndexError, ValueError) as exc:
+            with log_path().open("a", encoding="utf-8") as log:
+                print(f"Could not allow development extension: {exc}", file=log)
+            return 2
 
     _ensure_data_layout()
 
