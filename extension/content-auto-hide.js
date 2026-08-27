@@ -7,6 +7,7 @@
   const DRAG_HIDE_DELAY_MS = 1200;
   const EDGE_TRIGGER_WIDTH = 32;
   const EDGE_TRIGGER_HEIGHT = 150;
+  const VISIBLE_TRANSFORM = "translateX(-72px)";
   const HIDDEN_TRANSFORM = "translateX(calc(100% + 8px))";
 
   let host = null;
@@ -54,7 +55,9 @@
     if (!host) return;
     clearHideTimer();
     hidden = false;
-    host.style.transform = "translateX(0)";
+    // Keep Chutey clear of the browser/shelf edge while visible so large drag
+    // previews do not cover his reaction states or trip nearby edge UI.
+    host.style.transform = VISIBLE_TRANSFORM;
   }
 
   function hide() {
