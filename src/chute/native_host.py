@@ -84,11 +84,49 @@ def launch_bridge() -> bool:
         return False
 
 
+def terminate_stale_bridge() -> None:
+    """Kill only the ordinary Chute companion when its health endpoint is dead.
+
+    Sleep/resume can leave Chute.exe alive but unable to serve localhost. A
+    second Chute.exe is not a reliable recovery path in that state, so the
+    native wake helper clears the stale companion before launching a fresh one.
+    The Native Messaging helper itself is a different executable and is not
+    touched here.
+    """
+    if os.name != "nt":
+        return
+    try:
+        subprocess.run(
+            ["taskkill", "/IM", "Chute.exe", "/F"],
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            check=False,
+            creationflags=subprocess.CREATE_NO_WINDOW,
+        )
+    except OSError:
+        pass
+
+
 def ensure_bridge(timeout: float = 6.0) -> bool:
     if bridge_alive():
         return True
+
+    # Avoid killing a companion for one transiently slow health request.
+    time.sleep(0.12)
+    if bridge_alive(timeout=0.5):
+        return True
+
+    # On Windows an unhealthy Chute.exe may still be alive after sleep/resume.
+    # Clear that exact stale process before relaunching instead of stacking a
+    # second companion behind a poisoned process/port state.
+    if os.name == "nt":
+        terminate_stale_bridge()
+        time.sleep(0.18)
+
     if not launch_bridge():
         return False
+
     deadline = time.monotonic() + timeout
     while time.monotonic() < deadline:
         if bridge_alive(timeout=0.25):
