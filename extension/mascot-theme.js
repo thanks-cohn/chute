@@ -17,7 +17,8 @@
   const MAX_DECK_FRAMES = 32;
   const DECK_DIRECTORIES = {
     hover: "assets/grab/hover",
-    holding: "assets/grab/holding"
+    linger: "assets/grab/linger",
+    legacyHolding: "assets/grab/holding"
   };
 
   let pointerOver = false;
@@ -28,11 +29,11 @@
   let hoverIndex = -1;
   let hoverSwapTimer = null;
 
-  let holdingFrames = [];
-  let holdingActive = false;
-  let holdingIndex = -1;
-  let holdingStartTimer = null;
-  let holdingSwapTimer = null;
+  let lingerFrames = [];
+  let lingerActive = false;
+  let lingerIndex = -1;
+  let lingerStartTimer = null;
+  let lingerSwapTimer = null;
 
   const image = document.createElement("img");
   image.id = "chute-mascot-image";
@@ -112,15 +113,14 @@
   }
 
   function currentState() {
-    if (holdingActive && bin.classList.contains("dragover") && holdingFrames.length) {
-      return { kind: "holding", src: holdingFrames[Math.max(0, holdingIndex)] };
-    }
-
     if (bin.classList.contains("dragover")) {
       return { kind: "grab", src: customImages[IMAGE_KEYS.grab] || BUNDLED.grab };
     }
 
     if (pointerOver) {
+      if (lingerActive && lingerFrames.length) {
+        return { kind: "linger", src: lingerFrames[Math.max(0, lingerIndex)] };
+      }
       if (customImages[IMAGE_KEYS.hover]) {
         return { kind: "hover", src: customImages[IMAGE_KEYS.hover] };
       }
@@ -160,8 +160,9 @@
     probe.onerror = () => {
       if (token !== imageLoadToken) return;
 
-      if (state.kind === "holding") {
-        endHolding();
+      if (state.kind === "linger") {
+        endLinger();
+        if (pointerOver && !bin.classList.contains("dragover")) beginHoverDeck();
         showState();
         return;
       }
@@ -188,12 +189,12 @@
 
   function scheduleHoverSwap() {
     clearHoverSwapTimer();
-    if (!pointerOver || bin.classList.contains("dragover") || !hoverFrames.length) return;
+    if (!pointerOver || lingerActive || bin.classList.contains("dragover") || !hoverFrames.length) return;
     if (customImages[IMAGE_KEYS.hover]) return;
 
     hoverSwapTimer = setTimeout(() => {
       hoverSwapTimer = null;
-      if (!pointerOver || bin.classList.contains("dragover") || !hoverFrames.length) return;
+      if (!pointerOver || lingerActive || bin.classList.contains("dragover") || !hoverFrames.length) return;
       hoverIndex = chooseDifferentIndex(hoverFrames, hoverIndex);
       showState();
       scheduleHoverSwap();
@@ -201,9 +202,9 @@
   }
 
   function beginHoverDeck() {
-    if (!pointerOver || bin.classList.contains("dragover") || !hoverFrames.length) return;
+    if (!pointerOver || lingerActive || bin.classList.contains("dragover") || !hoverFrames.length) return;
     if (customImages[IMAGE_KEYS.hover]) return;
-    hoverIndex = Math.floor(Math.random() * hoverFrames.length);
+    if (hoverIndex < 0) hoverIndex = Math.floor(Math.random() * hoverFrames.length);
     showState();
     scheduleHoverSwap();
   }
@@ -213,93 +214,104 @@
     hoverIndex = -1;
   }
 
-  function clearHoldingStartTimer() {
-    if (!holdingStartTimer) return;
-    clearTimeout(holdingStartTimer);
-    holdingStartTimer = null;
+  function clearLingerStartTimer() {
+    if (!lingerStartTimer) return;
+    clearTimeout(lingerStartTimer);
+    lingerStartTimer = null;
   }
 
-  function clearHoldingSwapTimer() {
-    if (!holdingSwapTimer) return;
-    clearTimeout(holdingSwapTimer);
-    holdingSwapTimer = null;
+  function clearLingerSwapTimer() {
+    if (!lingerSwapTimer) return;
+    clearTimeout(lingerSwapTimer);
+    lingerSwapTimer = null;
   }
 
-  function scheduleHoldingSwap() {
-    clearHoldingSwapTimer();
-    if (!holdingActive || !bin.classList.contains("dragover") || !holdingFrames.length) return;
+  function scheduleLingerSwap() {
+    clearLingerSwapTimer();
+    if (!lingerActive || !pointerOver || bin.classList.contains("dragover") || !lingerFrames.length) return;
 
-    holdingSwapTimer = setTimeout(() => {
-      holdingSwapTimer = null;
-      if (!holdingActive || !bin.classList.contains("dragover")) return;
-      holdingIndex = chooseDifferentIndex(holdingFrames, holdingIndex);
+    lingerSwapTimer = setTimeout(() => {
+      lingerSwapTimer = null;
+      if (!lingerActive || !pointerOver || bin.classList.contains("dragover")) return;
+      lingerIndex = chooseDifferentIndex(lingerFrames, lingerIndex);
       showState();
-      scheduleHoldingSwap();
+      scheduleLingerSwap();
     }, randomBetween(650, 1800));
   }
 
-  function beginHoldingCountdown() {
-    if (!holdingFrames.length || holdingStartTimer || holdingActive || !bin.classList.contains("dragover")) return;
+  function beginLingerCountdown() {
+    if (!pointerOver || !lingerFrames.length || lingerStartTimer || lingerActive || bin.classList.contains("dragover")) return;
 
-    holdingStartTimer = setTimeout(() => {
-      holdingStartTimer = null;
-      if (!bin.classList.contains("dragover") || !holdingFrames.length) return;
+    lingerStartTimer = setTimeout(() => {
+      lingerStartTimer = null;
+      if (!pointerOver || bin.classList.contains("dragover") || !lingerFrames.length) return;
 
-      holdingActive = true;
-      holdingIndex = Math.floor(Math.random() * holdingFrames.length);
+      lingerActive = true;
+      endHoverDeck();
+      lingerIndex = Math.floor(Math.random() * lingerFrames.length);
       showState();
-      scheduleHoldingSwap();
+      scheduleLingerSwap();
     }, randomBetween(2000, 3000));
   }
 
-  function endHolding() {
-    clearHoldingStartTimer();
-    clearHoldingSwapTimer();
-    holdingActive = false;
-    holdingIndex = -1;
+  function endLinger() {
+    clearLingerStartTimer();
+    clearLingerSwapTimer();
+    lingerActive = false;
+    lingerIndex = -1;
   }
 
-  function syncHoldingState() {
+  function syncInteractionState() {
     if (bin.classList.contains("dragover")) {
       endHoverDeck();
-      beginHoldingCountdown();
+      endLinger();
       return;
     }
 
-    endHolding();
-    if (pointerOver) beginHoverDeck();
+    if (pointerOver) {
+      beginHoverDeck();
+      beginLingerCountdown();
+      return;
+    }
+
+    endHoverDeck();
+    endLinger();
   }
 
   async function loadTheme() {
-    const [local, discoveredHover, discoveredHolding] = await Promise.all([
+    const [local, discoveredHover, discoveredLinger, discoveredLegacyHolding] = await Promise.all([
       chrome.storage.local.get(Object.values(IMAGE_KEYS)),
       discoverDeck(DECK_DIRECTORIES.hover),
-      discoverDeck(DECK_DIRECTORIES.holding)
+      discoverDeck(DECK_DIRECTORIES.linger),
+      discoverDeck(DECK_DIRECTORIES.legacyHolding)
     ]);
 
     customImages = local || {};
     hoverFrames = discoveredHover;
-    holdingFrames = discoveredHolding;
+    // Prefer the new semantic folder, but automatically reuse the user's
+    // existing holding deck so no artwork needs to be renamed immediately.
+    lingerFrames = discoveredLinger.length ? discoveredLinger : discoveredLegacyHolding;
 
-    syncHoldingState();
-    if (pointerOver && !bin.classList.contains("dragover")) beginHoverDeck();
-    else showState();
+    syncInteractionState();
+    showState();
   }
 
   bin.addEventListener("pointerenter", () => {
     pointerOver = true;
     beginHoverDeck();
+    beginLingerCountdown();
     showState();
   });
 
   bin.addEventListener("pointerleave", () => {
     pointerOver = false;
     endHoverDeck();
+    endLinger();
     showState();
   });
 
   new MutationObserver(() => {
-    syncHoldingState();
+    syncInteractionState();
     showState();
   }).observe(bin, {
     attributes: true,
@@ -315,7 +327,7 @@
       changed = true;
     }
     if (changed) {
-      if (pointerOver && !bin.classList.contains("dragover")) beginHoverDeck();
+      syncInteractionState();
       showState();
     }
   });
