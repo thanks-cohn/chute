@@ -13,9 +13,18 @@
     grab: chrome.runtime.getURL("assets/grab/grab.png")
   };
 
+  const HOLDING_DIRECTORY = "assets/grab/holding";
+  const HOLDING_EXTENSIONS = ["png", "webp", "gif"];
+  const MAX_HOLDING_FRAMES = 32;
+
   let pointerOver = false;
   let customImages = {};
   let imageLoadToken = 0;
+  let holdingFrames = [];
+  let holdingActive = false;
+  let holdingIndex = -1;
+  let holdingStartTimer = null;
+  let holdingSwapTimer = null;
 
   const image = document.createElement("img");
   image.id = "chute-mascot-image";
@@ -50,10 +59,48 @@
     });
   }
 
+  function randomBetween(min, max) {
+    return min + Math.random() * (max - min);
+  }
+
+  function probeImage(src) {
+    return new Promise((resolve) => {
+      const probe = new Image();
+      probe.onload = () => resolve(true);
+      probe.onerror = () => resolve(false);
+      probe.src = src;
+    });
+  }
+
+  async function discoverHoldingFrames() {
+    const found = [];
+
+    // Runtime extension pages cannot enumerate packaged directories directly.
+    // Numbered files give us a drop-in deck: 1.png, 2.png, 3.png ...
+    // Discovery stops at the first missing number, so keep numbering contiguous.
+    for (let index = 1; index <= MAX_HOLDING_FRAMES; index += 1) {
+      let frame = null;
+      for (const extension of HOLDING_EXTENSIONS) {
+        const src = chrome.runtime.getURL(`${HOLDING_DIRECTORY}/${index}.${extension}`);
+        if (await probeImage(src)) {
+          frame = src;
+          break;
+        }
+      }
+      if (!frame) break;
+      found.push(frame);
+    }
+
+    holdingFrames = found;
+  }
+
   function currentState() {
-    if (bin.classList.contains("dragover")) return "grab";
-    if (pointerOver) return "hover";
-    return "default";
+    if (holdingActive && bin.classList.contains("dragover") && holdingFrames.length) {
+      return { kind: "holding", src: holdingFrames[Math.max(0, holdingIndex)] };
+    }
+    if (bin.classList.contains("dragover")) return { kind: "grab", src: customImages[IMAGE_KEYS.grab] || BUNDLED.grab };
+    if (pointerOver) return { kind: "hover", src: customImages[IMAGE_KEYS.hover] || BUNDLED.hover };
+    return { kind: "default", src: customImages[IMAGE_KEYS.default] || BUNDLED.default };
   }
 
   function setFallbackArtVisible(visible) {
@@ -70,26 +117,107 @@
 
   function showState() {
     const state = currentState();
-    const src = customImages[IMAGE_KEYS[state]] || BUNDLED[state];
     const token = ++imageLoadToken;
     const probe = new Image();
+
     probe.onload = () => {
       if (token !== imageLoadToken) return;
-      image.src = src;
+      image.src = state.src;
       image.style.display = "block";
       setFallbackArtVisible(false);
     };
+
     probe.onerror = () => {
       if (token !== imageLoadToken) return;
+
+      // A holding frame is optional. If one disappears, fall straight back to
+      // grab.png instead of flashing the legacy CSS mascot mid-drag.
+      if (state.kind === "holding") {
+        endHolding();
+        showState();
+        return;
+      }
+
       image.removeAttribute("src");
       image.style.display = "none";
       setFallbackArtVisible(true);
     };
-    probe.src = src;
+
+    probe.src = state.src;
+  }
+
+  function clearHoldingStartTimer() {
+    if (!holdingStartTimer) return;
+    clearTimeout(holdingStartTimer);
+    holdingStartTimer = null;
+  }
+
+  function clearHoldingSwapTimer() {
+    if (!holdingSwapTimer) return;
+    clearTimeout(holdingSwapTimer);
+    holdingSwapTimer = null;
+  }
+
+  function chooseDifferentHoldingIndex() {
+    if (holdingFrames.length <= 1) return 0;
+
+    let next = holdingIndex;
+    while (next === holdingIndex) {
+      next = Math.floor(Math.random() * holdingFrames.length);
+    }
+    return next;
+  }
+
+  function scheduleHoldingSwap() {
+    clearHoldingSwapTimer();
+    if (!holdingActive || !bin.classList.contains("dragover") || !holdingFrames.length) return;
+
+    // Irregular timing keeps the expression deck from feeling like a tiny GIF.
+    holdingSwapTimer = setTimeout(() => {
+      holdingSwapTimer = null;
+      if (!holdingActive || !bin.classList.contains("dragover")) return;
+      holdingIndex = chooseDifferentHoldingIndex();
+      showState();
+      scheduleHoldingSwap();
+    }, randomBetween(650, 1800));
+  }
+
+  function beginHoldingCountdown() {
+    if (!holdingFrames.length || holdingStartTimer || holdingActive || !bin.classList.contains("dragover")) return;
+
+    holdingStartTimer = setTimeout(() => {
+      holdingStartTimer = null;
+      if (!bin.classList.contains("dragover") || !holdingFrames.length) return;
+
+      holdingActive = true;
+      holdingIndex = Math.floor(Math.random() * holdingFrames.length);
+      showState();
+      scheduleHoldingSwap();
+    }, randomBetween(2000, 3000));
+  }
+
+  function endHolding() {
+    clearHoldingStartTimer();
+    clearHoldingSwapTimer();
+    holdingActive = false;
+    holdingIndex = -1;
+  }
+
+  function syncHoldingState() {
+    if (bin.classList.contains("dragover")) {
+      beginHoldingCountdown();
+      return;
+    }
+    endHolding();
   }
 
   async function loadTheme() {
-    customImages = await chrome.storage.local.get(Object.values(IMAGE_KEYS));
+    const [local] = await Promise.all([
+      chrome.storage.local.get(Object.values(IMAGE_KEYS)),
+      discoverHoldingFrames()
+    ]);
+    customImages = local || {};
+    syncHoldingState();
     showState();
   }
 
@@ -97,12 +225,16 @@
     pointerOver = true;
     showState();
   });
+
   bin.addEventListener("pointerleave", () => {
     pointerOver = false;
     showState();
   });
 
-  new MutationObserver(() => showState()).observe(bin, {
+  new MutationObserver(() => {
+    syncHoldingState();
+    showState();
+  }).observe(bin, {
     attributes: true,
     attributeFilter: ["class"]
   });
