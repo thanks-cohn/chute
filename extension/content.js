@@ -110,9 +110,17 @@
     }, "*");
   }
 
+  function sendDragActive(active) {
+    frame.contentWindow?.postMessage({
+      type: "chute-page-drag-active",
+      active: Boolean(active)
+    }, "*");
+  }
+
   function beginDragRouting() {
     if (dragRouting) return;
     dragRouting = true;
+    sendDragActive(true);
     frame.style.pointerEvents = "none";
     if (supportHover) {
       supportHover = false;
@@ -123,6 +131,7 @@
 
   function endDragRouting() {
     dragRouting = false;
+    sendDragActive(false);
     frame.style.pointerEvents = "auto";
     setDropActive(false, false);
   }
@@ -348,6 +357,20 @@
       sendDragSource(null);
       endDragRouting();
     }, 250);
+  }, true);
+
+  document.addEventListener("dragleave", (event) => {
+    const outsideViewport = event.clientX <= 0 ||
+      event.clientY <= 0 ||
+      event.clientX >= window.innerWidth ||
+      event.clientY >= window.innerHeight;
+    if (!outsideViewport || !dragRouting) return;
+    clearDragTimer = setTimeout(() => {
+      if (!dragRouting) return;
+      pageDragSource = null;
+      sendDragSource(null);
+      endDragRouting();
+    }, 120);
   }, true);
 
   window.addEventListener("blur", () => {
