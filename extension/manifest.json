@@ -37,11 +37,7 @@
         "bin.js",
         "bin-capture-settings.js",
         "bin-provenance.js",
-        "bin-drag-support.js",
-        "mascot-theme.js",
-        "assets/grab/default.png",
-        "assets/grab/hover.png",
-        "assets/grab/grab.png"
+        "bin-drag-support.js"
       ],
       "matches": ["http://*/*", "https://*/*"]
     }
