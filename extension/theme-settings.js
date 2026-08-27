@@ -6,6 +6,12 @@
     hover: "chuteMascotImageHover",
     grab: "chuteMascotImageGrab"
   };
+  const MENU_DEFAULTS = {
+    chuteMenuTheme: "original",
+    chuteMenuBackgroundColor: "#11130f",
+    chuteMenuTextColor: "#f4f5ee",
+    chuteMenuAccentColor: "#d7ff3f"
+  };
 
   const settingsRoot = document.querySelector(".settings");
   const floatingBehavior = document.querySelector("#floating-behavior");
@@ -26,15 +32,6 @@
     return label;
   }
 
-  function makeColor(id, value, label) {
-    const input = document.createElement("input");
-    input.id = id;
-    input.type = "color";
-    input.value = value;
-    input.setAttribute("aria-label", label);
-    return input;
-  }
-
   function makeFile(id, state) {
     const input = document.createElement("input");
     input.id = id;
@@ -47,12 +44,53 @@
     return input;
   }
 
-  const marker = document.createElement("div");
-  marker.className = "settings-note";
-  marker.innerHTML = "<strong>Chutey theme</strong> — bundled states come from <code>assets/grab/default.png</code>, <code>hover.png</code>, and <code>grab.png</code>. Optional local images override those files on this browser only.";
+  function makeColor(labelText, id, value) {
+    const label = document.createElement("label");
+    const text = document.createElement("span");
+    text.textContent = labelText;
+    const input = document.createElement("input");
+    input.id = id;
+    input.type = "color";
+    input.value = value;
+    input.setAttribute("aria-label", `${labelText} color`);
+    label.append(text, input);
+    return { label, input };
+  }
 
-  const boxColor = makeColor("mascot-box-color", "#ffe87a", "Mascot box color");
-  const textColor = makeColor("mascot-text-color", "#4a3a13", "Mascot text color");
+  const themeMarker = document.createElement("div");
+  themeMarker.className = "settings-note";
+  themeMarker.innerHTML = "<strong>Menu theme</strong> — recolors the Chute popup and Shelf only. Chutey's artwork is left alone.";
+
+  const themePresets = document.createElement("div");
+  themePresets.className = "theme-presets";
+  const presetDefs = [
+    ["original", "Original Chute"],
+    ["neon", "Neon Pink"],
+    ["navy", "Navy Blue"],
+    ["black", "Back to Black"]
+  ];
+  const presetButtons = new Map();
+  for (const [id, title] of presetDefs) {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "theme-preset";
+    button.dataset.theme = id;
+    button.textContent = title;
+    themePresets.append(button);
+    presetButtons.set(id, button);
+  }
+
+  const customColors = document.createElement("div");
+  customColors.className = "theme-custom-colors";
+  const backgroundColor = makeColor("Background", "menu-background-color", MENU_DEFAULTS.chuteMenuBackgroundColor);
+  const menuTextColor = makeColor("Text", "menu-text-color", MENU_DEFAULTS.chuteMenuTextColor);
+  const accentColor = makeColor("Accent", "menu-accent-color", MENU_DEFAULTS.chuteMenuAccentColor);
+  customColors.append(backgroundColor.label, menuTextColor.label, accentColor.label);
+
+  const mascotMarker = document.createElement("div");
+  mascotMarker.className = "settings-note";
+  mascotMarker.innerHTML = "<strong>Chutey images</strong> — bundled states come from <code>assets/grab/default.png</code>, <code>hover.png</code>, and <code>grab.png</code>. Optional local images override those files on this browser only.";
+
   const defaultImage = makeFile("mascot-image-default", "default");
   const hoverImage = makeFile("mascot-image-hover", "hover");
   const grabImage = makeFile("mascot-image-grab", "grab");
@@ -78,9 +116,10 @@
   uninstallNote.textContent = "Complete uninstall removes the Windows companion, startup/native-host registration, then this extension. Chute history is kept unless you select Delete local Chute history.";
 
   settingsRoot.append(
-    marker,
-    makeLabel("Mascot box color", boxColor),
-    makeLabel("Mascot text color", textColor),
+    themeMarker,
+    themePresets,
+    customColors,
+    mascotMarker,
     makeLabel("Default image", defaultImage),
     makeLabel("Hover image", hoverImage),
     makeLabel("Grab image", grabImage),
@@ -90,16 +129,16 @@
     uninstallNote
   );
 
+  function markTheme(id) {
+    for (const [themeId, button] of presetButtons) {
+      button.classList.toggle("active", id === themeId);
+    }
+  }
+
   function fileToDataUrl(file) {
     return new Promise((resolve, reject) => {
-      if (!file) {
-        reject(new Error("No image selected"));
-        return;
-      }
-      if (file.size > MAX_IMAGE_BYTES) {
-        reject(new Error("Mascot images must be 1.5 MB or smaller"));
-        return;
-      }
+      if (!file) return reject(new Error("No image selected"));
+      if (file.size > MAX_IMAGE_BYTES) return reject(new Error("Mascot images must be 1.5 MB or smaller"));
       const reader = new FileReader();
       reader.onload = () => resolve(String(reader.result || ""));
       reader.onerror = () => reject(new Error("Could not read image"));
@@ -108,14 +147,12 @@
   }
 
   async function loadSettings() {
-    const sync = await chrome.storage.sync.get({
-      chuteAutoHide: true,
-      chuteMascotBoxColor: "#ffe87a",
-      chuteMascotTextColor: "#4a3a13"
-    });
+    const sync = await chrome.storage.sync.get({ chuteAutoHide: true, ...MENU_DEFAULTS });
     if (floatingBehavior) floatingBehavior.value = sync.chuteAutoHide === false ? "always" : "auto-hide";
-    boxColor.value = sync.chuteMascotBoxColor || "#ffe87a";
-    textColor.value = sync.chuteMascotTextColor || "#4a3a13";
+    backgroundColor.input.value = sync.chuteMenuBackgroundColor || MENU_DEFAULTS.chuteMenuBackgroundColor;
+    menuTextColor.input.value = sync.chuteMenuTextColor || MENU_DEFAULTS.chuteMenuTextColor;
+    accentColor.input.value = sync.chuteMenuAccentColor || MENU_DEFAULTS.chuteMenuAccentColor;
+    markTheme(sync.chuteMenuTheme || "original");
   }
 
   floatingBehavior?.addEventListener("change", async () => {
@@ -124,12 +161,36 @@
     status(autoHide ? "Chutey will auto-hide" : "Chutey will stay visible");
   });
 
-  boxColor.addEventListener("input", () => {
-    chrome.storage.sync.set({ chuteMascotBoxColor: boxColor.value });
-  });
-  textColor.addEventListener("input", () => {
-    chrome.storage.sync.set({ chuteMascotTextColor: textColor.value });
-  });
+  for (const [themeId, button] of presetButtons) {
+    button.addEventListener("click", async () => {
+      try {
+        const theme = await globalThis.setChuteMenuTheme?.(themeId);
+        if (!theme) throw new Error("Menu theme engine is not loaded");
+        backgroundColor.input.value = theme.background;
+        menuTextColor.input.value = theme.text;
+        accentColor.input.value = theme.accent;
+        markTheme(themeId);
+        status(`${theme.name} theme applied`);
+      } catch (error) {
+        status(error.message, true);
+      }
+    });
+  }
+
+  async function saveCustomTheme() {
+    const next = {
+      chuteMenuTheme: "custom",
+      chuteMenuBackgroundColor: backgroundColor.input.value,
+      chuteMenuTextColor: menuTextColor.input.value,
+      chuteMenuAccentColor: accentColor.input.value
+    };
+    await chrome.storage.sync.set(next);
+    globalThis.applyChuteMenuTheme?.(next);
+    markTheme("custom");
+  }
+  backgroundColor.input.addEventListener("input", saveCustomTheme);
+  menuTextColor.input.addEventListener("input", saveCustomTheme);
+  accentColor.input.addEventListener("input", saveCustomTheme);
 
   for (const input of [defaultImage, hoverImage, grabImage]) {
     input.addEventListener("change", async () => {
@@ -155,10 +216,7 @@
     return new Promise((resolve, reject) => {
       chrome.runtime.sendNativeMessage(HOST_NAME, message, (response) => {
         const error = chrome.runtime.lastError;
-        if (error) {
-          reject(new Error(error.message));
-          return;
-        }
+        if (error) return reject(new Error(error.message));
         resolve(response || null);
       });
     });
