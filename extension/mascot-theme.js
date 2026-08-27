@@ -36,10 +36,18 @@
   });
   bin.append(image);
 
+  // The legacy CSS mascot keeps the count badge inside its .paper body. Move
+  // the badge out once so image-backed Chutey can replace the ENTIRE old body
+  // without losing the live count. bin.js keeps its existing node reference.
   const count = bin.querySelector(".count");
   if (count) {
-    count.style.position = "relative";
-    count.style.zIndex = "12";
+    bin.append(count);
+    Object.assign(count.style, {
+      position: "absolute",
+      zIndex: "12",
+      top: "0px",
+      right: "0px"
+    });
   }
 
   function currentState() {
@@ -49,9 +57,14 @@
   }
 
   function setFallbackArtVisible(visible) {
-    for (const selector of [".tape", ".mouth", ".face", ".label"]) {
+    // .paper IS the old yellow Chutey body. Hide it as one unit instead of
+    // hiding only its face/label, otherwise the PNG gets superimposed on top.
+    for (const selector of [".tape", ".paper", ".mouth"]) {
       const node = bin.querySelector(selector);
-      if (node) node.style.opacity = visible ? "" : "0";
+      if (node) {
+        node.style.opacity = visible ? "" : "0";
+        node.style.visibility = visible ? "" : "hidden";
+      }
     }
   }
 
