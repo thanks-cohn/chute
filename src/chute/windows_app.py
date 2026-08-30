@@ -5,10 +5,17 @@ import os
 import shutil
 import subprocess
 import sys
+import time
 import urllib.error
 import urllib.request
 from pathlib import Path
 
+from .native_host import (
+    allow_extension,
+    install_bundled_native_host,
+    register_windows_uninstaller,
+    schedule_uninstall,
+)
 from .server import DEFAULT_HOST, DEFAULT_PORT, serve
 
 _APP_NAME = "Chute"
@@ -82,33 +89,78 @@ def _launch_quiet(target: Path) -> None:
     )
 
 
+def _bundled_root() -> Path:
+    if getattr(sys, "frozen", False):
+        return Path(getattr(sys, "_MEIPASS", Path(sys.executable).parent))
+    return Path(__file__).resolve().parents[2]
+
+
+def _install_native_host_bundle() -> Path:
+    return install_bundled_native_host(_bundled_root())
+
+
+def _stop_old_installed_copy() -> None:
+    """Stop Chute.exe before replacing it, even when its health endpoint is dead."""
+    if os.name != "nt":
+        return
+    try:
+        subprocess.run(
+            ["taskkill", "/IM", "Chute.exe", "/F"],
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            check=False,
+            creationflags=subprocess.CREATE_NO_WINDOW,
+        )
+    except OSError:
+        return
+    time.sleep(0.45)
+
+
+def _copy_installed_exe(source: Path, target: Path) -> None:
+    """Replace a just-stopped Chute.exe, tolerating short Windows file-lock lag."""
+    last_error: PermissionError | None = None
+    for _ in range(12):
+        try:
+            shutil.copy2(source, target)
+            return
+        except PermissionError as exc:
+            last_error = exc
+            time.sleep(0.15)
+    if last_error is not None:
+        raise last_error
+
+
+def _refresh_windows_registration(target: Path) -> None:
+    # Refresh every time the installed app starts. The Run key and the native
+    # host are deliberately redundant recovery paths: either can repair the
+    # other after a reboot, browser restart, or stale localhost process.
+    _register_startup(target)
+    _install_native_host_bundle()
+    register_windows_uninstaller(target, version="2.6.0")
+
+
 def self_install_if_needed() -> bool:
     """Install the downloaded Chute companion for the current Windows user.
 
-    Returns True when the current process should exit because the installed copy
-    was launched. No administrator privileges or Windows Service are used.
+    Returns True when this process should exit because the installed copy was
+    launched. No administrator privileges, Windows Service, or Python install
+    are required.
     """
-
     if os.name != "nt" or not getattr(sys, "frozen", False):
         return False
 
     source = _current_exe()
     target = installed_exe()
     if _same_path(source, target):
-        _register_startup(target)
+        _refresh_windows_registration(target)
         return False
 
     target.parent.mkdir(parents=True, exist_ok=True)
     _ensure_data_layout()
-
-    try:
-        shutil.copy2(source, target)
-    except PermissionError:
-        if already_running():
-            return True
-        raise
-
-    _register_startup(target)
+    _stop_old_installed_copy()
+    _copy_installed_exe(source, target)
+    _refresh_windows_registration(target)
     _launch_quiet(target)
     return True
 
@@ -117,6 +169,21 @@ def main() -> int:
     if os.name != "nt":
         print("This Chute companion build is for Windows.", file=sys.stderr)
         return 2
+
+    args = sys.argv[1:]
+    if "--uninstall" in args:
+        schedule_uninstall(delete_data="--delete-data" in args)
+        return 0
+
+    if "--allow-extension" in args:
+        try:
+            index = args.index("--allow-extension")
+            allow_extension(args[index + 1])
+            return 0
+        except (IndexError, ValueError) as exc:
+            with log_path().open("a", encoding="utf-8") as log:
+                print(f"Could not allow development extension: {exc}", file=log)
+            return 2
 
     _ensure_data_layout()
 
