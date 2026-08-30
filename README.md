@@ -135,6 +135,8 @@ A simple way to think about the pair is:
 
 Chute handles the quick handoff. FrameChute is where you can move, resize, layer, save, and return to material later.
 
+> **FrameChute compatibility note:** The Chute version currently published in the Chrome Web Store may not support dragging Chute images directly into FrameChute. The **current fixed Chute extension in this GitHub repository does**, including with the **Chrome Web Store version of FrameChute**. If you specifically want Chute → FrameChute image dragging, use the current GitHub Chute extension until the Store build catches up.
+
 Neither requires the other.
 
 ## Install
@@ -143,9 +145,11 @@ Neither requires the other.
 
 For Windows, Chute has two small pieces: the browser extension and the Windows companion.
 
-1. **[Install Chute from the Chrome Web Store](https://chromewebstore.google.com/detail/chute/hpcpnigfadojjmnbflfhkfkallfafajb)**
-2. **[Download and run the Chute Windows companion](https://github.com/thanks-cohn/chute/releases)** once on that computer
-3. Open Chute in the browser and start dragging
+1. **[Install Chute from the Chrome Web Store](https://chromewebstore.google.com/detail/chute/hpcpnigfadojjmnbflfhkfkallfafajb)** for the normal Store installation, or use the current GitHub extension build if you need the latest FrameChute compatibility fix.
+2. **[Download and run the Chute Windows companion](https://github.com/thanks-cohn/chute/releases)** once on that computer.
+3. Open Chute in the browser and start dragging.
+
+**Using FrameChute?** The Chrome Web Store Chute build may not yet support Chute → FrameChute image dragging. The current fixed GitHub Chute extension does work with the Chrome Web Store release of FrameChute.
 
 Why is there a companion at all? Browsers deliberately limit how extensions can work with files on your computer. The companion gives Chute a local place to keep the things you choose to drop into it.
 
