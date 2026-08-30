@@ -13,7 +13,6 @@ from pathlib import Path
 from .native_host import (
     allow_extension,
     install_bundled_native_host,
-    register_native_host,
     register_windows_uninstaller,
     schedule_uninstall,
 )
@@ -21,7 +20,6 @@ from .server import DEFAULT_HOST, DEFAULT_PORT, serve
 
 _APP_NAME = "Chute"
 _RUN_KEY = r"Software\Microsoft\Windows\CurrentVersion\Run"
-_ONBOARDING_MARKER = ".extension-onboarding-v1"
 
 
 def _health_url() -> str:
@@ -48,10 +46,6 @@ def install_dir() -> Path:
 
 def installed_exe() -> Path:
     return install_dir() / "Chute.exe"
-
-
-def extension_dir() -> Path:
-    return install_dir() / "extension"
 
 
 def log_path() -> Path:
@@ -84,9 +78,7 @@ def _ensure_data_layout() -> None:
 
 
 def _launch_quiet(target: Path) -> None:
-    flags = 0
-    if os.name == "nt":
-        flags = subprocess.CREATE_NEW_PROCESS_GROUP | subprocess.DETACHED_PROCESS | subprocess.CREATE_NO_WINDOW
+    flags = subprocess.CREATE_NEW_PROCESS_GROUP | subprocess.DETACHED_PROCESS | subprocess.CREATE_NO_WINDOW
     subprocess.Popen(
         [str(target), "--background"],
         stdin=subprocess.DEVNULL,
@@ -103,155 +95,13 @@ def _bundled_root() -> Path:
     return Path(__file__).resolve().parents[2]
 
 
-def _bundled_extension_dir() -> Path:
-    return _bundled_root() / "extension"
-
-
-def _install_extension_bundle() -> Path | None:
-    source = _bundled_extension_dir()
-    manifest = source / "manifest.json"
-    if not manifest.is_file():
-        return None
-
-    target = extension_dir()
-    target.parent.mkdir(parents=True, exist_ok=True)
-    shutil.copytree(source, target, dirs_exist_ok=True)
-    return target
-
-
 def _install_native_host_bundle() -> Path:
     return install_bundled_native_host(_bundled_root())
 
 
-def _browser_candidates() -> list[tuple[str, str, list[Path]]]:
-    local = Path(os.environ.get("LOCALAPPDATA", Path.home() / "AppData" / "Local"))
-    program_files = Path(os.environ.get("PROGRAMFILES", r"C:\Program Files"))
-    program_files_x86 = Path(os.environ.get("PROGRAMFILES(X86)", r"C:\Program Files (x86)"))
-
-    opera_paths = [
-        local / "Programs" / "Opera" / "opera.exe",
-        local / "Programs" / "Opera GX" / "opera.exe",
-    ]
-    programs = local / "Programs"
-    if programs.is_dir():
-        opera_paths.extend(programs.glob("Opera*/opera.exe"))
-
-    return [
-        (
-            "Chrome",
-            "chrome://extensions/",
-            [
-                local / "Google" / "Chrome" / "Application" / "chrome.exe",
-                program_files / "Google" / "Chrome" / "Application" / "chrome.exe",
-                program_files_x86 / "Google" / "Chrome" / "Application" / "chrome.exe",
-            ],
-        ),
-        (
-            "Edge",
-            "edge://extensions/",
-            [
-                program_files_x86 / "Microsoft" / "Edge" / "Application" / "msedge.exe",
-                program_files / "Microsoft" / "Edge" / "Application" / "msedge.exe",
-            ],
-        ),
-        (
-            "Brave",
-            "brave://extensions/",
-            [
-                local / "BraveSoftware" / "Brave-Browser" / "Application" / "brave.exe",
-                program_files / "BraveSoftware" / "Brave-Browser" / "Application" / "brave.exe",
-                program_files_x86 / "BraveSoftware" / "Brave-Browser" / "Application" / "brave.exe",
-            ],
-        ),
-        ("Opera", "opera://extensions/", opera_paths),
-    ]
-
-
-def _detected_browsers() -> list[tuple[str, str, Path]]:
-    detected: list[tuple[str, str, Path]] = []
-    seen: set[str] = set()
-    for name, url, candidates in _browser_candidates():
-        for candidate in candidates:
-            try:
-                resolved = candidate.resolve()
-            except OSError:
-                resolved = candidate
-            key = os.path.normcase(str(resolved))
-            if key in seen or not resolved.is_file():
-                continue
-            seen.add(key)
-            detected.append((name, url, resolved))
-            break
-    return detected
-
-
-def _copy_path_to_clipboard(path: Path) -> None:
-    try:
-        subprocess.run(
-            ["clip.exe"],
-            input=str(path),
-            text=True,
-            check=False,
-            creationflags=subprocess.CREATE_NO_WINDOW,
-        )
-    except OSError:
-        pass
-
-
-def _show_setup_message(path: Path, browser_names: list[str]) -> None:
-    try:
-        import ctypes
-
-        browsers = ", ".join(browser_names) if browser_names else "your Chromium browser"
-        message = (
-            "Chute is installed and running.\n\n"
-            f"I opened the Extensions page for: {browsers}.\n\n"
-            "To enable the browser half before the Web Store release:\n"
-            "1. Turn on Developer mode.\n"
-            "2. Click Load unpacked.\n"
-            "3. Choose the Chute extension folder that just opened.\n\n"
-            f"The folder path is also copied to your clipboard:\n{path}"
-        )
-        ctypes.windll.user32.MessageBoxW(None, message, "Finish Chute browser setup", 0x40)
-    except Exception:
-        pass
-
-
-def _open_extension_onboarding(path: Path) -> None:
-    marker = install_dir() / _ONBOARDING_MARKER
-    if marker.exists():
-        return
-
-    browsers = _detected_browsers()
-    flags = subprocess.CREATE_NEW_PROCESS_GROUP | subprocess.DETACHED_PROCESS
-    for _, url, exe in browsers:
-        try:
-            subprocess.Popen(
-                [str(exe), url],
-                stdin=subprocess.DEVNULL,
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL,
-                close_fds=True,
-                creationflags=flags,
-            )
-        except OSError:
-            continue
-
-    try:
-        subprocess.Popen(["explorer.exe", str(path)], creationflags=flags)
-    except OSError:
-        pass
-
-    _copy_path_to_clipboard(path)
-    _show_setup_message(path, [name for name, _, _ in browsers])
-    try:
-        marker.write_text("Browser extension onboarding shown.\n", encoding="utf-8")
-    except OSError:
-        pass
-
-
 def _stop_old_installed_copy() -> None:
-    if os.name != "nt" or not already_running():
+    """Stop Chute.exe before replacing it, even when its health endpoint is dead."""
+    if os.name != "nt":
         return
     try:
         subprocess.run(
@@ -262,26 +112,41 @@ def _stop_old_installed_copy() -> None:
             check=False,
             creationflags=subprocess.CREATE_NO_WINDOW,
         )
-        time.sleep(0.45)
     except OSError:
-        pass
+        return
+    time.sleep(0.45)
+
+
+def _copy_installed_exe(source: Path, target: Path) -> None:
+    """Replace a just-stopped Chute.exe, tolerating short Windows file-lock lag."""
+    last_error: PermissionError | None = None
+    for _ in range(12):
+        try:
+            shutil.copy2(source, target)
+            return
+        except PermissionError as exc:
+            last_error = exc
+            time.sleep(0.15)
+    if last_error is not None:
+        raise last_error
 
 
 def _refresh_windows_registration(target: Path) -> None:
+    # Refresh every time the installed app starts. The Run key and the native
+    # host are deliberately redundant recovery paths: either can repair the
+    # other after a reboot, browser restart, or stale localhost process.
     _register_startup(target)
-    _install_extension_bundle()
     _install_native_host_bundle()
-    register_native_host()
     register_windows_uninstaller(target, version="2.6.0")
 
 
 def self_install_if_needed() -> bool:
-    """Install a downloaded frozen Chute.exe for the current user and relaunch it.
+    """Install the downloaded Chute companion for the current Windows user.
 
-    Returns True when the current process should exit because the installed copy
-    was launched. No administrator privileges or Windows Service are used.
+    Returns True when this process should exit because the installed copy was
+    launched. No administrator privileges, Windows Service, or Python install
+    are required.
     """
-
     if os.name != "nt" or not getattr(sys, "frozen", False):
         return False
 
@@ -294,22 +159,15 @@ def self_install_if_needed() -> bool:
     target.parent.mkdir(parents=True, exist_ok=True)
     _ensure_data_layout()
     _stop_old_installed_copy()
-    shutil.copy2(source, target)
-
-    extension = _install_extension_bundle()
-    _register_startup(target)
-    _install_native_host_bundle()
-    register_native_host()
-    register_windows_uninstaller(target, version="2.6.0")
+    _copy_installed_exe(source, target)
+    _refresh_windows_registration(target)
     _launch_quiet(target)
-    if extension is not None:
-        _open_extension_onboarding(extension)
     return True
 
 
 def main() -> int:
     if os.name != "nt":
-        print("This Chute desktop build is for Windows.", file=sys.stderr)
+        print("This Chute companion build is for Windows.", file=sys.stderr)
         return 2
 
     args = sys.argv[1:]
@@ -345,7 +203,6 @@ def main() -> int:
         with contextlib.redirect_stdout(log), contextlib.redirect_stderr(log):
             print("Starting Chute for Windows on 127.0.0.1:17891", flush=True)
             print(f"Chute data: {data_dir()}", flush=True)
-            print(f"Chute extension: {extension_dir()}", flush=True)
             try:
                 serve(DEFAULT_HOST, DEFAULT_PORT)
             except OSError as exc:
