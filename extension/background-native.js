@@ -19,6 +19,13 @@
     return requestUrl(input).startsWith(CHUTE_ORIGIN);
   }
 
+  function offlineError(cause) {
+    const error = new Error("Chute is asleep.");
+    error.name = "ChuteBridgeOfflineError";
+    if (cause !== undefined) error.cause = cause;
+    return error;
+  }
+
   function sendNative(message) {
     return new Promise((resolve, reject) => {
       chrome.runtime.sendNativeMessage(HOST_NAME, message, (response) => {
@@ -75,10 +82,6 @@
       });
   }
 
-  // Redundant recovery paths: Windows login startup is useful, but Chrome also
-  // gets to revive the companion whenever its MV3 worker is born or the browser
-  // itself starts. A disabled/missed Run-key launch therefore does not strand
-  // the extension at 127.0.0.1 until the user manually starts Chute.
   chrome.runtime.onStartup.addListener(() => ensureBridgeInBackground("browser startup"));
   chrome.runtime.onInstalled.addListener(() => ensureBridgeInBackground("extension install/update"));
   ensureBridgeInBackground("service worker startup");
@@ -87,9 +90,14 @@
     if (!isBridgeRequest(input)) return nativeFetch(input, init);
     try {
       return await nativeFetch(input, init);
-    } catch (error) {
-      await wakeCompanion();
-      return nativeFetch(input, init);
+    } catch (firstError) {
+      const recovered = await wakeCompanion();
+      if (!recovered) throw offlineError(firstError);
+      try {
+        return await nativeFetch(input, init);
+      } catch (secondError) {
+        throw offlineError(secondError);
+      }
     }
   };
 })();

@@ -2,7 +2,7 @@
   const HOST_NAME = "com.thankscohn.chute";
   const CHUTE_ORIGIN = "http://127.0.0.1:17891";
   const HEALTH_URL = `${CHUTE_ORIGIN}/health`;
-  const RETRY_DELAYS = [80, 180, 350, 700, 1200];
+  const POST_WAKE_DELAYS = [80, 180, 350, 700];
   const nativeFetch = window.fetch.bind(window);
   let wakePromise = null;
 
@@ -18,6 +18,13 @@
 
   function isBridgeRequest(input) {
     return requestUrl(input).startsWith(CHUTE_ORIGIN);
+  }
+
+  function offlineError(cause) {
+    const error = new Error("Chute is asleep.");
+    error.name = "ChuteBridgeOfflineError";
+    if (cause !== undefined) error.cause = cause;
+    return error;
   }
 
   function sendNative(message) {
@@ -52,6 +59,8 @@
       if (await healthCheck()) return true;
 
       try {
+        // The Windows native host itself waits for Chute.exe to become healthy,
+        // so this is the one authoritative wake/restart attempt for a cycle.
         const response = await sendNative({ action: "ensure_bridge" });
         if (!response?.ok) return false;
       } catch (error) {
@@ -59,7 +68,8 @@
         return false;
       }
 
-      for (const delay of RETRY_DELAYS) {
+      if (await healthCheck()) return true;
+      for (const delay of POST_WAKE_DELAYS) {
         await sleep(delay);
         if (await healthCheck()) return true;
       }
@@ -74,11 +84,21 @@
     if (!isBridgeRequest(input)) return nativeFetch(input, init);
     try {
       return await nativeFetch(input, init);
-    } catch (error) {
-      await wakeCompanion();
-      return nativeFetch(input, init);
+    } catch (firstError) {
+      const recovered = await wakeCompanion();
+      if (!recovered) throw offlineError(firstError);
+      try {
+        return await nativeFetch(input, init);
+      } catch (secondError) {
+        throw offlineError(secondError);
+      }
     }
   };
 
-  window.ChuteNativeWake = Object.freeze({ wake: wakeCompanion, hostName: HOST_NAME });
+  window.ChuteNativeWake = Object.freeze({
+    wake: wakeCompanion,
+    health: healthCheck,
+    hostName: HOST_NAME,
+    offlineError
+  });
 })();
