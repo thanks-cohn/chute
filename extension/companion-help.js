@@ -1,19 +1,23 @@
 (() => {
   const RELEASES_URL = "https://github.com/thanks-cohn/chute/releases";
 
-  function enhanceCompanionError() {
+  function enhanceCompanionHelp() {
     const empty = document.querySelector(".empty");
-    if (!empty || !/Chute is not running/i.test(empty.textContent || "")) return;
+    if (!empty) return;
+    if (!/Chute is asleep|Chute is not running|companion is not installed/i.test(empty.textContent || "")) return;
     if (empty.querySelector(".chute-companion-link")) return;
 
-    empty.innerHTML = `
-      <strong>Chute companion is not installed or could not be started.</strong>
-      The Chrome Web Store installs the browser half of Chute. On a new Windows computer, install the Windows companion once; after that Chute can wake it automatically after restarts or crashes.
+    const help = document.createElement("div");
+    help.className = "chute-companion-help";
+    help.innerHTML = `
+      <br>
+      <span>First time using Chute on this Windows PC?</span>
       <br><br>
-      <a class="chute-companion-link secondary-button" href="${RELEASES_URL}" target="_blank" rel="noopener noreferrer">Get the Windows companion</a>`;
+      <a class="chute-companion-link secondary-button" href="${RELEASES_URL}" target="_blank" rel="noopener noreferrer">Finish Windows setup</a>`;
+    empty.append(help);
   }
 
-  const observer = new MutationObserver(enhanceCompanionError);
+  const observer = new MutationObserver(enhanceCompanionHelp);
   observer.observe(document.documentElement, { childList: true, subtree: true });
-  enhanceCompanionError();
+  enhanceCompanionHelp();
 })();
