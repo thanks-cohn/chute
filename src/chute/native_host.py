@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import filecmp
 import json
 import os
 import re
@@ -322,11 +323,11 @@ def native_main() -> int:
         _write_message({"ok": False, "error": "Unsupported Chute native action"})
 
 
-def _same_file_shape(source: Path, target: Path) -> bool:
+def _same_file_contents(source: Path, target: Path) -> bool:
     try:
-        source_stat = source.stat()
-        target_stat = target.stat()
-        return source_stat.st_size == target_stat.st_size
+        if source.stat().st_size != target.stat().st_size:
+            return False
+        return filecmp.cmp(source, target, shallow=False)
     except OSError:
         return False
 
@@ -338,13 +339,16 @@ def install_bundled_native_host(bundle_root: Path) -> Path:
         raise FileNotFoundError(f"Bundled native host missing: {source}")
     target.parent.mkdir(parents=True, exist_ok=True)
 
-    # Windows locks a running native-host executable. Avoid rewriting the same
-    # helper every time Chute.exe wakes; replace it when the bundled build shape
-    # differs, which is the normal update case.
-    if not target.is_file() or not _same_file_shape(source, target):
+    # Do a real byte comparison, not a size-only check. Two different helper
+    # builds can have the same length, and leaving the old helper installed can
+    # strand a browser on an obsolete recovery protocol after an update.
+    if not target.is_file() or not _same_file_contents(source, target):
         try:
             shutil.copy2(source, target)
         except PermissionError:
+            # A one-shot native host can briefly be locked while it is waking
+            # Chute.exe. Keep the existing registered helper for this launch;
+            # the next ordinary Chute start will retry the replacement.
             if not target.is_file():
                 raise
 
