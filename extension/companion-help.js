@@ -7,8 +7,8 @@
     if (empty.querySelector(".chute-companion-link")) return;
 
     empty.innerHTML = `
-      <strong>Chute companion is not running.</strong>
-      Chute keeps your basket on your own computer. Install or start the Windows companion, then reopen this panel.
+      <strong>Chute companion is not installed or could not be started.</strong>
+      The Chrome Web Store installs the browser half of Chute. On a new Windows computer, install the Windows companion once; after that Chute can wake it automatically after restarts or crashes.
       <br><br>
       <a class="chute-companion-link secondary-button" href="${RELEASES_URL}" target="_blank" rel="noopener noreferrer">Get the Windows companion</a>`;
   }
