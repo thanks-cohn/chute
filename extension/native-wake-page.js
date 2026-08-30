@@ -20,6 +20,13 @@
     return requestUrl(input).startsWith(CHUTE_ORIGIN);
   }
 
+  function offlineError(cause) {
+    const error = new Error("Chute is asleep.");
+    error.name = "ChuteBridgeOfflineError";
+    if (cause !== undefined) error.cause = cause;
+    return error;
+  }
+
   function sendNative(message) {
     return new Promise((resolve, reject) => {
       try {
@@ -74,11 +81,20 @@
     if (!isBridgeRequest(input)) return nativeFetch(input, init);
     try {
       return await nativeFetch(input, init);
-    } catch (error) {
-      await wakeCompanion();
-      return nativeFetch(input, init);
+    } catch (firstError) {
+      const recovered = await wakeCompanion();
+      if (!recovered) throw offlineError(firstError);
+      try {
+        return await nativeFetch(input, init);
+      } catch (secondError) {
+        throw offlineError(secondError);
+      }
     }
   };
 
-  window.ChuteNativeWake = Object.freeze({ wake: wakeCompanion, hostName: HOST_NAME });
+  window.ChuteNativeWake = Object.freeze({
+    wake: wakeCompanion,
+    hostName: HOST_NAME,
+    offlineError
+  });
 })();
