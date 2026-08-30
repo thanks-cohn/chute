@@ -44,6 +44,9 @@
   async function wakeCompanion() {
     if (wakePromise) return wakePromise;
     wakePromise = (async () => {
+      // Fast path: do not spawn the native helper when the bridge is already up.
+      if (await bridgeHealthy()) return true;
+
       try {
         const response = await sendNative({ action: "ensure_bridge" });
         if (!response?.ok) return false;
@@ -62,6 +65,24 @@
     });
     return wakePromise;
   }
+
+  function ensureBridgeInBackground(reason) {
+    void wakeCompanion()
+      .then((ok) => {
+        if (!ok) console.debug(`Chute bridge unavailable after ${reason}`);
+      })
+      .catch((error) => {
+        console.debug(`Chute bridge wake failed after ${reason}:`, error?.message || error);
+      });
+  }
+
+  // Do not rely on the Windows Run key alone. MV3 service workers are allowed
+  // to disappear and restart, so every cold start becomes another chance to
+  // self-heal the local companion. Browser startup and extension updates are
+  // explicit recovery points too.
+  chrome.runtime.onStartup.addListener(() => ensureBridgeInBackground("browser startup"));
+  chrome.runtime.onInstalled.addListener(() => ensureBridgeInBackground("extension install/update"));
+  ensureBridgeInBackground("service worker startup");
 
   globalThis.fetch = async function chuteBackgroundFetch(input, init) {
     if (!isBridgeRequest(input)) return nativeFetch(input, init);
