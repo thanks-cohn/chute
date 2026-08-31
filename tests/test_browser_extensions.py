@@ -42,6 +42,28 @@ def test_discovers_random_unpacked_id_from_secure_preferences(tmp_path):
     assert discover_chute_extension_ids([user_data]) == [DEV_EXTENSION_ID]
 
 
+def test_discovers_bom_prefixed_secure_preferences(tmp_path):
+    user_data = tmp_path / "User Data"
+    profile = user_data / "Default"
+    profile.mkdir(parents=True)
+    extension_root = tmp_path / "checkout" / "extension"
+    _write_chute_manifest(extension_root)
+
+    settings = {
+        "extensions": {
+            "settings": {
+                DEV_EXTENSION_ID: {
+                    "path": str(extension_root),
+                    "manifest": {"name": "Chute"},
+                }
+            }
+        }
+    }
+    (profile / "Secure Preferences").write_text(json.dumps(settings), encoding="utf-8-sig")
+
+    assert discover_chute_extension_ids([user_data]) == [DEV_EXTENSION_ID]
+
+
 def test_discovers_from_preferences_and_rejects_non_chute(tmp_path):
     user_data = tmp_path / "User Data"
     profile = user_data / "Profile 1"

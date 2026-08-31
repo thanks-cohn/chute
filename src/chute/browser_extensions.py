@@ -23,6 +23,12 @@ def chrome_user_data_roots() -> list[Path]:
     ]
 
 
+def _read_json(path: Path) -> object:
+    # utf-8-sig accepts ordinary UTF-8 and also tolerates a BOM. Chrome itself
+    # normally writes plain JSON, but Windows tooling/editors can add a BOM.
+    return json.loads(path.read_text(encoding="utf-8-sig"))
+
+
 def _is_chute_manifest(value: object) -> bool:
     if not isinstance(value, dict):
         return False
@@ -40,7 +46,7 @@ def _path_is_chute(raw_path: object, profile_dir: Path) -> bool:
         paths.append(profile_dir / candidate)
     for path in paths:
         try:
-            manifest = json.loads((path / "manifest.json").read_text(encoding="utf-8"))
+            manifest = _read_json(path / "manifest.json")
         except (OSError, ValueError, TypeError, json.JSONDecodeError):
             continue
         if _is_chute_manifest(manifest):
@@ -82,8 +88,10 @@ def discover_chute_extension_ids(roots: list[Path] | None = None) -> list[str]:
             seen_files.add(resolved)
 
             try:
-                payload = json.loads(state_file.read_text(encoding="utf-8"))
+                payload = _read_json(state_file)
             except (OSError, ValueError, TypeError, json.JSONDecodeError):
+                continue
+            if not isinstance(payload, dict):
                 continue
 
             settings = payload.get("extensions", {}).get("settings", {})
