@@ -1,3 +1,47 @@
+# How to install this fixed version of Chute!
+
+> **Important Windows fix:** use **Chute for Windows v2.6.1 RC1** with the current Chute extension. This is the Windows companion build that fixes the previous sleep/disconnect problem and has been tested to wake Chute again after `Chute.exe` is killed.
+
+## If you installed Chute from the Chrome Web Store
+
+The Chrome Web Store extension still needs the Windows companion in order to keep Chute available locally and wake it again when the local worker stops responding.
+
+1. Keep or install the **Chrome Web Store version of Chute**: https://chromewebstore.google.com/detail/chute/hpcpnigfadojjmnbflfhkfkallfafajb
+2. Download **Chute for Windows v2.6.1 RC1** from the release page: https://github.com/thanks-cohn/chute/releases/tag/chute-windows-v2.6.1-rc1
+3. Or download the Windows setup EXE directly: https://github.com/thanks-cohn/chute/releases/download/chute-windows-v2.6.1-rc1/Chute-Setup.exe
+4. Double-click `Chute-Setup.exe` once. No Python installation, administrator account, or Windows Service is required.
+5. Open Chute in Chrome and use it normally.
+
+**Which EXE fixes the previous issue?** **Chute for Windows v2.6.1 RC1**. If you already downloaded Chute from the Chrome Web Store, this is the companion EXE you should install.
+
+## If you want the current fixed GitHub version
+
+The extension in this repository is the current **Chute 2.6.1** build. It is specifically designed not to leave you stranded if the local Chute worker sleeps, crashes, is killed, or disconnects.
+
+On Windows, the current GitHub extension can:
+
+- notice that the local bridge on `127.0.0.1:17891` is unavailable;
+- ask its Manifest V3 background worker to reconnect;
+- contact the installed Chute native helper;
+- wake or relaunch `Chute.exe`;
+- reconnect the browser UI when the local bridge returns;
+- show a **Reconnect** control instead of remaining forever on a "waking up" message if automatic recovery genuinely fails.
+
+The **v2.6.1 RC1 Windows companion also recognizes loaded unpacked copies of Chute even when Chrome gives them a different extension ID**. It keeps the official Chrome Web Store ID authorized too. That means the same Windows companion is intended to work with the Store installation and with the current `extension/` folder loaded through Developer mode.
+
+To load the current GitHub extension:
+
+1. Clone or pull the current `main` branch.
+2. Open `chrome://extensions` in Chrome.
+3. Enable **Developer mode**.
+4. Click **Load unpacked**.
+5. Select this repository's `extension/` folder.
+6. Install **Chute for Windows v2.6.1 RC1** using the release link above.
+
+This recovery path has been tested by killing `Chute.exe` and confirming that the extension/native helper can bring the local Chute bridge back automatically.
+
+---
+
 # Chute
 
 **Drag it in. Drag it back out.**
@@ -87,7 +131,7 @@ For browser images, Chute can keep the full original and, if you want, create a 
 
 ### It is designed to recover, not strand you
 
-On Windows, Chute can start with your computer and wake its companion again when the browser needs it. If Chute has gone to sleep, the extension offers **Reconnect** instead of expecting you to understand local servers or port numbers.
+On Windows, Chute can start with your computer and wake its companion again when the browser needs it. If Chute has gone to sleep, the current extension is designed to ask the native helper to wake or relaunch the local companion and reconnect automatically. If automatic recovery fails, Chute offers **Reconnect** instead of expecting you to understand local servers or port numbers.
 
 ## How Chute compares
 
@@ -143,13 +187,18 @@ Neither requires the other.
 
 ### Windows
 
+For the fixed Windows setup, use **Chute for Windows v2.6.1 RC1**:
+
+- Release page: https://github.com/thanks-cohn/chute/releases/tag/chute-windows-v2.6.1-rc1
+- Direct EXE: https://github.com/thanks-cohn/chute/releases/download/chute-windows-v2.6.1-rc1/Chute-Setup.exe
+
 For Windows, Chute has two small pieces: the browser extension and the Windows companion.
 
-1. **[Install Chute from the Chrome Web Store](https://chromewebstore.google.com/detail/chute/hpcpnigfadojjmnbflfhkfkallfafajb)** for the normal Store installation, or use the current GitHub extension build if you need the latest FrameChute compatibility fix.
-2. **[Download and run the Chute Windows companion](https://github.com/thanks-cohn/chute/releases)** once on that computer.
+1. **[Install Chute from the Chrome Web Store](https://chromewebstore.google.com/detail/chute/hpcpnigfadojjmnbflfhkfkallfafajb)** for the normal Store installation, or load the current GitHub `extension/` folder for the newest fixes.
+2. Download and run **Chute for Windows v2.6.1 RC1** once on that computer.
 3. Open Chute in the browser and start dragging.
 
-**Using FrameChute?** The Chrome Web Store Chute build may not yet support Chute → FrameChute image dragging. The current fixed GitHub Chute extension does work with the Chrome Web Store release of FrameChute.
+**If you already installed the Store version:** install the v2.6.1 RC1 companion EXE above. It keeps the official Store extension ID authorized and provides the native wake/reconnect path used by the fixed extension.
 
 Why is there a companion at all? Browsers deliberately limit how extensions can work with files on your computer. The companion gives Chute a local place to keep the things you choose to drop into it.
 
