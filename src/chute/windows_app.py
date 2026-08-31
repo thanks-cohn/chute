@@ -5,11 +5,13 @@ import os
 import shutil
 import subprocess
 import sys
+import threading
 import time
 import urllib.error
 import urllib.request
 from pathlib import Path
 
+from .browser_extensions import discover_chute_extension_ids
 from .native_host import (
     allow_extension,
     install_bundled_native_host,
@@ -20,6 +22,7 @@ from .server import DEFAULT_HOST, DEFAULT_PORT, serve
 
 _APP_NAME = "Chute"
 _RUN_KEY = r"Software\Microsoft\Windows\CurrentVersion\Run"
+_NATIVE_REFRESH_SECONDS = 5.0
 
 
 def _health_url() -> str:
@@ -99,6 +102,36 @@ def _install_native_host_bundle() -> Path:
     return install_bundled_native_host(_bundled_root())
 
 
+def _authorize_loaded_chute_extensions() -> int:
+    authorized = 0
+    for extension_id in discover_chute_extension_ids():
+        try:
+            allow_extension(extension_id)
+            authorized += 1
+        except (OSError, ValueError):
+            continue
+    return authorized
+
+
+def _native_origin_refresh_loop() -> None:
+    while True:
+        time.sleep(_NATIVE_REFRESH_SECONDS)
+        try:
+            _authorize_loaded_chute_extensions()
+        except Exception:
+            # Discovery is a compatibility aid. Never let it take down Chute.
+            pass
+
+
+def _start_native_origin_refresh() -> None:
+    thread = threading.Thread(
+        target=_native_origin_refresh_loop,
+        name="ChuteNativeOriginRefresh",
+        daemon=True,
+    )
+    thread.start()
+
+
 def _stop_old_installed_copy() -> None:
     """Stop Chute.exe before replacing it, even when its health endpoint is dead."""
     if os.name != "nt":
@@ -132,21 +165,17 @@ def _copy_installed_exe(source: Path, target: Path) -> None:
 
 
 def _refresh_windows_registration(target: Path) -> None:
-    # Refresh every time the installed app starts. The Run key and the native
-    # host are deliberately redundant recovery paths: either can repair the
-    # other after a reboot, browser restart, or stale localhost process.
+    # Refresh every time the installed app starts. The Store ID is always
+    # accepted by the bundled native host; loaded unpacked Chute IDs are learned
+    # from Chrome profile state and persisted as additional allowed origins.
     _register_startup(target)
     _install_native_host_bundle()
-    register_windows_uninstaller(target, version="2.6.0")
+    _authorize_loaded_chute_extensions()
+    register_windows_uninstaller(target, version="2.6.1")
 
 
 def self_install_if_needed() -> bool:
-    """Install the downloaded Chute companion for the current Windows user.
-
-    Returns True when this process should exit because the installed copy was
-    launched. No administrator privileges, Windows Service, or Python install
-    are required.
-    """
+    """Install the downloaded Chute companion for the current Windows user."""
     if os.name != "nt" or not getattr(sys, "frozen", False):
         return False
 
@@ -194,6 +223,9 @@ def main() -> int:
         with log_path().open("a", encoding="utf-8") as log:
             print(f"Chute self-install failed: {exc}", file=log)
         return 1
+
+    # Keep learning newly loaded unpacked Chute IDs while the companion is up.
+    _start_native_origin_refresh()
 
     if already_running():
         return 0
