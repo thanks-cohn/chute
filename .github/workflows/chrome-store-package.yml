@@ -39,14 +39,16 @@ jobs:
       - name: Build Chrome Web Store package
         run: python scripts/build-chrome-store.py
 
-      - name: Inspect packaged manifest
+      - name: Inspect packaged reconnect contract
         run: |
           python - <<'PY'
           import json
           from pathlib import Path
-          version = "2.6.0"
+
+          version = "2.6.1"
           package = Path(f"dist/chrome-store/chute-extension-{version}")
           manifest = json.loads((package / "manifest.json").read_text())
+
           assert manifest["manifest_version"] == 3
           assert manifest["version"] == version
           assert len(manifest["description"]) <= 132
@@ -54,17 +56,31 @@ jobs:
           assert "activeTab" not in manifest.get("permissions", [])
           assert "scripting" not in manifest.get("permissions", [])
           assert Path(f"dist/chrome-store/chute-chrome-{version}.zip").is_file()
+
+          background = (package / "background-entry.js").read_text()
+          assert '"background-native.js"' in background
+
+          for page_name in ("popup.html", "shelf.html"):
+              page = (package / page_name).read_text()
+              assert 'src="native-wake-page.js"' in page
+              assert 'src="bridge-reconnect.js"' in page
+              assert page.index('src="native-wake-page.js"') < page.index('src="bridge-reconnect.js"')
+
+          for required in ("background-native.js", "native-wake-page.js", "bridge-reconnect.js"):
+              assert (package / required).is_file()
+
           for size in ("16", "32", "48", "128"):
               assert (package / manifest["icons"][size]).is_file()
+
           print(json.dumps(manifest, indent=2))
           PY
 
       - name: Upload Chrome Web Store package
         uses: actions/upload-artifact@v4
         with:
-          name: Chute-Chrome-Web-Store-v2.6.0
+          name: Chute-Chrome-Web-Store-v2.6.1
           path: |
-            dist/chrome-store/chute-chrome-2.6.0.zip
+            dist/chrome-store/chute-chrome-2.6.1.zip
             dist/chrome-store/store-assets/store-icon-128.png
             dist/chrome-store/store-assets/small-promo-440x280.png
             dist/chrome-store/store-assets/marquee-1400x560.png
