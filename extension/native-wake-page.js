@@ -44,6 +44,17 @@
     });
   }
 
+  async function askWorkerToWake() {
+    if (!chrome.runtime?.sendMessage) return false;
+    try {
+      const response = await chrome.runtime.sendMessage({ type: "chute-ensure-bridge" });
+      return response?.ok === true;
+    } catch (error) {
+      console.debug("Chute worker wake unavailable:", error?.message || error);
+      return false;
+    }
+  }
+
   async function healthCheck() {
     try {
       const response = await nativeFetch(HEALTH_URL, { cache: "no-store" });
@@ -58,9 +69,16 @@
     wakePromise = (async () => {
       if (await healthCheck()) return true;
 
+      // Prefer the MV3 service worker as the single recovery owner. Sending a
+      // runtime message wakes the worker, and the worker asks the registered
+      // native helper to repair/restart Chute.exe.
+      if (await askWorkerToWake()) {
+        if (await healthCheck()) return true;
+      }
+
+      // Fallback for development/unpacked builds where the worker listener is
+      // unavailable but native messaging is still registered for this origin.
       try {
-        // The Windows native host itself waits for Chute.exe to become healthy,
-        // so this is the one authoritative wake/restart attempt for a cycle.
         const response = await sendNative({ action: "ensure_bridge" });
         if (!response?.ok) return false;
       } catch (error) {
