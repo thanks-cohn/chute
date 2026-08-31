@@ -131,8 +131,96 @@ def ensure_bridge(timeout: float = 6.0) -> bool:
     return False
 
 
+def _chrome_user_data_roots() -> list[Path]:
+    local = os.environ.get("LOCALAPPDATA")
+    if not local:
+        return []
+    base = Path(local)
+    return [
+        base / "Google" / "Chrome" / "User Data",
+        base / "Google" / "Chrome Beta" / "User Data",
+        base / "Google" / "Chrome Dev" / "User Data",
+        base / "Google" / "Chrome SxS" / "User Data",
+        base / "Chromium" / "User Data",
+    ]
+
+
+def _is_chute_manifest(value: object) -> bool:
+    if not isinstance(value, dict):
+        return False
+    name = str(value.get("name") or "").strip().lower()
+    homepage = str(value.get("homepage_url") or "").strip().lower()
+    return name == "chute" and "github.com/thanks-cohn/chute" in homepage
+
+
+def _extension_path_is_chute(raw_path: object) -> bool:
+    if not raw_path:
+        return False
+    try:
+        path = Path(str(raw_path)).expanduser()
+        manifest_path = path / "manifest.json"
+        payload = json.loads(manifest_path.read_text(encoding="utf-8"))
+        return _is_chute_manifest(payload)
+    except (OSError, ValueError, TypeError, json.JSONDecodeError):
+        return False
+
+
+def _discover_chute_extension_ids() -> list[str]:
+    """Find installed/unpacked Chute extension IDs in local Chrome profiles.
+
+    GitHub/unpacked extensions do not necessarily share the Chrome Web Store ID.
+    Chrome records their generated ID and source path in each profile's
+    Preferences file, so the Windows companion can safely authorize only entries
+    whose embedded or on-disk manifest identifies this Chute repository.
+    """
+    found: list[str] = []
+    seen_preferences: set[Path] = set()
+
+    for root in _chrome_user_data_roots():
+        if not root.is_dir():
+            continue
+        candidates = list(root.glob("*/Preferences"))
+        root_preferences = root / "Preferences"
+        if root_preferences.is_file():
+            candidates.append(root_preferences)
+
+        for preferences in candidates:
+            try:
+                resolved = preferences.resolve()
+            except OSError:
+                resolved = preferences
+            if resolved in seen_preferences:
+                continue
+            seen_preferences.add(resolved)
+
+            try:
+                payload = json.loads(preferences.read_text(encoding="utf-8"))
+            except (OSError, ValueError, TypeError, json.JSONDecodeError):
+                continue
+
+            settings = payload.get("extensions", {}).get("settings", {})
+            if not isinstance(settings, dict):
+                continue
+
+            for extension_id, entry in settings.items():
+                candidate = str(extension_id or "").strip().lower()
+                if not _EXTENSION_ID_RE.fullmatch(candidate) or not isinstance(entry, dict):
+                    continue
+                if not (_is_chute_manifest(entry.get("manifest")) or _extension_path_is_chute(entry.get("path"))):
+                    continue
+                if candidate not in found:
+                    found.append(candidate)
+
+    return found
+
+
 def _allowed_extension_ids() -> list[str]:
     ids = [STORE_EXTENSION_ID]
+
+    for candidate in _discover_chute_extension_ids():
+        if candidate not in ids:
+            ids.append(candidate)
+
     path = extra_origins_path()
     if path.is_file():
         try:
