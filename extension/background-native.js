@@ -82,6 +82,21 @@
       });
   }
 
+  // Extension pages should ask the MV3 worker to own recovery. That gives
+  // popup/shelf reconnects one durable place to wake or restart Chute.exe.
+  chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
+    if (message?.type !== "chute-ensure-bridge") return undefined;
+
+    wakeCompanion()
+      .then((ok) => sendResponse({ ok, bridge: ok ? "ready" : "unavailable" }))
+      .catch((error) => sendResponse({
+        ok: false,
+        bridge: "unavailable",
+        error: error?.message || String(error)
+      }));
+    return true;
+  });
+
   chrome.runtime.onStartup.addListener(() => ensureBridgeInBackground("browser startup"));
   chrome.runtime.onInstalled.addListener(() => ensureBridgeInBackground("extension install/update"));
   ensureBridgeInBackground("service worker startup");

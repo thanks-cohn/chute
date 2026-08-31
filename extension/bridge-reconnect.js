@@ -1,6 +1,6 @@
 (() => {
   const CHUTE_ORIGIN = "http://127.0.0.1:17891";
-  const AUTO_RETRY_DELAYS = [250, 500, 1000, 2000];
+  const AUTO_RETRY_DELAYS = [250, 500, 1000, 2000, 3500];
   const nativeFetch = window.fetch.bind(window);
   const RAW_TRANSPORT_PATTERN = /(?:127\.0\.0\.1(?::\d+)?|localhost(?::\d+)?|failed to fetch|networkerror|load failed|chute (?:server|bridge) returned|local bridge returned|chute is not running|could not read file \(\d+\)|chutebridgeofflineerror)/i;
 
@@ -49,30 +49,55 @@
     }
   }
 
+  async function askWorkerToWake() {
+    if (!globalThis.chrome?.runtime?.sendMessage) return false;
+    try {
+      const response = await chrome.runtime.sendMessage({ type: "chute-ensure-bridge" });
+      return response?.ok === true;
+    } catch (error) {
+      console.debug("Chute worker reconnect unavailable:", error?.message || error);
+      return false;
+    }
+  }
+
   async function recoverBridge({ forceNative = false } = {}) {
     if (recoveryPromise) return recoveryPromise;
 
     recoveryPromise = (async () => {
       emitBridgeState("waking");
 
-      if (forceNative && window.ChuteNativeWake?.wake) {
-        const woke = await window.ChuteNativeWake.wake();
-        if (woke) {
-          emitBridgeState("connected", { recovered: true });
-          return true;
-        }
-      } else if (await rawHealthCheck()) {
+      if (await rawHealthCheck()) {
         emitBridgeState("connected", { recovered: false });
         return true;
       }
 
-      // The failed request that brought us here has already received one full
-      // native wake cycle from native-wake-page.js. These are only bounded
-      // health probes, not repeated process launches.
+      // The service worker is the preferred recovery owner. Sending this
+      // message wakes the MV3 worker if necessary; the worker then talks to the
+      // Windows native host, which repairs/restarts Chute.exe and waits for the
+      // localhost bridge to become healthy.
+      if (await askWorkerToWake()) {
+        if (await rawHealthCheck()) {
+          emitBridgeState("connected", { recovered: true, via: "worker" });
+          return true;
+        }
+      }
+
+      // Keep a direct page-native path as a fallback for unpacked/development
+      // builds or unusual worker startup failures.
+      if ((forceNative || lastBridgeState === "waking") && window.ChuteNativeWake?.wake) {
+        const woke = await window.ChuteNativeWake.wake();
+        if (woke && await rawHealthCheck()) {
+          emitBridgeState("connected", { recovered: true, via: "native" });
+          return true;
+        }
+      }
+
+      // A helper may have launched successfully but taken a little longer to
+      // bind localhost. Keep probing instead of leaving the UI frozen forever.
       for (const delay of AUTO_RETRY_DELAYS) {
         await sleep(delay);
         if (await rawHealthCheck()) {
-          emitBridgeState("connected", { recovered: true });
+          emitBridgeState("connected", { recovered: true, via: "probe" });
           return true;
         }
       }
@@ -118,19 +143,30 @@
     if (!status) return;
 
     let reconnecting = false;
+    let autoReconnectScheduled = false;
+
+    function refreshView() {
+      if (refresh) {
+        refresh.click();
+        return;
+      }
+      // popup.html has no refresh button. Reloading the extension page reruns
+      // shelf.js immediately and replaces the stale asleep message with data.
+      setTimeout(() => location.reload(), 0);
+    }
 
     function renderWaking() {
       status.classList.remove("error");
-      status.textContent = "Waking Chute…";
+      status.textContent = "Chute went to sleep too — waking up…";
       if (files && RAW_TRANSPORT_PATTERN.test(files.textContent || "")) {
-        files.innerHTML = '<div class="empty"><strong>Chute is waking up.</strong>This usually takes only a moment.</div>';
+        files.innerHTML = '<div class="empty"><strong>Chute is waking up.</strong>The worker is reconnecting to the local helper automatically.</div>';
       }
     }
 
     function renderOffline() {
       status.classList.add("error");
       status.replaceChildren();
-      status.append(document.createTextNode("Chute is asleep. "));
+      status.append(document.createTextNode("Chute could not wake itself. "));
 
       const reconnectButton = document.createElement("button");
       reconnectButton.type = "button";
@@ -146,7 +182,7 @@
         if (ok) {
           status.classList.remove("error");
           status.textContent = "Chute reconnected";
-          refresh?.click();
+          refreshView();
         } else {
           renderOffline();
         }
@@ -154,15 +190,35 @@
       status.append(reconnectButton);
 
       if (files) {
-        files.innerHTML = '<div class="empty"><strong>Chute is asleep.</strong>Hit Reconnect above and Chute will try to wake itself.</div>';
+        files.innerHTML = '<div class="empty"><strong>Chute is asleep.</strong>Automatic reconnect failed. Hit Reconnect above to ask the worker/helper again.</div>';
       }
+    }
+
+    function scheduleAutomaticReconnect() {
+      if (autoReconnectScheduled || reconnecting) return;
+      autoReconnectScheduled = true;
+      queueMicrotask(async () => {
+        try {
+          renderWaking();
+          const ok = await recoverBridge({ forceNative: false });
+          if (ok) {
+            status.classList.remove("error");
+            status.textContent = "Chute reconnected";
+            refreshView();
+          } else {
+            renderOffline();
+          }
+        } finally {
+          autoReconnectScheduled = false;
+        }
+      });
     }
 
     function normalizeRawFailure() {
       const statusText = status.textContent || "";
       const filesText = files?.textContent || "";
       if (RAW_TRANSPORT_PATTERN.test(statusText) || RAW_TRANSPORT_PATTERN.test(filesText)) {
-        renderOffline();
+        scheduleAutomaticReconnect();
       }
     }
 
@@ -174,7 +230,7 @@
         renderOffline();
       } else if (state === "connected" && (
         status.classList.contains("error") ||
-        /waking chute|chute is asleep/i.test(status.textContent || "")
+        /waking up|waking chute|chute is asleep|could not wake itself/i.test(status.textContent || "")
       )) {
         status.classList.remove("error");
         status.textContent = "Chute reconnected";
@@ -189,12 +245,15 @@
     async function probeAfterWake() {
       if (wakeProbeRunning || document.hidden) return;
       wakeProbeRunning = true;
-      const healthy = await rawHealthCheck();
-      if (!healthy) {
-        const recovered = await recoverBridge({ forceNative: true });
-        if (recovered) refresh?.click();
+      try {
+        const healthy = await rawHealthCheck();
+        if (!healthy) {
+          const recovered = await recoverBridge({ forceNative: false });
+          if (recovered) refreshView();
+        }
+      } finally {
+        wakeProbeRunning = false;
       }
-      wakeProbeRunning = false;
     }
 
     window.addEventListener("focus", probeAfterWake);
