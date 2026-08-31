@@ -2,7 +2,8 @@
   const HOST_NAME = "com.thankscohn.chute";
   const CHUTE_ORIGIN = "http://127.0.0.1:17891";
   const HEALTH_URL = `${CHUTE_ORIGIN}/health`;
-  const POST_WAKE_DELAYS = [80, 180, 350, 700];
+  const WORKER_WAKE_TIMEOUT_MS = 8000;
+  const DIRECT_WAKE_TIMEOUT_MS = 8000;
   const nativeFetch = window.fetch.bind(window);
   let wakePromise = null;
 
@@ -10,27 +11,21 @@
     return new Promise((resolve) => setTimeout(resolve, ms));
   }
 
-  function requestUrl(input) {
-    if (typeof input === "string") return input;
-    if (input instanceof URL) return input.href;
-    return input?.url || "";
-  }
-
-  function isBridgeRequest(input) {
-    return requestUrl(input).startsWith(CHUTE_ORIGIN);
-  }
-
-  function offlineError(cause) {
-    const error = new Error("Chute is asleep.");
-    error.name = "ChuteBridgeOfflineError";
-    if (cause !== undefined) error.cause = cause;
-    return error;
-  }
-
-  function sendNative(message) {
+  function callbackMessage(send, timeoutMs, timeoutMessage) {
     return new Promise((resolve, reject) => {
+      let settled = false;
+      const timer = setTimeout(() => {
+        if (settled) return;
+        settled = true;
+        reject(new Error(timeoutMessage));
+      }, timeoutMs);
+
       try {
-        chrome.runtime.sendNativeMessage(HOST_NAME, message, (response) => {
+        send((response) => {
+          if (settled) return;
+          settled = true;
+          clearTimeout(timer);
+
           const error = chrome.runtime.lastError;
           if (error) {
             reject(new Error(error.message));
@@ -39,19 +34,34 @@
           resolve(response || null);
         });
       } catch (error) {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timer);
         reject(error);
       }
     });
   }
 
+  async function sendNative(message) {
+    return callbackMessage(
+      (done) => chrome.runtime.sendNativeMessage(HOST_NAME, message, done),
+      DIRECT_WAKE_TIMEOUT_MS,
+      "Chute native helper timed out."
+    );
+  }
+
   async function askWorkerToWake() {
-    if (!chrome.runtime?.sendMessage) return false;
+    if (!chrome.runtime?.sendMessage) return null;
     try {
-      const response = await chrome.runtime.sendMessage({ type: "chute-ensure-bridge" });
+      const response = await callbackMessage(
+        (done) => chrome.runtime.sendMessage({ type: "chute-ensure-bridge" }, done),
+        WORKER_WAKE_TIMEOUT_MS,
+        "Chute worker reconnect timed out."
+      );
       return response?.ok === true;
     } catch (error) {
       console.debug("Chute worker wake unavailable:", error?.message || error);
-      return false;
+      return null;
     }
   }
 
@@ -69,15 +79,15 @@
     wakePromise = (async () => {
       if (await healthCheck()) return true;
 
-      // Prefer the MV3 service worker as the single recovery owner. Sending a
-      // runtime message wakes the worker, and the worker asks the registered
-      // native helper to repair/restart Chute.exe.
-      if (await askWorkerToWake()) {
-        if (await healthCheck()) return true;
-      }
+      // Main/store builds prefer the MV3 worker. If the worker answered, its
+      // answer is authoritative: it already attempted the same registered
+      // helper, so do not run the native sequence a second time.
+      const workerResult = await askWorkerToWake();
+      if (workerResult === true) return healthCheck();
+      if (workerResult === false) return false;
 
-      // Fallback for development/unpacked builds where the worker listener is
-      // unavailable but native messaging is still registered for this origin.
+      // Only fall back to direct native messaging if the worker route itself was
+      // unavailable (for example an unusual service-worker startup failure).
       try {
         const response = await sendNative({ action: "ensure_bridge" });
         if (!response?.ok) return false;
@@ -87,7 +97,7 @@
       }
 
       if (await healthCheck()) return true;
-      for (const delay of POST_WAKE_DELAYS) {
+      for (const delay of [100, 250, 500, 900]) {
         await sleep(delay);
         if (await healthCheck()) return true;
       }
@@ -98,25 +108,12 @@
     return wakePromise;
   }
 
-  window.fetch = async function chuteNativeWakeFetch(input, init) {
-    if (!isBridgeRequest(input)) return nativeFetch(input, init);
-    try {
-      return await nativeFetch(input, init);
-    } catch (firstError) {
-      const recovered = await wakeCompanion();
-      if (!recovered) throw offlineError(firstError);
-      try {
-        return await nativeFetch(input, init);
-      } catch (secondError) {
-        throw offlineError(secondError);
-      }
-    }
-  };
-
+  // This file intentionally does NOT wrap window.fetch. bridge-reconnect.js is
+  // the one page-level recovery wrapper. Keeping a single owner prevents one
+  // failed request from running the entire native wake sequence twice.
   window.ChuteNativeWake = Object.freeze({
     wake: wakeCompanion,
     health: healthCheck,
-    hostName: HOST_NAME,
-    offlineError
+    hostName: HOST_NAME
   });
 })();
