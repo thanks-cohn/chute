@@ -2,6 +2,7 @@
   const HOST_NAME = "com.thankscohn.chute";
   const CHUTE_ORIGIN = "http://127.0.0.1:17891";
   const HEALTH_URL = `${CHUTE_ORIGIN}/health`;
+  const NATIVE_WAKE_TIMEOUT_MS = 7500;
   const nativeFetch = globalThis.fetch.bind(globalThis);
   let wakePromise = null;
 
@@ -28,14 +29,32 @@
 
   function sendNative(message) {
     return new Promise((resolve, reject) => {
-      chrome.runtime.sendNativeMessage(HOST_NAME, message, (response) => {
-        const error = chrome.runtime.lastError;
-        if (error) {
-          reject(new Error(error.message));
-          return;
-        }
-        resolve(response || null);
-      });
+      let settled = false;
+      const timer = setTimeout(() => {
+        if (settled) return;
+        settled = true;
+        reject(new Error("Chute native helper timed out."));
+      }, NATIVE_WAKE_TIMEOUT_MS);
+
+      try {
+        chrome.runtime.sendNativeMessage(HOST_NAME, message, (response) => {
+          if (settled) return;
+          settled = true;
+          clearTimeout(timer);
+
+          const error = chrome.runtime.lastError;
+          if (error) {
+            reject(new Error(error.message));
+            return;
+          }
+          resolve(response || null);
+        });
+      } catch (error) {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timer);
+        reject(error);
+      }
     });
   }
 
@@ -82,8 +101,9 @@
       });
   }
 
-  // Extension pages should ask the MV3 worker to own recovery. That gives
-  // popup/shelf reconnects one durable place to wake or restart Chute.exe.
+  // Extension pages ask the MV3 worker to own recovery. Sending the message also
+  // wakes a sleeping MV3 worker, then this worker asks the registered Windows
+  // native host to repair/restart Chute.exe.
   chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     if (message?.type !== "chute-ensure-bridge") return undefined;
 
