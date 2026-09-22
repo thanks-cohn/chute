@@ -44,106 +44,82 @@ The ranges are nonoverlapping: exactly 25 is yellow, exactly 50 is light green, 
 
 ---
 
-# Addendum: Source-aware saved-item history and a permissioned CHUTE API
+# Addendum: JSONL provenance history, human discovery, and an agent-friendly API
 
-**Status:** Proposal only. Extend the calendar/history idea into an intuitive *memory of saved discoveries* while preserving Chute's small, fast basket. The goal is not to monitor general browsing or to turn Chute into a cloud file manager.
+**Storage decision: pure JSONL. NO SQLite, SQL, relational database server, or SQL-style schema/migration/permissions system.** Chute's canonical *new* saved-item metadata and provenance records should be ordinary UTF-8 JSON Lines files: one independently parseable JSON object per line. The original preserved files remain normal local files. Humans interact through an intuitive calendar, search, and item details; agents/programs consume the same structured metadata through a small local API or user-authorized JSONL export.
 
-## The user experience: remember a discovery, not just a filename
+## Purpose: save the discovery as well as the file
 
-When a person **explicitly saves an item through Chute**, retain, when available:
+For each item deliberately saved through CHUTE, capture what is actually known **at save time**:
 
-1. **The saved item:** stable Chute item ID, original filename, kind/MIME, size, save timestamp, availability of the locally preserved original, and thumbnail reference when available.
-2. **The resource URL:** the direct URL from which the image, file, or other resource was obtained, if reliably known.
-3. **The page URL:** the URL shown in the active/source browser tab when the item was saved; also retain the page title and hostname where available. The resource URL and page URL are *different fields* and may point to different domains.
-4. **The relationship:** a stable reference linking an item to its source page/site and capture event, plus capture method and confidence/availability of the source data. An unknown source must remain `null`, never an inferred fact.
+- Stable \`item_id\`, file name/type/size, UTC timestamp, category (\`download\`, desktop import, link, etc.), and whether the preserved original remains available.
+- **Resource URL** — the actual file/image URL, if known and suitable to retain.
+- **Page URL** — the address shown in the source browser tab's URL bar at the time of save, if known and suitable to retain.
+- Optional page title, hostname, acquisition method and provenance certainty. The page URL and resource URL must remain separate, nullable fields; never invent one from the other.
+- Shared \`source_id\` or derived normalized hostname to link saved items to the same webpage/site. Plain IDs and fields are enough for relationships: **no SQL joins or separate relational engine**.
 
-The saved original is the durable item. Source URLs are *context*, not a promise that the remote resource will still exist, be public, or be fetchable later. `blob:`, `data:`, signed/expiring URLs, redirects, local files, browser-internal pages, and cross-origin images need explicit missing/temporary-source handling; avoid preserving secrets in URL queries or fragments.
+For desktop drops, temporary \`blob:\` URLs, expiring links, or unavailable browser context, record an honest null/unknown source rather than fabricating a website. A remote resource URL is historical context, not a guarantee that the resource can be fetched again. Preserve the local original.
 
-A user should be able to open Chute's calendar, select an active date, see the saved items for that local day, and then:
+## Human presentation
 
-- **Open saved item** or drag its preserved copy back out.
-- **Visit source webpage**, when a safe usable page URL is available; show clearly that this opens an external site.
-- **Copy source URL** or **copy resource URL** individually if present.
-- **Show more from this webpage/site**, grouping and searching by shared source page/domain.
-- Search by filename, date range, file type, page title, domain, and known source URL; surface clear filters instead of requiring database syntax.
+Keep the everyday basket minimal. In the calendar, a day is colored by **number of successfully saved downloads** (100+ deep green; 50–99 light green; 25–49 yellow; 1–24 red; zero uncolored). Selecting a date shows items from that **local calendar day**. An item detail or context menu can show **Where this came from**, **Open source webpage**, **Copy page URL**, **Copy resource URL**, and **Show more saved from this website** when those fields exist. Add an ordinary search/filter UI by name, source site/page, file type and date. Show the original saved file even if its links have expired. Date, website and thumbnail should be visible human cues; machine IDs should not clutter the interface.
 
-For an item with no trustworthy URL (for example one dragged from the desktop), show “Source not recorded,” not a fake or misleading link. Display the captured date, hostname, and human-readable title when possible, rather than exposing opaque IDs or raw URL strings as the primary UI. Keep these options within a simple item detail or context menu so the everyday basket remains uncluttered.
+## Storage: simple, durable JSONL files
 
-## Data model: a tiny local, searchable relationship index
+Proposed layout (names are illustrative; implementation should fit Chute's existing directory):
 
-Use an embedded **local SQLite index** if appropriate for the current runtime, or an equally lightweight embedded store after measuring integration and footprint. *No hosted database or Chute account is necessary for the initial feature.* Keep preserved file bytes in Chute's existing local storage; the index holds metadata and references, **not duplicate file blobs**. Existing `HISTORY_FORMAT.md` v1 event/UTC-day TSV data remains frozen and readable independently; do not silently change its eight-column contract. A derived index should be rebuildable from trusted history plus any additional backward-compatible provenance sidecar/event records.
+\`\`\`text
+~/Chute/
+  files/                          # preserved originals, not duplicate JSON blobs
+  metadata/
+    items/
+      2026-09-22.jsonl            # one saved-item or provenance event per line
+      2026-09-23.jsonl
+    index/
+      days.jsonl                  # optional DERIVED cache; can always be rebuilt
+      sources.jsonl               # optional DERIVED cache; can always be rebuilt
+\`\`\`
 
-Suggested conceptual entities (names and exact schema are implementation choices):
+Example **one line** in an \`items/*.jsonl\` file (displayed prettily here for readability; on disk it is a single line):
 
-| Entity | Representative fields | Purpose |
+\`\`\`json
+{"version":1,"event":"saved","item_id":"item_example_123","saved_kind":"download","saved_at_utc":"2026-09-22T15:15:00Z","name":"mountain.webp","mime":"image/webp","size_bytes":204800,"preserved_available":true,"source_id":"src_example_gallery","provenance":{"page_url":"https://example.com/gallery","page_title":"Landscape gallery","hostname":"example.com","resource_url":"https://cdn.example.com/mountain.webp","capture_method":"browser_save","source_status":"observed_at_save"}}
+\`\`\`
+
+**Contract:** UTF-8; each line is exactly one self-contained, versioned JSON object; stable item IDs; timestamps stored as ISO-8601 UTC; explicit \`null\` for unknown optional fields; append new immutable events rather than silently rewriting past events. A failed or partial trailing line after a crash must not destroy earlier valid records: write serialized complete lines safely, recover/skip an incomplete trailing record, and provide a deterministic repair/rebuild path. For edits/deletion, append a corresponding update/tombstone event or safely rebuild a compacted JSONL file atomically; ensure deletion also propagates to any derived index, and provide a real way to erase sensitive stored URLs on user request rather than leaving them in indefinite backups.
+
+**Existing compatibility:** \`HISTORY_FORMAT.md\` documents Chute's *existing* frozen v1 UTC-day TSV event files. Do not corrupt them or relabel them JSONL. The proposed architecture makes **JSONL the canonical format for new provenance-aware metadata**, with a one-time or lazy, lossless import of relevant legacy records where possible; preserve the v1 TSV reader and old files for backward compatibility until an explicit migration strategy is implemented. Legacy source information that cannot be verified remains unknown. Avoid double-counting the same underlying save represented in old and new files. No SQL conversion at any stage.
+
+**Quick lookup without SQL:** For a selected date, read the relevant JSONL day files, including neighboring UTC days where the displayed local timezone crosses midnight. For site/date search across long history, optionally maintain small derived JSONL summaries and in-memory lookup maps keyed by \`item_id\`, normalized hostname, or day. Rebuild those caches from the canonical event stream whenever needed; never make their presence necessary to recover data. Stream and paginate large files; cache only bounded information in RAM so it works on modest computers.
+
+## API surface: same simple objects for people, programs and AI agents
+
+Propose a small, versioned, local interface that **returns and accepts ordinary JSON objects representing the same JSONL records**. For stream/export endpoints, return \`application/x-ndjson\` (newline-delimited JSON; JSONL) so agents can process one record at a time. Individual record responses can use \`application/json\`. Do not expose SQL queries, a relational database interface, direct write access to internal index files, or require an ORM.
+
+Illustrative future operations (adapt endpoint naming to Chute's existing companion/extension architecture):
+
+| Capability | Proposed API | Behavior |
 | --- | --- | --- |
-| `items` | `item_id`, `name`, `mime`, `size_bytes`, `saved_at_utc`, `saved_kind`, `preserved_available` | Stable saved-item metadata; separately mark whether an event qualifies as a successfully saved *download* for the calendar. |
-| `sources` | `source_id`, `page_url`, `page_title`, `hostname` | Reuse a source record for multiple items; allow website/page grouping. |
-| `item_provenance` | `item_id`, `source_id` (nullable), `resource_url` (nullable), `captured_at_utc`, `capture_method`, `source_status` | Connect an item to what was actually known when saved. Permit multiple origins/events only when genuinely recorded; do not invent relationships. |
+| Describe format | \`GET /v1/capabilities\` | Reports schema version, supported actions and plain field definitions. |
+| Search saved items | \`GET /v1/items?query=...&site=...&kind=...&date=...&timezone=...&limit=...&cursor=...\` | Returns JSON items with stable IDs and structured source fields; deterministic pagination. |
+| Read one item | \`GET /v1/items/{item_id}\` | Returns a single JSON object, with explicit nulls for unknown provenance. |
+| Calendar activity | \`GET /v1/calendar/days?month=2026-09&timezone=America/Chicago\` | Returns local-day download counts and \`none|red|yellow|light_green|deep_green\` band values, matching human UI. |
+| Get items from a source | \`GET /v1/items?source_id=...\` or \`?site=...\` | Lets a person or agent discover related downloads from a webpage/site. |
+| Stream/export history | \`GET /v1/items/export?from=...&to=...\` | Returns authorized records as **JSONL**, without exposing raw filesystem paths. |
+| Save a new item (later) | \`POST /v1/items\` | Accepts a user-approved handoff and optional *observed*, validated provenance. Adds a proper JSONL save event. |
+| Retrieve preserved content (later) | \`GET /v1/items/{item_id}/content\` | Explicitly authorized content handoff; the metadata API does not imply access to file bytes. |
 
-Give `item_id` a stable identifier across the basket, historical view, and API. Index saved date, saved kind, name, normalized hostname, and source references; lazily compute or cache per-day download counts. The displayed calendar uses the user's chosen **IANA timezone**, not an accidental UTC-file boundary. Deduplicate history `add`/`recall` events by actual successful-save identity; don't count removal, recall, or failed saves as new downloads. If older entries lack reliable provenance or download classification, leave it unknown, and do not synthesize it from unrelated browser history.
+The API should have short documentation, sample requests/responses, and a published **JSON Schema** for the JSONL record shape. Agents can map natural-language requests to structured filters; applications can stream/export records without needing to understand Chute's filesystem; humans get the same results through calendar, previews and search. A JSON Schema is only a documentation/validation contract for simple objects — **not a SQL schema or migration requirement**. Include clear error responses for unknown item, missing content, and denied access.
 
-## An API for applications and AI agents — human intent, machine clarity
+**Access without database-permission headaches:** no database accounts, SQL roles, or database administration. Keep metadata local. The application itself should still guard its API: local-only transport is not sufficient to stop a malicious webpage or unrelated process from reading a private download history. Use the platform's practical per-app/user approval and minimal read-metadata vs read-file controls; do not force the user through unnecessary permission prompts for CHUTE's own calendar and search. Never let an arbitrary browser origin call a localhost endpoint unrestricted. Source capture is tied to a deliberate save, not continuous browsing, and users can disable it or erase sensitive provenance.
 
-**Propose** a documented, versioned `/v1` local API, surfaced through the existing companion via authenticated loopback/IPC and a carefully permissioned browser-extension bridge where needed. The implementation should determine the safest transport for each platform; these routes are illustrative *future contracts*, not statements about endpoints that already exist.
+## Delivery plan
 
-| Proposed capability | Example API surface | Meaning |
-| --- | --- | --- |
-| Discover supported operations | `GET /v1/capabilities` | Returns supported features, schema version, and granted scopes. |
-| Find saved items | `GET /v1/items?query=...&kind=image&site=...&from=...&to=...&limit=...&cursor=...` | Paginated, stable IDs; explicit filters and structured results. Date-range bounds include timezone semantics. |
-| Read one item's metadata | `GET /v1/items/{item_id}` | Name, MIME, timestamps, availability, and structured provenance fields permitted to the caller. |
-| Get calendar activity | `GET /v1/calendar/days?month=2026-09&timezone=America/Chicago` | Per-local-day qualifying download counts and a machine-readable `activity_band` of `none|red|yellow|light_green|deep_green`. Human UI applies theme-appropriate actual colors. |
-| Filter history by day or source | `GET /v1/items?date=2026-09-22&timezone=America/Chicago` or `?source_id=...` | Enables the calendar, website grouping, external clients, and agents to use the same query semantics. |
-| Add a saved item | `POST /v1/items` | **Optional later write scope:** user-approved file/byte handoff with validated origin metadata. Never silently import arbitrary filesystem paths or spoof browser-observed provenance. |
-| Obtain the original or initiate handoff | `GET /v1/items/{item_id}/content` or a short-lived handoff operation | Requires a separate, explicit content-read permission and may return a scoped stream/handle rather than exposing unrestricted local paths. |
-| Subscribe to changes | `GET /v1/events` (optional later) | Opt-in notifications for newly saved items or updated day counts; bounded and authorized, never a general browsing log. |
+1. Capture source-page and resource URLs when a user saves a file; append one clear versioned **JSONL** save record, with reliable null/unknown behavior.
+2. Build the human-facing date/site navigation and calendar activity from JSONL records; add simple derived JSONL caches only if profiling shows they help.
+3. Publish a read-only JSON/JSONL API with calendar, item detail, structured search, and streaming export; document examples that an agent can parse with no SQL dependency.
+4. Add permissioned file handoff and writes for authorized programs/agents later, using the same simple JSONL event model. Keep CHUTE's core basket independent of the optional API.
 
-Treat the route names and request shapes above as a proposed design to validate against Chute's current architecture. Keep a stable **JSON schema/OpenAPI description**, field definitions, examples, error codes (`permission_denied`, `not_found`, `source_unavailable`, `content_unavailable`), pagination limits, and clear nullability. Represent dates as ISO-8601 timestamps in UTC for storage, with explicit IANA timezone for day-based queries. Provide file-kind vocabularies and distinguish `saved_kind=download` from a desktop import or clipboard/link capture. Never fabricate a resource URL from the page URL or vice versa.
+**Acceptance:** exactly 100 successfully saved downloads on a local date colors the calendar deep green and yields count \`100\` from the API; a saved item can be found by date and original page hostname; a missing URL remains null; an agent can iterate a JSONL export line-by-line; legacy v1 TSV remains readable and does not duplicate records; no SQLite, SQL, server database, ORM, or SQL migration is introduced.
 
-Sample *proposed* item response for agents and other programs:
-
-```json
-{
-  "item_id": "item_example_123",
-  "name": "mountain.webp",
-  "kind": "image",
-  "saved_kind": "download",
-  "saved_at_utc": "2026-09-22T15:15:00Z",
-  "preserved_available": true,
-  "provenance": {
-    "page_url": "https://example.com/gallery",
-    "page_title": "Landscape gallery",
-    "hostname": "example.com",
-    "resource_url": "https://cdn.example.com/mountain.webp",
-    "source_status": "observed_at_save"
-  }
-}
-```
-
-An agent should be able to map a request such as **“Find the images I saved from that architecture site sometime in July”** into an authorized structured query, show the matching files with the relevant source and date, and let the person choose what to retrieve or open. A human gets the *same data* via a simple calendar, search, thumbnails, and “more from this site” actions; neither interface needs a special proprietary export or direct access to database internals.
-
-## Trust and resource boundaries
-
-- **Local-first by default:** no cloud sync, telemetry, remote index, or account requirement; local metadata and originals remain under the user's control. If a future cloud option exists, make it a distinct explicit opt-in.
-- **Capture only on user-directed save:** do not record continuous browsing, other tabs, or unselected site visits. Capture only the source tab applicable to the saved item, when available; do not request broad browser permissions solely for convenience.
-- **URL minimization:** prefer safe canonical page URL/hostname when sufficient; omit credentials, fragments, and known sensitive query parameters. Allow disabling source capture, excluding sites/private windows, editing or deleting individual source records, and clearing the provenance index without necessarily deleting preserved files. Exclude private/incognito contexts by default unless the user explicitly opts in and the browser permits it.
-- **Authorization:** a loopback listener is *not* authentication. Bind locally; require per-client/app authorization, scoped tokens or OS-level IPC permissions, origin checks/CSRF protections for browser callers, and explicit consent for content reads/writes. Search/list metadata and read original content should be separate scopes. Deny access by default; never permit arbitrary external webpages or untrusted agents to enumerate the whole history.
-- **Safe handling:** redact secrets from logs and error messages; avoid exposing unrestricted filesystem paths, auto-fetching historical URLs, or automatically sending saved file contents to a remote agent. Respect deletion/retention choices and report when a preserved original or source has become unavailable.
-- **Lean operation:** bounded pagination, indexed day/source queries, background-safe incremental index updates, and predictable performance on modest Windows/Linux hardware. Keep API and indexing optional when feasible so core drag-and-drop remains fast and reliable.
-
-## Suggested staged delivery
-
-1. **Human-first provenance:** capture safe page/resource source fields only for newly saved items where available; show an unobtrusive “Where this came from” detail and “more from this website” filter.
-2. **Local relational index:** add fast searching and calendar source/day grouping without breaking the v1 history format or requiring cloud services.
-3. **Read-only local API:** document capabilities, scoped item search/details and calendar counts with stable IDs and schemas; test consent, null provenance, timezone edges, and long histories.
-4. **Permissioned handoff and agent clients:** add explicit content and optional write/event scopes, SDK examples, and integration with CHUTE-compatible programs (including SUBSTRATE) after the read-only model is safe and stable.
-
-## Acceptance criteria
-
-- Save an image from a webpage: the item retains its file plus distinct observed source-page URL and direct resource URL where available; selecting “more from this website” finds related saved items.
-- Save a desktop file or a browser item with an unavailable/temporary URL: no invented origin is shown; the saved original remains usable.
-- Save 100 qualifying downloads on a displayed local date: the existing calendar's **deep green** rule applies; querying the API for that date returns count `100` and `activity_band=deep_green`.
-- Search/filter through the UI and authorized API yields the same item identities and date/source semantics. A disallowed app cannot list metadata or read file contents.
-- Existing v1 histories remain readable. Indexed data can be rebuilt without changing the meaning of historical events; unsupported old fields remain unknown.
-
-**Combined outcome:** CHUTE stays a small intuitive basket while becoming a private, searchable memory of saved discoveries for humans — and a well-documented, consent-based file/provenance interface for applications and agents.
+**Combined outcome:** an intuitive human calendar/history backed by small, portable, auditable JSONL records that programs and agents can understand directly — without making CHUTE a database administration project.
