@@ -11,6 +11,12 @@ const css = fs.readFileSync(path.join(root, "extension/shared.css"), "utf8");
 
 assert(shelf.includes("thumbObserver.observe(icon)"), "Observe visible icon container");
 assert(!shelf.includes("thumbObserver.observe(thumb)"), "Hidden thumbnail must not be observed");
+assert(shelf.includes("if (index < 8)"), "First visible image rows must start without observer callbacks");
+assert(shelf.includes("queueMicrotask(() =>"), "Visible image loading must be scheduled after DOM attachment");
+assert(shelf.includes("createRow(file, index)"), "Pass the actual row index, not the page size");
+assert(workflow.includes("if (!await showThumbnail(img, source)) return"), "Original saved image must display before cache encoding");
+assert(workflow.indexOf("showThumbnail(img, source)") < workflow.indexOf("await persistThumbnail(file, thumbnail)"), "Thumbnails must display before cache persistence");
+
 assert(css.includes(".file-thumb[hidden] { display: none !important; }"));
 assert(css.includes(".file-icon.has-thumbnail .file-fallback"));
 assert(!shelf.includes("Showing ${file.name} in your file manager"), "No developer success status");
