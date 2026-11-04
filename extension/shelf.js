@@ -243,6 +243,10 @@ function createRow(file, index) {
   const row = document.createElement("article");
   row.className = `file-row${file.active ? "" : " archived"}`;
   row.dataset.chuteId = file.id;
+  // Keep the exact authorized item identity in the local extension DOM.
+  // History tile clicks use this instead of guessing from an icon or filename.
+  row.__chuteyFile = file;
+  if (location.pathname.endsWith("/shelf.html")) row.tabIndex = 0;
   const state = file.active
     ? dragOutMode === "source" ? "Drag address" : "Drag original"
     : "In history";
