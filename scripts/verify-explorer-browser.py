@@ -65,7 +65,7 @@ def main():
                 if fixture_mode:
                     browser = playwright.chromium.launch(executable_path=os.environ.get("CHUTE_TEST_CHROME") or shutil.which("chromium"), headless=True, args=["--no-sandbox"])
                     context = browser.new_context()
-                    context.add_init_script("""window.chrome = {storage:{local:{get:async d=>Object.assign({},d,window.__local||{}),set:async x=>{window.__local=Object.assign(window.__local||{},x)}},sync:{get:async d=>d},session:{get:async d=>d,remove:async()=>{}},onChanged:{addListener(){}}},runtime:{sendNativeMessage:async()=>({ok:true,explorer_protocol:'1.1',read_only:true,token:window.__nativeSessionToken}),sendMessage:async()=>({}),onMessage:{addListener(){}},connectNative(){throw Error('fixture: no native host')}}};""")
+                    context.add_init_script("""window.chrome = {storage:{local:{get:async d=>Object.assign({},d,window.__local||{}),set:async x=>{window.__local=Object.assign(window.__local||{},x)}},sync:{get:async d=>d},session:{get:async d=>d,remove:async()=>{}},onChanged:{addListener(){}}},runtime:{sendNativeMessage:async()=>({ok:true,explorer_protocol:'1.1',protocol:'1.1',read_only:true,token:window.__nativeSessionToken}),sendMessage:async()=>({}),onMessage:{addListener(){}},connectNative(){throw Error('fixture: no native host')}}};""")
                     origin = "chrome-extension://abcdefghijklmnopabcdefghijklmnop"
                     # Test-only transport: real browser/GUI/API, not extension enrollment proof.
                     context.route("http://127.0.0.1:17891/api/explorer/**", lambda route: route.fulfill(response=route.fetch(headers={**route.request.headers, "origin": origin})))
@@ -81,7 +81,7 @@ def main():
                 context.add_init_script("window.__nativeSessionToken = " + json.dumps(session.token) + ";")
                 if not fixture_mode:
                     # Browser proof only: real native picker is covered separately on Windows.
-                    context.add_init_script("chrome.runtime.sendNativeMessage = async () => ({ok:true, explorer_protocol:'1.1',read_only:true, token:window.__nativeSessionToken});")
+                    context.add_init_script("chrome.runtime.sendNativeMessage = async () => ({ok:true, explorer_protocol:'1.1',protocol:'1.1',read_only:true, token:window.__nativeSessionToken});")
                 page = context.new_page()
                 errors = []
                 page.on("pageerror", lambda error: errors.append(str(error)))

@@ -23,6 +23,7 @@ jobs:
           python -m pytest -q
       - name: Existing worker and Shelf regressions
         run: |
+          node scripts/verify-explorer-api.cjs
           node scripts/verify-worker-boot.cjs
           node scripts/verify-thumbnail-icons.cjs
           node scripts/verify-chutey-tabs-and-mascot.cjs

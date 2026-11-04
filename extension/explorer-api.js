@@ -20,6 +20,9 @@
       }
       const response = await chrome.runtime.sendNativeMessage("com.thankscohn.chute", {action: select ? (writable ? "explorer_select_write_folder" : "explorer_select_folder") : "explorer_resume"});
       if (!response?.ok || !response.token) throw new Error(response?.error || "Select a folder using the matching Windows companion.");
+      if (response.protocol !== "1.1") {
+        throw new Error("The running Windows companion needs updating or restarting. Use the Windows EXE and Chrome extension from the same test pair.");
+      }
       token = response.token;
       return response;
     },

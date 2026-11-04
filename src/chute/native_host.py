@@ -397,7 +397,7 @@ def native_main() -> int:
         action = str(message.get("action") or "")
         if action == "get_native_capabilities":
             origin = sys.argv[1].rstrip("/") if len(sys.argv) > 1 else ""
-            if origin.removeprefix("chrome-extension://") not in _allowed_extension_ids():
+            if not origin.startswith("chrome-extension://") or origin.removeprefix("chrome-extension://") not in _allowed_extension_ids():
                 _write_message({"ok":False,"error":"Unenrolled native caller"})
             else:
                 _write_message({"ok":True,"explorer_protocol":"1.1","persistent_consent":True})
