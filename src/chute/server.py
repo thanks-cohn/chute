@@ -106,7 +106,7 @@ class ChuteHandler(BaseHTTPRequestHandler):
         path = parsed.path
 
         if path == "/health":
-            self._json({"ok": True, "service": "chute"})
+            self._json({"ok": True, "service": "chute", "build": "main-2.6.1-upgrades-2026-11-03", "features": ["browse", "calendar", "reveal"]})
             return
 
         if path == "/api/files":
