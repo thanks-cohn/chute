@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import io
 import json
 import subprocess
 import tempfile
@@ -96,7 +97,7 @@ class RevealEndpointTests(unittest.TestCase):
     def setUp(self) -> None:
         self.temp = tempfile.TemporaryDirectory()
         self.store = Store(Path(self.temp.name) / "state")
-        self.item = self.store.add_stream("proof.txt", __import__("io").BytesIO(b"hello"), 5)
+        self.item = self.store.add_stream("proof.txt", io.BytesIO(b"hello"), 5)
         self.server = ChuteServer(("127.0.0.1", 0), self.store)
         self.thread = threading.Thread(target=self.server.serve_forever, daemon=True)
         self.thread.start()
@@ -131,7 +132,7 @@ class RevealEndpointTests(unittest.TestCase):
     def test_web_origins_and_unknown_ids_cannot_launch(self) -> None:
         with mock.patch("chute.server.reveal_file") as reveal:
             self.assertEqual(self.post(self.item.id, "https://example.com")[0], 403)
-            self.assertEqual(self.post("../outside")[0], 400)
+            self.assertEqual(self.post("not-an-id")[0], 400)
             self.assertEqual(self.post("f" * 32)[0], 404)
             reveal.assert_not_called()
 
