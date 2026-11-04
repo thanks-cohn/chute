@@ -1,0 +1,76 @@
+name: Tag the user-confirmed working Windows and Chrome pair
+on:
+  push:
+    branches:
+      - chute-main-2.6.1-upgrades-2026-11-03
+    paths:
+      - .github/workflows/tag-working-pair.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  actions: read
+
+jobs:
+  tag-working-pair:
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+      REPO: ${{ github.repository }}
+      TAG: chute-v2.6.1-main-upgrades-2026-11-03-working
+      SOURCE_SHA: 8fc7a3f698632ffa42f2f14db59fa5be7d271e86
+      WINDOWS_RUN: "41770688623"
+      CHROME_RUN: "41770688602"
+      TESTS_RUN: "41770688697"
+    steps:
+      - name: Verify Windows EXE, Chrome extension and tests use exactly the same source
+        shell: bash
+        run: |
+          set -euo pipefail
+          for run in "$WINDOWS_RUN" "$CHROME_RUN" "$TESTS_RUN"; do
+            sha="$(gh api "repos/$REPO/actions/runs/$run" --jq .head_sha)"
+            result="$(gh api "repos/$REPO/actions/runs/$run" --jq .conclusion)"
+            if [[ "$sha" != "$SOURCE_SHA" || "$result" != "success" ]]; then
+              echo "Refusing tag: run $run was built from $sha with $result" >&2
+              exit 1
+            fi
+          done
+
+      - name: Create annotated tag pointing at the EXACT working-binary commit
+        shell: bash
+        run: |
+          set -euo pipefail
+          existing="$(gh api "repos/$REPO/git/ref/tags/$TAG" --jq .object.sha 2>/dev/null || true)"
+          if [[ -n "$existing" ]]; then
+            echo "Tag already exists ($existing). Never move or overwrite a known-good tag."
+            exit 0
+          fi
+
+          message="$(cat <<EOF
+          USER-CONFIRMED WORKING PAIR — Chute Windows EXE + Chrome MV3 Extension
+          Source branch: chute-main-2.6.1-upgrades-2026-11-03
+          Exact source SHA: $SOURCE_SHA
+          Windows companion EXE: https://github.com/$REPO/actions/runs/$WINDOWS_RUN
+          Chrome extension ZIP: https://github.com/$REPO/actions/runs/$CHROME_RUN
+          Windows + Linux + worker-boot tests: https://github.com/$REPO/actions/runs/$TESTS_RUN
+          User verified this matched pair works on Windows.
+          Do not confuse this with the older public v2.6.1 RC1.
+          Preserve the original working Chute and back up local Chute data before installing.
+          EOF
+          )"
+          tag_sha="$(gh api --method POST "repos/$REPO/git/tags" \
+            -f tag="$TAG" -f message="$message" \
+            -f object="$SOURCE_SHA" -f type=commit --jq .sha)"
+          gh api --method POST "repos/$REPO/git/refs" \
+            -f ref="refs/tags/$TAG" -f sha="$tag_sha" >/dev/null
+          echo "Created immutable annotated tag: $TAG"
+          echo "Points to the validated working pair at commit: $SOURCE_SHA"
+
+      - name: Verify the tag resolves to the source SHA
+        shell: bash
+        run: |
+          set -euo pipefail
+          tag_obj="$(gh api "repos/$REPO/git/ref/tags/$TAG" --jq .object.sha)"
+          target="$(gh api "repos/$REPO/git/tags/$tag_obj" --jq .object.sha)"
+          test "$target" = "$SOURCE_SHA"
+          echo "PASS: $TAG -> $SOURCE_SHA"
