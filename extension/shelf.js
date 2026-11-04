@@ -4,7 +4,10 @@ const CHUTE_DRAG_TYPE = "application/x-chute-item";
 const CHUTE_DRAG_PREFIX = "CHUTE_ITEM:";
 const generatedThumbs = new Set();
 
-let displayLimit = 50;
+let displayLimit = 40;
+let currentPage = 0;
+let hasMorePages = false;
+let historyRequestToken = 0;
 let showThumbnails = true;
 let dragOutMode = "file";
 let selectedDay = "";
@@ -27,6 +30,10 @@ const historyPrevButton = document.querySelector("#history-prev");
 const historyNextButton = document.querySelector("#history-next");
 const historyLatestButton = document.querySelector("#history-latest");
 const sentinel = document.querySelector("#history-sentinel");
+const pageNav = document.querySelector("#history-pagination");
+const pagePrevButton = document.querySelector("#history-page-prev");
+const pageNextButton = document.querySelector("#history-page-next");
+const pageLabel = document.querySelector("#history-page-label");
 
 function formatSize(bytes) {
   const units = ["B", "KB", "MB", "GB"];
@@ -332,29 +339,43 @@ function setStatus(message, error = false) {
 
 async function loadSettings() {
   const settings = await chrome.storage.sync.get({
-    chuteDisplayLimit: 50,
+    chutePageSize: 40,
     chuteThumbnails: true,
     chuteDragOutMode: "file"
   });
-  const next = Number(settings.chuteDisplayLimit);
-  displayLimit = Number.isFinite(next) && next >= 0 ? Math.trunc(next) : 50;
+  const next = Number(settings.chutePageSize);
+  displayLimit = Number.isFinite(next) && next >= 1
+    ? Math.min(500, Math.trunc(next)) : 40;
   showThumbnails = settings.chuteThumbnails !== false;
   dragOutMode = settings.chuteDragOutMode === "source" ? "source" : "file";
 }
 
-async function fetchHistoryDay(day = null) {
-  const suffix = day ? `?date=${encodeURIComponent(day)}` : "";
-  const response = await api(`/api/history${suffix}`);
+async function fetchHistoryPage(day = null, page = currentPage) {
+  const params = new URLSearchParams({
+    scope: "history",
+    page: String(page),
+    limit: String(displayLimit)
+  });
+  if (day) params.set("date", day);
+  const response = await api(`/api/browse?${params}`);
   return response.json();
 }
 
-// Stable IDs and active/archive status are sufficient to detect meaningful
-// changes without tearing down the Shelf every time the polling timer fires.
+// Only rebuild the current page when a save or its state actually changes.
 function latestHistorySignature(payload) {
   return JSON.stringify([
     payload.date || null,
+    Boolean(payload.has_more),
     (payload.files || []).map((file) => [file.id, Boolean(file.active)])
   ]);
+}
+
+function updatePageControls(payload) {
+  hasMorePages = Boolean(payload.has_more);
+  if (pagePrevButton) pagePrevButton.disabled = currentPage === 0;
+  if (pageNextButton) pageNextButton.disabled = !hasMorePages;
+  if (pageLabel) pageLabel.textContent = `Page ${currentPage + 1}`;
+  if (pageNav) pageNav.hidden = currentPage === 0 && !hasMorePages;
 }
 
 function updateHistoryNavigation(payload) {
@@ -366,99 +387,64 @@ function updateHistoryNavigation(payload) {
   if (historyNextButton) historyNextButton.disabled = !nextDate;
 }
 
-async function appendDay(day = null) {
-  if (loadingHistory || dragOutActive) return false;
-  loadingHistory = true;
-  try {
-    const payload = await fetchHistoryDay(day);
-    updateHistoryNavigation(payload);
-    if (!payload.date) return false;
-
-    for (const file of payload.files) {
-      if (displayLimit > 0 && loadedCount >= displayLimit) break;
-      listElement.append(createRow(file, loadedCount));
-      loadedCount += 1;
-    }
-    previousDate = payload.previous_date;
-    return Boolean(payload.files.length || payload.previous_date);
-  } finally {
-    loadingHistory = false;
-  }
-}
-
-async function fillNumericLimit() {
-  while (displayLimit > 0 && loadedCount < displayLimit && previousDate) {
-    const day = previousDate;
-    await appendDay(day);
-  }
-}
-
 async function resetHistory(day = selectedDay || null) {
   if (dragOutActive) return;
+  const token = ++historyRequestToken;
   try {
-    loadedCount = 0;
-    previousDate = null;
-    nextDate = null;
-    currentDate = null;
+    // Fetch first: an unavailable companion should not blank the existing rows.
+    const payload = await fetchHistoryPage(day, currentPage);
+    if (token !== historyRequestToken) return;
+    if (currentPage > 0 && !payload.files.length) {
+      currentPage -= 1;
+      await resetHistory(day);
+      return;
+    }
+    loadedCount = payload.files.length;
     generatedThumbs.clear();
     thumbObserver.disconnect();
     listElement.replaceChildren();
 
-    const payload = await fetchHistoryDay(day);
     updateHistoryNavigation(payload);
-    if (!selectedDay) lastLatestHistorySignature = latestHistorySignature(payload);
+    updatePageControls(payload);
+    if (!day && currentPage === 0) {
+      lastLatestHistorySignature = latestHistorySignature(payload);
+    }
 
-    if (!payload.date || !payload.files.length) {
+    if (!payload.files.length) {
       if (day) {
         listElement.innerHTML = `<div class="empty"><strong>No Chute history for ${escapeHtml(day)}.</strong>Choose another day or return to Latest.</div>`;
         setStatus("No history for that day");
       } else {
         listElement.innerHTML = `<div class="empty"><strong>Nothing in Chute history yet.</strong>Drop an image or run <code>chute ./some-file</code>.</div>`;
-        setStatus("Local bridge connected");
+        setStatus("Local bridge connected · history preserved");
       }
       return;
     }
 
     for (const file of payload.files) {
-      if (displayLimit > 0 && !selectedDay && loadedCount >= displayLimit) break;
       listElement.append(createRow(file, loadedCount));
-      loadedCount += 1;
     }
-    previousDate = payload.previous_date;
-
-    if (!selectedDay && displayLimit > 0) await fillNumericLimit();
-
-    const mode = selectedDay
-      ? currentDate
-      : displayLimit === 0
-        ? "bottomless"
-        : `latest ${displayLimit}`;
-    setStatus(`${loadedCount} item${loadedCount === 1 ? "" : "s"} shown · ${mode}`);
+    const from = currentPage * displayLimit + 1;
+    const to = from + loadedCount - 1;
+    setStatus(`${from}–${to} in ${day || "all history"} · page ${currentPage + 1}`);
     chrome.runtime.sendMessage({ type: "badge-refresh" });
-  } catch {
-    listElement.innerHTML = `<div class="empty"><strong>Chute is not running.</strong>Run <code>chute serve</code>, or send a file.</div>`;
-    setStatus("Cannot reach 127.0.0.1:17891", true);
+  } catch (error) {
+    if (token !== historyRequestToken) return;
+    setStatus(error.message || "Cannot reach 127.0.0.1:17891", true);
+    console.warn("Chute history page failed:", error);
   }
 }
 
-const historyObserver = new IntersectionObserver(async (entries) => {
-  if (!entries.some((entry) => entry.isIntersecting)) return;
-  if (selectedDay || displayLimit !== 0 || !previousDate || loadingHistory || dragOutActive) return;
-  const day = previousDate;
-  await appendDay(day);
-  setStatus(`${loadedCount} history items loaded · ∞`);
-}, { rootMargin: "300px" });
-
-if (sentinel) historyObserver.observe(sentinel);
-
 historyDateInput?.addEventListener("change", async () => {
   selectedDay = historyDateInput.value || "";
+  currentPage = 0;
   await resetHistory(selectedDay || null);
 });
 
 historyPrevButton?.addEventListener("click", async () => {
   if (!previousDate) return;
   selectedDay = previousDate;
+  currentPage = 0;
   if (historyDateInput) historyDateInput.value = selectedDay;
   await resetHistory(selectedDay);
 });
@@ -466,13 +452,27 @@ historyPrevButton?.addEventListener("click", async () => {
 historyNextButton?.addEventListener("click", async () => {
   if (!nextDate) return;
   selectedDay = nextDate;
+  currentPage = 0;
   if (historyDateInput) historyDateInput.value = selectedDay;
   await resetHistory(selectedDay);
 });
 
 historyLatestButton?.addEventListener("click", async () => {
   selectedDay = "";
+  currentPage = 0;
   if (historyDateInput) historyDateInput.value = "";
+  await resetHistory();
+});
+
+pagePrevButton?.addEventListener("click", async () => {
+  if (currentPage === 0 || dragOutActive) return;
+  currentPage -= 1;
+  await resetHistory();
+});
+
+pageNextButton?.addEventListener("click", async () => {
+  if (!hasMorePages || dragOutActive) return;
+  currentPage += 1;
   await resetHistory();
 });
 
@@ -491,8 +491,9 @@ refreshButton?.addEventListener("click", () => resetHistory());
 
 chrome.storage.onChanged.addListener(async (changes, area) => {
   if (area !== "sync") return;
-  if (changes.chuteDisplayLimit || changes.chuteThumbnails || changes.chuteDragOutMode) {
+  if (changes.chutePageSize || changes.chuteThumbnails || changes.chuteDragOutMode) {
     await loadSettings();
+    currentPage = 0;
     await resetHistory();
   }
 });
@@ -500,10 +501,11 @@ chrome.storage.onChanged.addListener(async (changes, area) => {
 loadSettings().then(() => resetHistory());
 
 async function refreshLatestIfChanged() {
-  if (latestHistoryCheckInFlight || loadingHistory || dragOutActive || selectedDay || window.scrollY >= 8) return;
+  if (latestHistoryCheckInFlight || dragOutActive || selectedDay || currentPage !== 0 ||
+      location.pathname.endsWith("/popup.html") || window.scrollY >= 8) return;
   latestHistoryCheckInFlight = true;
   try {
-    const payload = await fetchHistoryDay();
+    const payload = await fetchHistoryPage(null, 0);
     if (latestHistorySignature(payload) !== lastLatestHistorySignature) {
       await resetHistory();
     }
