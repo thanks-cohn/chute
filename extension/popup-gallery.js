@@ -18,9 +18,26 @@
     document.body.dataset.galleryLayout = choice.columns + "x" + choice.rows;
     if (dial) dial.value = String(step);
     if (readout) readout.textContent = choice.columns + " × " + choice.rows;
+    queueMicrotask(sizeGridCells);
     return step;
   }
   applyLayout(0);
+  const grid = document.querySelector("#files");
+  // A fixed geometric cell track stops expanded cards from redefining implicit
+  // row heights and colliding at every density (4x4 through 6x5).
+  function sizeGridCells() {
+    if (!grid) return;
+    const style = getComputedStyle(grid);
+    const columns = Number(document.body.style.getPropertyValue("--chutey-gallery-columns")) || 4;
+    const space = grid.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight);
+    const gap = parseFloat(style.columnGap) || 0;
+    const cell = (space - gap * (columns - 1)) / columns;
+    if (cell > 0) grid.style.setProperty("--chutey-gallery-cell", cell + "px");
+  }
+  if (grid && typeof ResizeObserver !== "undefined") new ResizeObserver(sizeGridCells).observe(grid);
+  window.addEventListener("resize",sizeGridCells);
+  sizeGridCells();
+
   dial?.addEventListener("input", () => {
     const step = applyLayout(dial.value);
     void chrome.storage.sync.set({chutePopupGridStep:step}).catch(console.warn);
