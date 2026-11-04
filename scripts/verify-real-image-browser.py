@@ -35,11 +35,11 @@ def real_png() -> bytes:
     # 16 x 16 actual image bytes, independently decodable by Chrome.
     width = height = 16
     pixels = b"".join(
-        b"\${key}" + b"".join(bytes((x * 16, y * 16, 90, 255)) for x in range(width))
+        b"\x00" + b"".join(bytes((x * 16, y * 16, 90, 255)) for x in range(width))
         for y in range(height)
     )
     return (
-        b"\${key}\${key}\${key}\${key}\${key}"
+        b"\x89PNG\r\n\x1a\n"
         + png_chunk(b"IHDR", struct.pack(">IIBBBBB", width, height, 8, 6, 0, 0, 0))
         + png_chunk(b"IDAT", zlib.compress(pixels))
         + png_chunk(b"IEND", b"")
