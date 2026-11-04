@@ -114,6 +114,27 @@ The user specifically requires:
 
 **Mandatory visual regression:** real Chrome/Playwright (or equivalent installed-browser) screenshot/geometry test of opening preview must assert unchanged Explorer width, height and column layout; main Explorer becomes/remains scrollable; bottom preview actually overlaps lower files; its document scroll stays inside it; History stays intact. A flex/grid split pane that reduces the Explorer area **fails acceptance**, even if both components display.
 
+## Cross-product requirement: REDOWN clouds ↔ Chutey local Explorer
+
+**Mandatory target, coordinated across both repositories:** read
+[Chutey's interoperability contract](REDOWN_CHUTEY_BIDIRECTIONAL_INTEROP.md) and
+[REDOWN's counterpart](https://github.com/thanks-cohn/REDOWN/blob/main/docs/proposals/CHUTEY_REDOWNS_CLOUD_LOCAL_INTEROP.md)
+before implementing drag/drop. The target is **real bidirectional file transfer**:
+cloud file from a connected REDOWN provider → the exact user-selected Chutey
+local directory; Chutey local file → the exact REDOWN cloud provider/bucket/folder.
+Preserve filename and actual bytes, stream large files within real limits,
+verify final contents, and default to COPY. Never claim a `.url` shortcut is
+an image or a synthetic event is verified drag-and-drop.
+
+Chutey owns the scoped local filesystem engine, REDOWN owns its authenticated
+cloud adapters. Define a versioned, short-lived, permissioned transfer handoff
+with joint tests, without a second worker or exposed cloud tokens/local paths.
+Browser cross-extension drag has real restrictions: implement a user-initiated
+Send to/Save to handoff as a truthful fallback and distinguish mocked versus
+installed-Chrome/live-provider results. **Do not defer designing the adapter
+interface until after GUI completion.** The Chutey API-first Explorer must stay
+usable independently if the REDOWN-side integration is not yet built.
+
 ## 6. Drag and drop is the primary way files move
 
 ### A. Local Explorer → web (Google, ChatGPT, Yandex)
