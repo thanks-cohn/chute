@@ -15,7 +15,7 @@ syncContextMenu = function(mode) {
       await new Promise((resolve, reject) => {
         chrome.contextMenus.create({
           id: "chute-send",
-          title: contexts.length === 1 ? "Send image to Chute" : "Send to Chute",
+          title: "Feed Chutey!",
           contexts
         }, () => {
           const error = chrome.runtime.lastError;
