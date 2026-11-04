@@ -80,7 +80,7 @@ for size in ("16", "32", "48", "128"):
     icon = EXT / path
     assert icon.is_file(), path
     data = icon.read_bytes()
-    assert data.startswith(b"\\x89PNG\\r\\n\\x1a\\n"), path
+    assert data.startswith(b"\x89PNG\r\n\x1a\n"), path
     assert int.from_bytes(data[16:20], "big") == int(size)
     assert int.from_bytes(data[20:24], "big") == int(size)
 
