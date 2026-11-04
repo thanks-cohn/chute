@@ -75,6 +75,7 @@ function control(value) {
   const row=context.createRow(file,3);
   row.handlers.click({target:{closest:()=>null},defaultPrevented:false});
   for(let i=0;i<8;i++)await Promise.resolve();
+  await new Promise(resolve=>setImmediate(resolve));
   assert.equal(opened,1);
   assert.equal(closed,1);
   assert.equal(sessionWrites.length,1);
