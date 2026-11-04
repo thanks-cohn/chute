@@ -4,16 +4,57 @@
   const host = document.querySelector("#chutey-explorer-view");
   if (!host) return;
   const api = window.ChuteyExplorerAPI;
-  host.innerHTML = `<div class="ex-native"><button type="button" data-action="select" aria-label="Select folder">▰ Select another folder</button><button type="button" data-action="resume" aria-label="Reconnect folder">↻</button><button type="button" data-action="write">Approve writes…</button><button type="button" data-action="live">Copy to Live</button><button type="button" data-action="reconcile">Check last copy</button><button type="button" data-action="revoke">Revoke access</button></div><form class="ex-connect" hidden><label>Local read session <input type="password" autocomplete="off" aria-label="Local read session token" required></label><button title="Connect" aria-label="Connect">↗</button></form>
+  host.innerHTML = `<div class="ex-native"><button type="button" data-action="select" aria-label="Choose another Windows folder" title="Browse for another folder">▰ Browse</button><button type="button" data-action="resume" aria-label="Reconnect folder" title="Reconnect">↻</button><details class="ex-more-settings"><summary title="Folder access and transfers" aria-label="More file options">⋯ <span>More</span></summary><div class="ex-advanced-actions"><button type="button" data-action="write">Allow saving here…</button><button type="button" data-action="live">Copy selected to Chutey</button><button type="button" data-action="reconcile">Check transfer</button><button type="button" data-action="revoke">Remove folder access</button></div></details></div><form class="ex-connect" hidden><label>Local read session <input type="password" autocomplete="off" aria-label="Local read session token" required></label><button title="Connect" aria-label="Connect">↗</button></form>
     <div class="ex-toolbar"><button data-action="back" title="Back" aria-label="Back">‹</button><button data-action="forward" title="Forward" aria-label="Forward">›</button><button data-action="parent" title="Parent folder" aria-label="Parent folder">↑</button><button data-action="roots" title="Approved folders" aria-label="Approved folders">⌂</button><button data-action="refresh" title="Refresh" aria-label="Refresh">↻</button><span class="ex-breadcrumb">Local files</span><button data-action="grid" title="Toggle grid" aria-label="Toggle grid">▦</button></div>
     <div class="ex-filter"><input type="search" placeholder="Search this folder" aria-label="Search this folder"><select aria-label="Sort files"><option value="name">Name</option><option value="type">Type</option><option value="date">Date</option><option value="size">Size</option></select></div>
-    <div class="ex-workspace"><aside class="ex-tree" aria-label="Folder navigator"></aside><div class="ex-list" role="listbox" aria-label="Local files" aria-multiselectable="true" tabindex="0"></div></div>
+    <div class="ex-workspace"><aside class="ex-tree" aria-label="Folder navigator"></aside><div class="ex-column-resize" role="separator" tabindex="0" aria-label="Resize folders and files columns" aria-orientation="vertical" aria-valuemin="15" aria-valuemax="75" aria-valuenow="36" title="Drag to resize folders"></div><div class="ex-list" role="listbox" aria-label="Local files" aria-multiselectable="true" tabindex="0"></div></div>
     <div class="ex-status" role="status" aria-live="polite">Start an owner-approved local read session. Folder writes and browser transfers await native safety validation.</div>
     <section class="ex-preview" aria-label="File preview" hidden><div class="ex-resize" role="separator" aria-label="Resize preview" aria-orientation="horizontal" tabindex="0"></div><header><strong></strong><button data-action="close" title="Close preview" aria-label="Close preview">×</button></header><div class="ex-preview-body"></div></section><div class="ex-menu" role="menu" hidden></div>`;
   const $ = selector => host.querySelector(selector);
   const list = $(".ex-list"), tree = $(".ex-tree"), preview = $(".ex-preview"), status = $(".ex-status"), menu = $(".ex-menu");
   let current = null, parent = null, rows = [], roots = [], selected = new Set(), back = [], forward = [];
   let offset = 0, requestId = 0, previewId = 0, abort = null, urls = [], grid = false;
+  // Folder navigation can be resized by mouse or keyboard. Persist only a
+  // non-sensitive ratio; never store a private root path or access token.
+  const workspace = $(".ex-workspace");
+  const columnGrip = $(".ex-column-resize");
+  let folderWidth = 36;
+  function setFolderWidth(value, persist = false) {
+    folderWidth = Math.max(15, Math.min(75, Math.round(Number(value) || 36)));
+    workspace.style.setProperty("--chutey-folder-width", folderWidth + "%");
+    columnGrip.setAttribute("aria-valuenow", String(folderWidth));
+    if (persist) void chrome.storage.local.set({chuteyFolderPanePercent:folderWidth}).catch(() => {});
+  }
+  setFolderWidth(36);
+  let resizingColumns = false;
+  columnGrip.addEventListener("pointerdown", event => {
+    if (event.button !== 0) return;
+    resizingColumns = true;
+    columnGrip.setPointerCapture(event.pointerId);
+    event.preventDefault();
+  });
+  columnGrip.addEventListener("pointermove", event => {
+    if (!resizingColumns || !columnGrip.hasPointerCapture(event.pointerId)) return;
+    const bounds = workspace.getBoundingClientRect();
+    setFolderWidth((event.clientX - bounds.left) / bounds.width * 100);
+  });
+  function endColumnResize() {
+    if (!resizingColumns) return;
+    resizingColumns = false;
+    setFolderWidth(folderWidth,true);
+  }
+  columnGrip.addEventListener("pointerup",endColumnResize);
+  columnGrip.addEventListener("pointercancel",endColumnResize);
+  columnGrip.addEventListener("lostpointercapture",endColumnResize);
+  columnGrip.addEventListener("keydown", event => {
+    const delta = event.key === "ArrowLeft" ? -5 : event.key === "ArrowRight" ? 5 : 0;
+    if (delta) { event.preventDefault(); setFolderWidth(folderWidth + delta,true); }
+    else if (event.key === "Home") { event.preventDefault(); setFolderWidth(15,true); }
+    else if (event.key === "End") { event.preventDefault(); setFolderWidth(75,true); }
+  });
+  void chrome.storage.local.get({chuteyFolderPanePercent:36}).then(value => {
+    setFolderWidth(value.chuteyFolderPanePercent);
+  }).catch(() => {});
   const thumbnails = new Map();
   const liveCopies = new Map();
   let writable = false;
