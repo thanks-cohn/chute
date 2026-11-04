@@ -4,7 +4,7 @@
 **Date:** 2026-11-04  
 **Priority:** P0 stop recurring native folder picker and stabilize Windows pairing; P0 basic UX/selection/preview; P1 cross-application/premium bulk.  
 **Execution:** From latest main, inspect concurrent branches/PRs, implement in a focused `codex/chutey-intuitive-explorer-ux-2026-11-04` branch (suffix if occupied), provide a reviewable PR and **matched** Windows EXE + Chrome extension TEST artifacts. **Do not auto-merge, deploy or publish a release.**
-**Owner's directive:** “Simple. Intuitive. Functional.” This is an **implementation request**, not a request to create another plan. Do not rebuild existing engines.
+**Owner's directive:** “Simple. Intuitive. Functional.” **The user must NEVER struggle with drag-and-drop.** Match the dependable, familiar feel of normal Windows Explorer and standard file drag-and-drop: one natural gesture, obvious feedback, dependable completion or a clear truthful reason why a destination cannot accept it. This is an **implementation request**, not a request to create another plan. Do not rebuild existing engines.
 
 ## 0. FIRST: Diagnose and stop recurrent directory-picker / reconnect prompts BEFORE all cosmetic work (P0)
 
@@ -51,9 +51,38 @@ Left folder tree and right file-list separated by **resizable middle vertical wa
 - Enter explicitly opens preview; Escape closes; keyboard navigation must not hijack typing into search, filename editing or settings.
 - Keep selected count subtle and readable. Free maintains normal selection mechanics and one-file operations; Premium gates **bulk actions/throughput**, not Ctrl/Shift functionality itself.
 
-## 4. One continuous, reliable drag
+## 4. Non-negotiable: Drag-and-drop must be STANDARD, DEPENDABLE and EFFORTLESS (P0)
 
-**Hover → mouse down/hold → drag → drop** from the ENTIRE card/row. Use natural movement threshold. Never require an intermediate **Copy to Live** action then a second drag, a second click, the icon hotspot, or preview toggling. Selected files drag together when entitled; correct drag badges/cursors/valid drop target highlights. Reuse the existing native Explorer Python source and CHUTE `drag-relay.js`/`content.js`/`direct-drop-google-yandex.js`/`drop-lifecycle.js` pipelines rather than inventing a parallel engine. Confirm real bytes + filename/MIME arrive, receipts/KEEP BOTH; never leak raw native paths, bearer tokens or opaque internal handles to pages. Chrome may prevent true cross-app file drag; provide an **honest user-initiated fallback**, never fake success.
+**Owner's acceptance standard: “The user should NEVER struggle with drag and drop.”** Drag-and-drop is CHUTE's core interaction, not an optional flourish. A user should be able to bring any supported item from a CHUTE card to a supported destination **in the same instinctive way they drag a file from Windows Explorer**, every time. The user should not need to learn Chutey internals, retry mysterious failures, wait for a hidden pre-copy, or distinguish extension panels from the native companion.
+
+### Exact gesture contract
+
+1. **Hover:** only subtly highlight the card and show it can be dragged.
+2. **Press and hold anywhere on the card/row:** preserve selected items; do NOT preview, navigate, modify selection unexpectedly, or activate another button.
+3. **Move beyond a conventional movement threshold:** begin real drag **on the FIRST attempt** with a visible thumbnail/ghost, copy cursor and selected-item count when multiple files are selected. No icon-only hitbox, hidden first-stage “Copy to Live”, second drag, extra modifier, or copy-before-drag prerequisite.
+4. **Cross a panel/window boundary:** continue the gesture without losing drag state, selection, bytes, focus or intended destination. No interfering custom overlay, swallowed pointer, preview, ghost thumbnail blocking pointer events, or stuck drag after leaving the Shelf.
+5. **Hover a valid target:** show a calm, obvious eligible drop state. For unsupported target, indicate that before release where possible; never misleadingly show a green success state.
+6. **Release once:** the receiver gets the original requested bytes, filename, extension and MIME where supported; verified result appears only after the destination confirms it. Default to copy/KEEP BOTH, never silently move/delete the source.
+7. **Cancel or fail:** Escape/cancel/invalid drop leaves the original untouched, resets ghost/hover/selection state cleanly and permits another drag immediately. Provide a short, useful explanation without technical codes or alarming dialogs.
+
+### Implementation: repair the existing pipeline, do not hide defects
+
+- Reuse the existing Python permissioned Explorer engine, CHUTE Live basket, `drag-relay.js`, `content.js`, `direct-drop-google-yandex.js`, `drop-lifecycle.js`, and native bridge. Audit dragstart/dragenter/dragover/drop/dragend/pointer lifecycle and timing across popup, Shelf and real website. Resolve first-drag rejection and “copy to Live, then drag again” behavior at its origin; do not merely relabel it or add an alternate top-level command.
+- **Eliminate race conditions:** expired native token, cold companion, service worker suspension, thumbnail fetch, asynchronous source export, extension popup closure, receiver registration and document focus must not cause silent first-attempt failure. Prepare permitted transfer capability or cached source before it is needed without pre-copying files into Live or leaking content, and ensure bounded legitimate recovery. Never fake a native/OS drag carrying real local files if Chrome disallows it.
+- **Do not promise impossible universal behavior:** browser and website security may prevent native cross-window file drops or programmatic file injection. Identify those boundaries explicitly via real testing. Preserve ordinary drag for real supported targets; offer the simplest honest, user-initiated alternative (e.g. Copy/Paste with real bytes where supported or file-picker handoff) for unsupported ones. Do not brand fallback as successful drag.
+- Selection must work naturally for **one** file, selected multiple files (Premium bulk transfer only), long filenames, thumbnail and non-thumbnail rows, grids and list layouts. Dragging a selected file drags the selected group; dragging an unselected item uses the familiar Windows-style selection behavior.
+- Performance and feedback: no perceptible “dead first drag,” phantom upload, retry button required for ordinary supported drag, spurious double-open, card teleport, hover flicker, popup overlay or long silent stall. Progress is unobtrusive for larger transfers. Source metadata/provenance stays local except bytes + minimal necessary receiver metadata.
+- **Do not weaken permissions** to make drag feel fast: an unapproved local destination may require one contextual explicit authorization; browsing alone must not start recurrent folder prompts.
+
+### P0 drag/drop acceptance matrix (demonstrate rather than assert)
+
+Test with real installed matched Windows EXE + Chrome extension, including **fresh install and after restart**, on at least:
+- Local Explorer → Chutey Live, Live → authorized Explorer, Explorer → permitted Explorer folder, website → authorized Explorer, and selected multi-file batch when Premium is legitimately enabled.
+- Existing browser flows: CHUTE Live/Explorer → ChatGPT attachment surface, Google/Lens and Yandex **only where the sites actually accept real files**, plus REDOWN after its own secure adapter is implemented.
+- First drag immediately after Shelf opens, cold native worker, warm worker, service-worker suspension/resumption, tab switch, narrow Shelf, Chrome popup closure constraints, 125%/150% browser zoom, and prolonged session.
+- Single left-click then drag, direct mouse-down+drag, Ctrl/Shift multi-select then drag, interrupted drag, Escape, invalid destination, cancelled consent, slow large file, rapid repeated drags, and source missing mid-transfer.
+- Show timestamps/metrics **pointerdown → dragstart → target dragover → drop → verified receiver receipt**, plus a small redacted screen recording or equivalent actual-user interaction evidence. Measure first-attempt supported drop success across repeated runs; report **counts and failures**, not invented percentages.
+- **Pass/fail: for a supported destination and valid permission, the first natural drag gesture works and the correct file is delivered.** A successful second attempt after a failed first attempt is a failure. A visually responsive ghost without delivered bytes is a failure. Cross-browser unsupported flows must be clearly documented, not claimed complete.
 
 ## 5. Proper context menu: Copy & Paste are mandatory
 
@@ -94,7 +123,7 @@ Required automated + **real Windows/Chrome interactive** tests:
 1. **First**: previous approved folder resumes across restarts with zero spontaneous pickers, no daily reconnection ritual, and only explicit Browse invokes picker; reproduce/report exact original dialog/error cause.
 2. Click selects, double-click previews, Up/Down changes selection, open preview tracks keyboard selection, closed preview stays closed; Shift/Ctrl/arrow selection, Ctrl+A and right-click selection preservation.
 3. Context Copy/Paste and Ctrl+C/V with real bytes, single and Premium bulk, destination-specific limits and honest receipts.
-4. Drag from selection in one continuous motion, including source/destination across supported surfaces; no pre-copy.
+4. **Critical gate:** first-gesture, real-byte drag/drop succeeds reliably on each actually supported target across cold/warm/restarted Windows+Chrome conditions; test single and entitled multi-select, drop across panel/window boundaries, unsupported sites, cancellation, recovery and verified receipts. Record per-scenario first-attempt success counts and failure causes. No pre-copy, second attempt, fake success or stuck ghost.
 5. Inline preview appears beneath clicked file or History card, following cards push down and grid rows don't overlap.
 6. Divider drag/keyboard resizing, persistence and independent scrolling.
 7. Branding “Your Everything”, History “DRAG ME!”, Chrome “Feed Chutey!”.
@@ -107,9 +136,15 @@ Deliver: focused implementation PR; concise root-cause report of repeated picker
 
 1. STOP repeated folder picker/reconnect annoyance and prove root cause.
 2. Make selection, keyboard arrows, preview behavior and native Copy/Paste correct.
-3. Repair one-gesture drag, bulk selection/transfer and validate external destinations.
+3. Treat dependable first-gesture drag/drop as a P0 stop-ship gate: diagnose and repair event/bridge races, run the Windows/Chrome matrix, then validate entitled bulk and external destinations.
 4. Finish per-card inline preview, resizable tree divider and History labels/branding.
 5. Professional spacing/padding/aesthetic QA and regression sweep.
 6. Hand back evidence-backed PR + paired test artifacts for user approval. **Do not merge automatically.**
 
 **The core principle:** An unfamiliar person should recognize how to select, browse, preview, copy, paste and drag immediately, with no understanding of permissions, sessions, endpoints, transport adapters or backend recovery mechanics.
+
+## ADDENDUM — Owner's final drag-and-drop standard (binding, 2026-11-04)
+
+> **“Drag and drop must always be dependable and just as standardized as regular drag and droppers. The user should NEVER struggle with drag and drop.”**
+
+Codex must design every implementation choice and acceptance test around this promise. The intuitive mental model is **hover → click/hold → drag → drop → file actually arrives**. If any supported workflow forces a second attempt, an unexplained Copy-to-Live intermediary, guessing where to drop, or wondering whether a save actually happened, **that workflow is not finished**. This standard overrides shortcuts that merely make the UI look interactive. Confirm with real Windows user-gesture testing, provider/target-specific evidence and truthful constraints; do not ship deceptive fake parity for destinations the browser cannot support.
