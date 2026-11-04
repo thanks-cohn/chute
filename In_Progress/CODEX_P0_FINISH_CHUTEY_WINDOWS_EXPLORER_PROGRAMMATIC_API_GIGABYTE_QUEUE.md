@@ -139,6 +139,155 @@ A user can select an authorized Windows folder, see it in Chutey's real Shelf Ex
 
 A new authorized agent can discover the operations, generate deterministic fixtures and adverse edge cases, measure true latency/throughput/limits, detect wrong bytes, minimize a failure, fix owning code, and rerun complete regressions. The product should aspire to a new benchmark for secure, fast, readable and teachable **browser + local programmatic file infrastructure**—with proof, not marketing claims.
 
+## 11. SOURCE-AUDITED HANDOFF AND PRECISE BLOCKERS
+
+**Inspection checkpoint:** GitHub `main` at `3fd27da9731b0ac71c0b639c43cc5de0973383aa` (later `main` commits through November 4 add ideas-only documentation). All findings must be rechecked against actual source before altering code.
+
+| Source | Actual finding | Required next step |
+|---|---|---|
+| `extension/background-entry.js`, `extension/background-native.js` | Existing MV3 worker, native-host wake/reconnect and side-panel infrastructure already exist. | **Reuse**; don't rebuild worker because the Explorer is unfinished. |
+| `src/chute/server.py`, `src/chute/windows_app.py`, `src/chute/native_host.py`, `src/chute/reveal.py` | Existing Python companion, localhost server, Windows packaging and safe Store-ID reveal ownership. | **Extend in place**, preserving Chutey History and native lifecycle. |
+| `src/chute/explorer/security.py` | `RootGrant` requires POSIX/`O_NOFOLLOW` and raises `UNSUPPORTED_PLATFORM` on Windows. | Create audited Windows-specific, handle-based authorized roots, protecting against reparse/junction/symlink and path-swap escapes. |
+| `src/chute/explorer/protocol.py` | `READ_COMMANDS`: capabilities, roots, list, stat, search, preview; writes/OS actions deliberately in `BLOCKED_COMMANDS`. | Implement approved mutations and register them **only after independent verification**. |
+| `extension/explorer-view.js`, `extension/explorer-api.js` | Browser is a thin read-only client; the owner must paste a manually issued `Local read session` token; Explorer drop is rejected. | Use trusted native owner-selected folder enrollment and real typed command route, not permanent blanket permissions. |
+| `tools/explorer_lab/chutey_explorer_lab.py` | Real Python dispatcher and seeded fixtures exist but primarily verify reads and refusals. | Grow it into cross-platform real-operation oracle runner, 500-case architecture, and repeatable performance laboratory. |
+| `src/chute/explorer/interop.py` | REDOWN local↔cloud transfer-intent schema exists but transport is disabled. | Preserve typed contract; don't falsely claim uploads/downloads until independently verified across both actual engines. |
+| `scripts/verify-explorer-browser.py` and [Explorer CI](https://github.com/thanks-cohn/chute/actions/runs/41786484225) | Chromium CI failed at line 108 because Playwright `wait_for_function` string evaluation violated extension CSP `script-src 'self'`. | Change test technique to extension-CSP-compliant assertions, **never enable unsafe-eval**. |
+| `docs/explorer/evidence/summary.json` | Earlier Explorer lab reports **9 PASS / 8 BLOCKED**; source documents **58 local Python tests passed**, not real Windows Explorer acceptance. | Maintain correct evidence boundaries. No claim that Windows writes, full drag/drop or large transfers pass. |
+
+**The precise missing functional bridge:** a Windows owner-approved local root → safe Explorer grant → real Python dispatcher → authorized loopback/native adapter → existing Shelf Explorer tab. Without this, the UI cannot become usable by merely styling the current tab.
+
+## 12. THE 500-GOLDEN PYTHON LAB IS A FIRST-CLASS ENGINE REQUIREMENT
+
+**Owner's clarification:** Design the new engine **now** so it can eventually support **500+ meaningful, fully executable and independently verified scenarios**, analogous to the REDOWN BOOT 500 and planned Click2Cloud V3+1 right-click laboratory. The *number is not an excuse to delay the first usable Windows build*. Build the stable test hooks early; progressively expand and validate the corpus in parallel with P0-A/B/C.
+
+**Important distinction:** REDOWN's BOOT 500 includes simulated scenario execution, while Click2Cloud's 500-case golden atlas is currently **authored descriptions**, not 500 proven executable goldens. Chutey must aim for real **Python-executed file operations with independently observed filesystem effects**, with installed Windows/Chrome and browser site checks classified separately.
+
+### 12.1 A scriptable, consistent public-to-authorized-caller contract
+
+All domain operations must be reachable through the **real `src/chute/explorer/` production Python engine** with stable versioned schemas and discoverable capabilities. The same typed request/receipt semantics must be used by Shelf/extension, right-click, clipboard, queue and Python tests. GUI-only file behavior is an architectural regression.
+
+Support an API-level **`inspectCapabilities` → `prepare` → `execute/enqueue` → `observe` → `verify/reconcile`** lifecycle, with scope validation at the actual operation boundary. These are contract roles; choose actual Python method names after source audit, document them and implement tests before promising their presence.
+
+Minimal conceptual shape, **not claimed existing code**:
+
+```python
+from chute.explorer import Explorer
+
+# The actual trusted native caller issues grants for owner-selected disposable roots.
+# Headless tests inject those same scoped grants without using the Shelf.
+engine = Explorer(grants=[test_authorized_root])
+caps = engine.execute("capabilities")
+job = engine.execute("copy", source=source_handle, destination=dest_handle, conflict="keep_both")
+receipt = engine.execute("get_job", operation_id=job["operation_id"])
+# Independent fixture oracle compares original bytes/tree/identity to destination.
+```
+
+Keep `operation_id` stable across queue/restart/reconciliation; return typed `ACCEPTED/QUEUED/RUNNING/VERIFYING/COMMITTED/FAILED/CANCELLED/BLOCKED/UNCERTAIN` status, progress and reason codes. Never relabel an operation COMMITTED from a UI timer or queue acknowledgment alone.
+
+**Debugging and determinism without a second engine:** use dependency-injected I/O, clock/scheduler and failpoints to simulate disk-full, permission denial, interrupted process, locked handle, stale clipboard, revocation and delayed resources while invoking the **actual Python engine handlers**. The injected environment may be fake, but **the operation implementation under test is not**. Document which tests use actual filesystem bytes and which use injected boundaries.
+
+### 12.2 The logical state graph
+
+Version a machine-readable state model covering at least:
+
+- **Root/authorization:** unpaired, paired, no root, pending selection, granted read, granted write, expired/revoked, wrong extension identity, missing native companion.
+- **File and folder:** absent, present, empty/nonempty directory, locked, permission denied, replaced-between-stat-and-open, symlink/reparse entry, conflict existing, partially staged, fully verified.
+- **Clipboard:** empty, Chutey file/folder references, Windows shell file selection, external text/bitmap, Cut pending, source deleted, source changed, expired grant, malicious path-shaped payload.
+- **Job:** accepted, queued, running, waiting for read/write resource, verifying, committed, cancelled, failed, blocked, uncertain and restart recovery/reconciliation.
+- **Browser/Shelf:** closed/open, cold/warm MV3 service worker, local companion awake/asleep, preview pending, drag permitted/rejected, unsupportable target site, reopening and item selection.
+- **Streaming/size:** zero byte, small, large GiB, sparse versus real bytes, unknown-length stream, cancellation boundary, end-of-file mismatch, short writes, backpressure, disk-full.
+
+Generate **bounded** exhaustive state transition enumerations and valid/invalid paths through these graphs, plus targeted pairwise/t-way combinations (e.g., grant revoked × large copy × restart, clipboard whole folder × nested conflict × queue pressure). Use BFS/DFS, explicit unreachable states, exact seeds, property-based generation/shrinking, mutation tests and reproducible concurrency schedules. Exhaustive coverage applies **only** to the explicitly finite model, not arbitrary real-world devices or file trees.
+
+### 12.3 The 500-case target and anti-padding standard
+
+Build toward a **reviewed 500-case reference corpus** with unique stable IDs, approved user intent, exact initial state, operation/action sequence, expected outcome, prohibited effects, required proof class, failure injection, nearest similar case and meaningful behavioral difference.
+
+Suggested **coverage budgeting**, subject to actual source audit (not a requirement to pad categories):
+
+| Domain | Illustrative case target |
+|---|---:|
+| Boot/connection, native enrollment and permission lifecycle | 45 |
+| Navigation, inventory, pagination, search, preview and formats | 70 |
+| Mutations, conflicts, path identity and transactional safety | 100 |
+| Clipboard (including whole-folder copy/cut/paste) and OS integration | 65 |
+| Streaming, multi-GiB files, queue scheduling, crash/recovery | 85 |
+| Security/adversarial filesystem and authorization edge cases | 65 |
+| Shelf/context menu/Chrome adapter/drag integration | 40 |
+| Cross-domain sequences and performance/release regressions | 30 |
+| **Target distinct golden scenarios** | **500** |
+
+**Not 500 variations of the same filename.** If genuinely distinct behavioral requirements total fewer than 500, report the smaller truthfully justified atlas and keep generated permutations as a separate count. Don't silently relabel `BLOCKED` as `PASS`.
+
+For each run, save:
+- `corpus-version`, `engine-version`, source SHA, OS/filesystem/device, fixed seed, initial directory tree and explicit consent fixture;
+- exact selected command and operation ID, ordered state/event journal, expected vs actual output and error/status;
+- independent before/after metadata and SHA-256 of **actual source and destination bytes** for the appropriate scenarios (including directory-tree identity, empty folders and conflict naming);
+- fault-injection trace, nearest relevant existing regression, coverage graph edges/branches, profiling metrics, reproducible replay command and an explicit **proof class**;
+- `PASS`, `FAIL`, `BLOCKED`, `UNKNOWN`, `UNSUPPORTED`, `NOT_TESTED` or `PARTIAL`.
+
+**Independent-oracle rule:** An API returning `"state":"completed"` is not proof. Fixtures must intentionally corrupt written bytes, change destination folder identities and simulate false success; the oracle must reject all. Preserve all earlier failing receipts and link corrective commits. After every proposed fix, replay minimized failure → neighboring logical transitions → full accepted golden suite → cross-domain fault/security/performance gates.
+
+### 12.4 Self-correcting agent loop, without unsafe autonomy
+
+Build the laboratory for the same **iteratively self-correcting** process envisioned in REDOWN's `IMPORTANT/UNIVERSAL_AGENTIC_TEST_CORPUS_AND_PIPELINE.md`:
+1. Generate/select meaningful scenario and execute it against actual code.
+2. Compare with independent expected outcome and exact file/tree effects.
+3. Identify earliest known and independent root faults via typed receipts and missing-evidence markers.
+4. Minimize failure to replayable inputs and propose a falsifiable code repair.
+5. Patch only the owning implementation in a development branch—not test goldens.
+6. Rerun failing case, related state transitions and all accepted regressions; retain before/after evidence.
+7. Repeat within explicit safety, compute and time budgets; stop with `BLOCKED` or `UNKNOWN` where necessary.
+
+No agent automatically changes user files, installs binaries, merges to main, spends money, grants permissions or changes an owner-approved golden contract to claim success.
+
+### 12.5 Real tests versus logical simulations
+
+A strong Python suite can establish the engine's logic and filesystem effects but **cannot prove** that a web page accepted a synthetic drag, Chrome loaded an installed extension, Windows shell paste worked, or a REDOWN cloud provider confirmed a transfer. Publish separate proof classes:
+
+- `PYTHON_LOGICAL` — deterministic state/input/model tests;
+- `REAL_LOCAL_FILESYSTEM_WINDOWS` / `REAL_LOCAL_FILESYSTEM_POSIX` — actual temporary files and independently verified bytes;
+- `NATIVE_CLIPBOARD_WINDOWS` — actual shell clipboard roundtrip;
+- `INSTALLED_CHROME` — real extension profile, native messaging and UI;
+- `LIVE_SITE` — approved representative browser destinations;
+- `REDOWN_LIVE_PROVIDER` — separate opt-in cloud transfer and independent provider readback;
+- `PERFORMANCE` — hardware/volume-specific latency and sustained throughput.
+
+A 500-golden logical score is a **powerful engineering milestone**, not release certification. Every critical security, wrong-destination, lost-byte, misleading-success or BOOT regression remains a blocker even if the other 499 pass.
+
+## 13. EXTENSIBLE “SPECIAL ABILITIES” — LATER, NOT A BLOCKER FOR P0
+
+The owner envisions Chutey evolving beyond ordinary folders: perhaps **“Git ZIP → Chutey”**, **“Movie → Chutey”**, or other useful workflows not yet invented. The architecture should support safe future capability modules without forcing them into the first usable Windows release.
+
+- A module describes its supported source types, explicit owner intent, required permissions, expected output artifacts, byte/metadata semantics, resource budget, streaming/queue requirements, typed errors and independent verification.
+- Example future **Git archive to Chutey**: given a user-authorized public/accessible repository or ZIP archive, safely ingest a bounded ZIP and optionally extract to an approved folder with zip-bomb/zip-slip, symlink, total-expanded-size and collision defenses; this is **future scope**, not an existing feature.
+- Example future **movie/video to Chutey**: import a user-owned local video, a legitimately downloadable video file or a service-provided authorized export via a supported source adapter; preserve actual bytes and use media-aware previews/transcoding only when separately implemented and verifiable. **No DRM bypass, access-control circumvention or false promise that every streaming site permits downloading.**
+- Future adapters might add image resize/format conversion, safe archive extraction, batch naming, intelligent intake, cloud handoffs, screenshots and programmer-defined source workflows. **Capability discovery must distinguish implemented, gated, experimental and unsupported.**
+- Every special ability must use the **same jobs, queue, operation IDs, security boundaries, data/stream semantics and Python test interface**, so an agent can add a new domain with focused fixtures and reuse the existing corpus generator and performance reporting.
+- A future “plugin” cannot execute arbitrary commands, read arbitrary paths or inherit Chrome/cloud credentials merely because it registers a capability. Keep opt-in, bounded, explicit grants.
+- Do **not** implement these future abilities during the P0 Windows filesystem and clipboard rescue unless they are required for a verified baseline; keep deferred Chutey mascot/gallery art and unrelated SKIN API separate.
+
+## 14. DELIVERY AND ACCEPTANCE RECEIPT: DO NOT STOP AT DOCUMENTATION
+
+**Phase milestones must be visible and callable as soon as each is actually implemented**, with honest gates rather than “all or nothing” product claims:
+
+| Gate | Deliverable | Independent acceptance |
+|---|---|---|
+| **A — Owner can debug real Windows Explorer** | Built matched Windows EXE + Chrome ZIP; trusted root picker; browser/file list and previews in existing Shelf | Actual installed paired app browses user-selected safe disposable folder, correctly shows bytes, permissions/restart and real preview; CI does not use unsafe-eval |
+| **B — Real file operations** | Versioned Python mutate/clipboard endpoints and corresponding Shelf menus | Recursive directory copy and paste, Cut, multi-selection, rename/mkdir/trash, actual Windows shell clipboard where supported, exact independent destination hashes and conflict behavior |
+| **C — Large queued operation system** | Disk-bounded streaming, backpressure, durable journal, pause/cancel/reconcile, real progress | Multi-GiB physical bytes and deep directory fixture tests, bounded memory, restart recovery and truthful UNCERTAIN states |
+| **D — Universal programmatic laboratory** | Schema + scenario registry/runner + generator + independent oracle + benchmark and agent receipt | Same source-owned operations callable by Python; gradual distinct-case corpus toward 500 with transparent categories/coverage and measured performance |
+| **E — Browser/local/REDOWN integrations** | Legitimate browser transfer methods and separate authorized cloud bridging | Installed Chrome/live-site acceptance; source/destination size/hash and scoped permissions; unsupported actions reported honestly |
+
+**The owner wants A immediately usable, not held hostage to completion of E.** Keep building B/C/D where safe and independent; report A/B/C/D/E individually. Do not push code straight to production or claim all gates PASS from simulations.
+
+The final PR must contain code, tests, command examples, reproducible receipts, performance datasets, paired review artifacts, source audit, failure and security gates, user walkthrough, precise rollback, and a statement of outstanding environment or permissions blockers. If an unavoidable blocker exists, provide a usable partial build and machine-readable BLOCKED evidence rather than halting with another proposal.
+
+**Definition of the ambition:** a compact, polished Chutey Explorer whose underlying Python API is robust and elegant enough to become a reference implementation for *local + browser file programmability*. A new agent should be able to discover every supported operation, generate representative and adversarial real-file scenarios, measure throughput and latency, diagnose a regression and independently verify a repair. **Working results and transparent limits are the standard.**
+
+---
+
 ### Lightweight starter for Codex
 
-> In `thanks-cohn/chute`, on `codex/chutey-explorer-windows-usable-asap-2026-11-04`, read and execute `In_Progress/CODEX_P0_FINISH_CHUTEY_WINDOWS_EXPLORER_PROGRAMMATIC_API_GIGABYTE_QUEUE.md`. Finish the **Windows** Python Explorer using existing Chutey worker/companion, repair CSP-unsafe CI, deliver a paired working Windows+Chrome test build early, then true directory clipboard copy/paste, multi-GiB streaming+durable queue and reproducible Python latency/limit lab. Every supported UI action must call the same programmatic API. Preserve old working functionality, block unsafe capabilities honestly, do not modify deferred gallery/mascot ideas, and do not auto-merge/deploy. Commit code/tests and publish precise verified versus blocked evidence.
+> In `thanks-cohn/chute`, branch `codex/chutey-explorer-windows-usable-asap-2026-11-04`, execute this complete P0 implementation request. Inspect real Windows/Python/extension code first. Deliver a **working, paired Windows Explorer + Chrome test build early**, reusing existing worker/companion and fixing CSP-incompatible CI without weakening security. Finish owner-consented Windows filesystem access, full-directory clipboard Copy/Cut/Paste, verified multi-GiB streaming and persistent operation queue. **Everything supported must be callable headlessly through one versioned Python API. Design its schema, deterministic failpoints and independent oracles for a future 500+ distinct executable golden-scenario corpus, implementing real tests incrementally now.** Keep future Git ZIP/video special abilities, gallery and mascot as extensible deferred scope. Iteratively fix source failures without weakening tests. Commit code + reproducible proof; keep separate Windows, Chrome, provider and performance gates. Never auto-merge/deploy.
