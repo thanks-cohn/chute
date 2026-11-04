@@ -41,7 +41,7 @@ jobs:
         run: |
           set -euo pipefail
           existing="$(gh api "repos/$REPO/git/ref/tags/$TAG" --jq .object.sha 2>/dev/null || true)"
-          if [[ -n "$existing" ]]; then
+          if [[ "$existing" =~ ^[0-9a-f]{40}$ ]]; then
             echo "Tag already exists ($existing). Never move or overwrite a known-good tag."
             exit 0
           fi
