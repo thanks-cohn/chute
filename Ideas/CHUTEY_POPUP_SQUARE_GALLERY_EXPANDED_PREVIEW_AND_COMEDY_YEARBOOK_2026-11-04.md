@@ -58,3 +58,30 @@ Movements must be **small, non-blocking and optional**, not cover clickable cont
 - Asset design and behavior can later coordinate with the future **REDOWN Mascot API**, but Chutey must not become dependent on it or import unnecessary privileged engine code.
 
 **Owner's governing vision:** A cute, fast square gallery that becomes a larger swipe-through viewer, accompanied by Chutey's mischievous family-yearbook personality, with expressive little animations in response to Shelf actions. Preserve the functional Chute beneath the playful surface.
+
+## Future pixel-art portrait escapes, reactive eyes and recurring easter eggs
+
+**Owner's precise visual intent:** The tiny Chutey icon is a living *pixelated portrait*, not an interchangeable static logo or a generic smooth 3D mascot. Even at icon size it can visibly tangle its tongue, wink, blink, misbehave, look towards the mouse, glance away guiltily, whistle nonchalantly, tilt, squat and hold a mischievous smile. Movements should be cute, crisp, legible at small resolutions, lightweight and sometimes so subtle the user wonders whether the image really moved.
+
+### Signature easter egg: the portrait escapes its own frame
+
+1. While the small extension pop-out is visible, Chutey's portrait looks deceptively static; slight mouse-following eyes or a tongue movement reveals life.
+2. Just before the **real floating Chutey** arrives in the lower-right of the browser, the character quietly **disappears from the portrait**, as though it has escaped its painting.
+3. The separate floating Chutey appears at the bottom-right, allowing the user to recognize that the portrait's character has escaped into the browser.
+4. Chutey then **returns to the little portrait**, whistles innocently, looks away and acts as though nothing happened. Keep animation state coordinated so no second “clone” is accidentally portrayed.
+5. Replay rarely, vary the timing and eventually connect it to an expanding family of mischievous recurring jokes, hidden triggers and custom expressive actions.
+
+The timing and staging should tell a story **without explanatory text**: an ordinary painting suddenly becomes a physical, mischievous resident of the browser. Distinguish the tiny portrait actor from the existing real floating mascot; preserve Chutey's native wake/open and UI layering behavior.
+
+### Future reusable action library
+
+- **Expression verbs:** `trackCursor`, `eyeDart`, `blink`, `tongueTangle`, `whistle`, `lookInnocent`, `peek`, `hide`, `startle`, `recover`.
+- **Scene verbs:** `leavePortrait`, `appearAtCorner`, `returnToPortrait`, `freezeAsPicture`, `reactToShelfAction`, `playCallbackGag`.
+- **Trigger family:** gallery open/expand/next/previous, drag start/end, copying/pasting, saved-item recall, preview pending/failure, real verified completion, switching tabs, pointer proximity, idle/surprise states.
+- **Reliability:** animation events are observational and cancelable. They do not claim file success, keep Chutey's floating mascot awake, intercept input, invent clicks or leak browser contents. Respect reduced motion, performance tiers and user disable/sound settings.
+- **Original work:** create Chutey's own comedic art and timing; avoid copying recognizable TV gags. Reuse the yearbook-pose library across failed previews, loading, idle and small micro-animation transitions.
+
+**Also preserve this later UI behavior:** When a user clicks **Open** on an item in the little extension popup while the Shelf exists, prefer opening/selecting/previewing the actual item **inside Chutey's Shelf**, rather than automatically sending the user to Windows File Explorer. The goal is to make the Shelf a natural home for day-to-day file work. Keep an explicit Open in Windows Explorer alternative when appropriate. If the Shelf is closed, open or focus it using supported extension APIs and retain item identity and permissions. If the file cannot be previewed internally, communicate the limitation and provide a safe fallback—never open a different item. This interaction is intended for a later UI phase unless specifically included in an approved Explorer implementation.
+
+**Everything in this section is planning only. Do not implement pixel art, animation timing, popup restyling or easter eggs during the P0 Windows Explorer API work.**
+
