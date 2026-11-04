@@ -25,6 +25,20 @@
   <details class="settings-panel">
     <summary>⚙ Settings</summary>
     <section class="settings" aria-label="Chute settings">
+      <div class="setting-label">Gallery density</div>
+      <div class="gallery-density-control">
+        <input id="gallery-density" type="range" min="0" max="3" step="1" value="0" aria-label="Gallery grid density, four by four through six by five">
+        <output id="gallery-density-value" for="gallery-density" aria-live="polite">4 × 4</output>
+      </div>
+      <div class="settings-note">Move the dial to rearrange the grid instantly: 4×4, 5×4, 5×5 or 6×5. A page never loads more than 30 items; scrolling and Previous / Next remain available.</div>
+      <div class="setting-label">Shelf image preview</div>
+      <select id="shelf-viewer-size" aria-label="Image preview card size in Shelf">
+        <option value="half">Half-size (default)</option>
+        <option value="full">Full — up to calendar</option>
+      </select>
+      <div class="settings-note">Click a gallery image to find and open it in the Shelf. Full preview expands upward to the calendar; Half preserves more browsing room.</div>
+
+
       <div class="setting-label">Browser access</div>
       <select id="access-mode" aria-label="How Chute appears in the browser">
         <option value="floating">Floating mascot</option>
@@ -62,19 +76,6 @@
         <input id="browser-image-height" type="number" min="1" step="1" value="512" aria-label="Custom image maximum height">
       </div>
 
-      <div class="setting-label">Gallery density</div>
-      <div class="gallery-density-control">
-        <input id="gallery-density" type="range" min="0" max="3" step="1" value="0" aria-label="Gallery grid density, four by four through six by five">
-        <output id="gallery-density-value" for="gallery-density" aria-live="polite">4 × 4</output>
-      </div>
-      <div class="settings-note">Move the dial to rearrange the grid instantly: 4×4, 5×4, 5×5 or 6×5. A page never loads more than 30 items; scrolling and Previous / Next remain available.</div>
-      <div class="setting-label">Shelf image preview</div>
-      <select id="shelf-viewer-size" aria-label="Image preview card size in Shelf">
-        <option value="half">Half-size (default)</option>
-        <option value="full">Full — up to calendar</option>
-      </select>
-      <div class="settings-note">Click a gallery image to find and open it in the Shelf. Full preview expands upward to the calendar; Half preserves more browsing room.</div>
-
       <label>
         <span>Generated menu thumbnails</span>
         <input id="show-thumbnails" class="toggle" type="checkbox" checked>
@@ -91,6 +92,8 @@
     </section>
   </details>
 
+  <!-- History is a SINGLE standalone gallery surface, never part of Settings. -->
+  <section id="chutey-popup-gallery" aria-label="Chutey saved items gallery">
   <div class="history-nav">
     <button id="history-prev" class="icon-button" type="button" title="Older day">‹</button>
     <input id="history-date" type="date" aria-label="Selected history date" hidden>
@@ -125,6 +128,7 @@
   </nav>
   <div id="history-sentinel" class="history-sentinel" aria-hidden="true"></div>
   <div class="popup-note">Latest is your live working Chute. Dated history stays on disk and remains available in the Shelf or by choosing a date.</div>
+  </section>
 
   <script src="native-wake-page.js"></script>
   <script src="bridge-reconnect.js"></script>

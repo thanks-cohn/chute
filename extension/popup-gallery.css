@@ -3,7 +3,36 @@ body.chutey-gallery-popup { width:390px; max-height:600px; overflow-y:auto; over
 .chutey-gallery-popup .gallery-density-control { display:flex; justify-content:flex-end; align-items:center; gap:8px; }
 .chutey-gallery-popup #gallery-density { width:116px; min-width:0; accent-color:#d7ff3f; cursor:ew-resize; }
 .chutey-gallery-popup #gallery-density-value { color:#e3f0d6; font-size:11px; min-width:40px; text-align:right; font-variant-numeric:tabular-nums; }
-.chutey-gallery-popup .settings-panel[open] { max-height:325px; overflow-y:auto; }
+/* Settings is a compact, opaque popover above the ONE independent gallery.
+   Its content scrolls internally and never contains/reflows History. */
+.chutey-gallery-popup .settings-panel {
+  position:relative;
+  z-index:40;
+  isolation:isolate;
+}
+.chutey-gallery-popup .settings-panel[open] { overflow:visible; }
+.chutey-gallery-popup .settings-panel[open] .settings {
+  position:absolute;
+  top:100%;
+  left:0;
+  right:0;
+  z-index:41;
+  max-height:min(280px, 48vh);
+  overflow-y:auto;
+  overscroll-behavior:contain;
+  padding-top:12px;
+  background:#151a13;
+  border:1px solid #46533c;
+  border-radius:0 0 12px 12px;
+  box-shadow:0 12px 24px #000c;
+}
+.chutey-gallery-popup #chutey-popup-gallery {
+  position:relative;
+  isolation:isolate;
+  z-index:1;
+  border-top:1px solid #2d3b25;
+}
+
 .chutey-gallery-popup #files {
   display:grid; grid-template-columns:repeat(var(--chutey-gallery-columns,4),minmax(0,1fr));
   align-content:start; align-items:start; gap:6px; padding:8px 10px;
