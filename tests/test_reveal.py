@@ -78,7 +78,7 @@ class RevealTests(unittest.TestCase):
                 mock.patch("chute.reveal.subprocess.Popen") as popen,
             ):
                 self.assertEqual(reveal_file(path), "folder")
-                self.assertEqual(popen.call_args.args[0], ["xdg-open", str(path.parent)])
+                self.assertEqual(popen.call_args.args[0], ["xdg-open", str(path.resolve().parent)])
 
     def test_linux_native_fallback_selects_file(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
