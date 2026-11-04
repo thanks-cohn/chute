@@ -72,6 +72,8 @@ def build_parser() -> argparse.ArgumentParser:
     send.add_argument("--port", type=int, default=DEFAULT_PORT)
 
     run = sub.add_parser("serve", help="run the localhost bridge")
+    run.add_argument("--explorer-root", type=Path, help="explicit owner-selected read-only folder (POSIX preview)")
+    run.add_argument("--explorer-origin", help="exact owner-approved chrome-extension:// ID origin")
     run.add_argument("--host", default=DEFAULT_HOST)
     run.add_argument("--port", type=int, default=DEFAULT_PORT)
 
@@ -112,7 +114,7 @@ def main(argv: list[str] | None = None) -> int:
         return 0
 
     if args.command == "serve":
-        serve(args.host, args.port)
+        serve(args.host, args.port, explorer_root=args.explorer_root, explorer_origin=args.explorer_origin)
         return 0
 
     if args.command == "list":

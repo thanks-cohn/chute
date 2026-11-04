@@ -1,0 +1,721 @@
+{
+  "seed": 731,
+  "counts": {
+    "PASS": 9,
+    "FAIL": 0,
+    "BLOCKED": 8,
+    "UNSUPPORTED": 0,
+    "UNKNOWN": 0
+  },
+  "results": [
+    {
+      "scenario": "capabilities",
+      "verdict": "PASS",
+      "receipt": {
+        "version": "1.0",
+        "operation_id": "ea30474f9ab945a3acedc49c2a1f7cf3",
+        "state": "completed",
+        "result": {
+          "version": "1.0",
+          "commands": [
+            "capabilities",
+            "roots",
+            "list",
+            "stat",
+            "search",
+            "preview"
+          ],
+          "blocked": {
+            "mkdir": "NATIVE_CONSENT_REQUIRED",
+            "rename": "NATIVE_CONSENT_REQUIRED",
+            "copy": "NATIVE_CONSENT_REQUIRED",
+            "move": "NATIVE_CONSENT_REQUIRED",
+            "trash": "NATIVE_CONSENT_REQUIRED",
+            "receive": "NATIVE_CONSENT_REQUIRED",
+            "open": "NATIVE_CONSENT_REQUIRED",
+            "reveal": "NATIVE_CONSENT_REQUIRED"
+          },
+          "limits": {
+            "page": 200,
+            "directory": 20000,
+            "text_bytes": 262144,
+            "thumbnail_bytes": 16777216,
+            "sessions_seconds": 900
+          },
+          "transforms": "reserved; unsupported",
+          "writable": false
+        }
+      }
+    },
+    {
+      "scenario": "roots",
+      "verdict": "PASS",
+      "receipt": {
+        "version": "1.0",
+        "operation_id": "743e4ffb37a847f3acbae9ca849cbed3",
+        "state": "completed",
+        "result": {
+          "roots": [
+            {
+              "handle": "D721K8gqDTZZ5Gm-jgNCFpVoDGUeQO0p",
+              "name": "fixture",
+              "kind": "directory"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "scenario": "list",
+      "verdict": "PASS",
+      "receipt": {
+        "version": "1.0",
+        "operation_id": "b3d1cc46b90d429f8a95a757230b091b",
+        "state": "completed",
+        "result": {
+          "entries": [
+            {
+              "handle": "oQosWKcynY-Oc2mX8oTDfJpBrkXnVnDc",
+              "name": "sparse.bin",
+              "kind": "file",
+              "size": 1048576,
+              "modified_ns": 1793774059387028416,
+              "mime": "application/octet-stream",
+              "identity": "27:264149:1793774059387028416:1048576"
+            },
+            {
+              "handle": "6rfWT03O_Wr-clASbueXzRjKWFQM87zo",
+              "name": "Unicode-雪.txt",
+              "kind": "file",
+              "size": 3,
+              "modified_ns": 1793774059386139632,
+              "mime": "text/plain",
+              "identity": "27:264140:1793774059386139632:3"
+            },
+            {
+              "handle": "dvZwoAtXBIvMAGbiCWrNRZ56t5Qmysdy",
+              "name": "zero.bin",
+              "kind": "file",
+              "size": 0,
+              "modified_ns": 1793774059386139632,
+              "mime": "application/octet-stream",
+              "identity": "27:264144:1793774059386139632:0"
+            }
+          ],
+          "total": 146,
+          "next_offset": null,
+          "parent": null,
+          "name": "fixture",
+          "consistency": "live; refresh after concurrent changes"
+        }
+      }
+    },
+    {
+      "scenario": "stat",
+      "verdict": "PASS",
+      "receipt": {
+        "version": "1.0",
+        "operation_id": "ae83820696504feb92f14a60410d6794",
+        "state": "completed",
+        "result": {
+          "handle": "kxoskNKJIbIElHrVzwDYEXIQt0Hsdctg",
+          "name": "note.txt",
+          "kind": "file",
+          "size": 57000,
+          "modified_ns": 1793774059386058640,
+          "mime": "text/plain",
+          "identity": "27:264139:1793774059386058640:57000",
+          "parent": "D721K8gqDTZZ5Gm-jgNCFpVoDGUeQO0p"
+        }
+      }
+    },
+    {
+      "scenario": "search",
+      "verdict": "PASS",
+      "receipt": {
+        "version": "1.0",
+        "operation_id": "3e576bada64c41cd90ea4ba5f0cdee01",
+        "state": "completed",
+        "result": {
+          "entries": [
+            {
+              "handle": "6rfWT03O_Wr-clASbueXzRjKWFQM87zo",
+              "name": "Unicode-雪.txt",
+              "kind": "file",
+              "size": 3,
+              "modified_ns": 1793774059386139632,
+              "mime": "text/plain",
+              "identity": "27:264140:1793774059386139632:3"
+            }
+          ],
+          "total": 1,
+          "next_offset": null,
+          "parent": null,
+          "name": "fixture",
+          "consistency": "live; refresh after concurrent changes"
+        }
+      }
+    },
+    {
+      "scenario": "preview",
+      "verdict": "PASS",
+      "receipt": {
+        "version": "1.0",
+        "operation_id": "48a65ef730bc4c02b74fc15365b3d520",
+        "state": "completed",
+        "result": {
+          "handle": "kxoskNKJIbIElHrVzwDYEXIQt0Hsdctg",
+          "name": "note.txt",
+          "kind": "file",
+          "size": 57000,
+          "modified_ns": 1793774059386058640,
+          "mime": "text/plain",
+          "identity": "27:264139:1793774059386058640:57000",
+          "parent": "D721K8gqDTZZ5Gm-jgNCFpVoDGUeQO0p",
+          "preview": "text"
+        }
+      }
+    },
+    {
+      "scenario": "bounded-navigation",
+      "verdict": "PASS",
+      "receipt": {
+        "version": "1.0",
+        "operation_id": "04cb031ea17e47439c682ea8570c0341",
+        "state": "completed",
+        "result": {
+          "entries": [
+            {
+              "handle": "Oc6htMH8y4FUCh75oRe4xsZNwxvuex5g",
+              "name": "deep",
+              "kind": "directory",
+              "size": 4096,
+              "modified_ns": 1793774059386139632,
+              "mime": null,
+              "identity": "27:264142:1793774059386139632:4096"
+            },
+            {
+              "handle": "p91gtWOC40flB2AZ4nkLErkrZnw0st_Q",
+              "name": "empty",
+              "kind": "directory",
+              "size": 4096,
+              "modified_ns": 1793774059386139632,
+              "mime": null,
+              "identity": "27:264141:1793774059386139632:4096"
+            },
+            {
+              "handle": "8ZyijOF-mddowJ-zaA0x05MXYl8ZWimz",
+              "name": "escape",
+              "kind": "blocked",
+              "size": 39,
+              "modified_ns": 1793774059402376754,
+              "mime": null,
+              "identity": "27:265008:1793774059402376754:39"
+            },
+            {
+              "handle": "5Vm_tIcU8cc7uTmD2mzKVe0dN8E4Zda3",
+              "name": "generated.png",
+              "kind": "file",
+              "size": 74,
+              "modified_ns": 1793774059386950479,
+              "mime": "image/png",
+              "identity": "27:264148:1793774059386950479:74"
+            },
+            {
+              "handle": "EfMtjarr5YN4nV1pHhC1_JrBDNaE_7yP",
+              "name": "long-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx.txt",
+              "kind": "file",
+              "size": 9,
+              "modified_ns": 1793774059386824841,
+              "mime": "text/plain",
+              "identity": "27:264147:1793774059386824841:9"
+            },
+            {
+              "handle": "kxoskNKJIbIElHrVzwDYEXIQt0Hsdctg",
+              "name": "note.txt",
+              "kind": "file",
+              "size": 57000,
+              "modified_ns": 1793774059386058640,
+              "mime": "text/plain",
+              "identity": "27:264139:1793774059386058640:57000"
+            },
+            {
+              "handle": "J87J7CI7jcReBdt_sQGsWJ3T0wb-sB0C",
+              "name": "seed-0000.bin",
+              "kind": "file",
+              "size": 568,
+              "modified_ns": 1793774059387265152,
+              "mime": "application/octet-stream",
+              "identity": "27:264150:1793774059387265152:568"
+            },
+            {
+              "handle": "GnWCR8EQ2sh5tO0mQx9vGu338zs-a1L8",
+              "name": "seed-0001.bin",
+              "kind": "file",
+              "size": 4015,
+              "modified_ns": 1793774059387884963,
+              "mime": "application/octet-stream",
+              "identity": "27:264151:1793774059387884963:4015"
+            },
+            {
+              "handle": "HOmv4NHkbUzuswXTR5TlwJnebYkW3gnF",
+              "name": "seed-0002.bin",
+              "kind": "file",
+              "size": 1623,
+              "modified_ns": 1793774059387963561,
+              "mime": "application/octet-stream",
+              "identity": "27:264152:1793774059387963561:1623"
+            },
+            {
+              "handle": "8O5Z9tJ4GujX99Ez43XFN2pw-FD5LIpK",
+              "name": "seed-0003.bin",
+              "kind": "file",
+              "size": 1940,
+              "modified_ns": 1793774059388023561,
+              "mime": "application/octet-stream",
+              "identity": "27:264153:1793774059388023561:1940"
+            },
+            {
+              "handle": "JMV63_Kv7F_zbbp5ufXacMVdHlfpp5ud",
+              "name": "seed-0004.bin",
+              "kind": "file",
+              "size": 3855,
+              "modified_ns": 1793774059388126716,
+              "mime": "application/octet-stream",
+              "identity": "27:264154:1793774059388126716:3855"
+            },
+            {
+              "handle": "D3yclXosqtNstBQGMed7aK3wuwkVGaMe",
+              "name": "seed-0005.bin",
+              "kind": "file",
+              "size": 3342,
+              "modified_ns": 1793774059388186596,
+              "mime": "application/octet-stream",
+              "identity": "27:264155:1793774059388186596:3342"
+            },
+            {
+              "handle": "nW_m0ZOz4wxbgXNEv8DUT5iGhbWLqKsN",
+              "name": "seed-0006.bin",
+              "kind": "file",
+              "size": 1324,
+              "modified_ns": 1793774059388232775,
+              "mime": "application/octet-stream",
+              "identity": "27:264156:1793774059388232775:1324"
+            },
+            {
+              "handle": "EoIbCGBzkBnSabP6rewwBixdSMklFJPB",
+              "name": "seed-0007.bin",
+              "kind": "file",
+              "size": 1313,
+              "modified_ns": 1793774059388278484,
+              "mime": "application/octet-stream",
+              "identity": "27:264157:1793774059388278484:1313"
+            },
+            {
+              "handle": "X1ImENu6ZXE6zq-1Wr-oCpVtJkgsmWsC",
+              "name": "seed-0008.bin",
+              "kind": "file",
+              "size": 2536,
+              "modified_ns": 1793774059388325094,
+              "mime": "application/octet-stream",
+              "identity": "27:264158:1793774059388325094:2536"
+            },
+            {
+              "handle": "Fj1vBpzRF0l1li49QSHEpDxSFQq3yVbJ",
+              "name": "seed-0009.bin",
+              "kind": "file",
+              "size": 3473,
+              "modified_ns": 1793774059388371033,
+              "mime": "application/octet-stream",
+              "identity": "27:264159:1793774059388371033:3473"
+            },
+            {
+              "handle": "vrI9RpsY3k-RYhbckNCMG949IGTlS3dE",
+              "name": "seed-0010.bin",
+              "kind": "file",
+              "size": 2840,
+              "modified_ns": 1793774059388416671,
+              "mime": "application/octet-stream",
+              "identity": "27:264160:1793774059388416671:2840"
+            },
+            {
+              "handle": "WMuxu_bt5zwjr8N9lUNNpZrdeVuyE14O",
+              "name": "seed-0011.bin",
+              "kind": "file",
+              "size": 1640,
+              "modified_ns": 1793774059390675183,
+              "mime": "application/octet-stream",
+              "identity": "27:264162:1793774059390675183:1640"
+            },
+            {
+              "handle": "Ys65knYwVJCAmBsuGf0bRajL91RbPFKK",
+              "name": "seed-0012.bin",
+              "kind": "file",
+              "size": 1783,
+              "modified_ns": 1793774059390762124,
+              "mime": "application/octet-stream",
+              "identity": "27:264163:1793774059390762124:1783"
+            },
+            {
+              "handle": "WfD3g5IfNldck-i7CF687JUShuBVRfD1",
+              "name": "seed-0013.bin",
+              "kind": "file",
+              "size": 1023,
+              "modified_ns": 1793774059390820441,
+              "mime": "application/octet-stream",
+              "identity": "27:264164:1793774059390820441:1023"
+            },
+            {
+              "handle": "EuxjHnE_xpIv7T7bF7oTu6CwGaUdsPwA",
+              "name": "seed-0014.bin",
+              "kind": "file",
+              "size": 1755,
+              "modified_ns": 1793774059390872509,
+              "mime": "application/octet-stream",
+              "identity": "27:264165:1793774059390872509:1755"
+            },
+            {
+              "handle": "XtcdchvCzNzH3mY0SSd6FB3PvK8IuDTu",
+              "name": "seed-0015.bin",
+              "kind": "file",
+              "size": 1267,
+              "modified_ns": 1793774059390926951,
+              "mime": "application/octet-stream",
+              "identity": "27:264166:1793774059390926951:1267"
+            },
+            {
+              "handle": "Bdc0OIYPFS2hJm0Nq4hJEIzuYYAX7NCh",
+              "name": "seed-0016.bin",
+              "kind": "file",
+              "size": 778,
+              "modified_ns": 1793774059391192840,
+              "mime": "application/octet-stream",
+              "identity": "27:264167:1793774059391192840:778"
+            },
+            {
+              "handle": "3lcim1PRNEy0c_0KbMi2rr5FsLLBMSig",
+              "name": "seed-0017.bin",
+              "kind": "file",
+              "size": 2619,
+              "modified_ns": 1793774059391273992,
+              "mime": "application/octet-stream",
+              "identity": "27:264168:1793774059391273992:2619"
+            },
+            {
+              "handle": "iVp3Z1K8udgf0Kes2xTB4tES0R_AMHbH",
+              "name": "seed-0018.bin",
+              "kind": "file",
+              "size": 2353,
+              "modified_ns": 1793774059391325930,
+              "mime": "application/octet-stream",
+              "identity": "27:264169:1793774059391325930:2353"
+            },
+            {
+              "handle": "Xvqk-M5xA2gWeMeIMDpD_J6nw36Um_DN",
+              "name": "seed-0019.bin",
+              "kind": "file",
+              "size": 2220,
+              "modified_ns": 1793774059391372590,
+              "mime": "application/octet-stream",
+              "identity": "27:264170:1793774059391372590:2220"
+            },
+            {
+              "handle": "p_q-hscPfOOCaMfyV2MQNZjgNWS_d2kC",
+              "name": "seed-0020.bin",
+              "kind": "file",
+              "size": 470,
+              "modified_ns": 1793774059391424048,
+              "mime": "application/octet-stream",
+              "identity": "27:264171:1793774059391424048:470"
+            },
+            {
+              "handle": "Fxu_LqBBPuuHRURxNQU65Y0cNjPX6P9s",
+              "name": "seed-0021.bin",
+              "kind": "file",
+              "size": 2549,
+              "modified_ns": 1793774059391471869,
+              "mime": "application/octet-stream",
+              "identity": "27:264172:1793774059391471869:2549"
+            },
+            {
+              "handle": "7ngUmeAfrKs5_KeaZlH-fEYw5tw9-5tY",
+              "name": "seed-0022.bin",
+              "kind": "file",
+              "size": 652,
+              "modified_ns": 1793774059391514564,
+              "mime": "application/octet-stream",
+              "identity": "27:264173:1793774059391514564:652"
+            },
+            {
+              "handle": "nZHUbEYG77orI43SNn9i675O5R1Ge1qc",
+              "name": "seed-0023.bin",
+              "kind": "file",
+              "size": 3060,
+              "modified_ns": 1793774059391559932,
+              "mime": "application/octet-stream",
+              "identity": "27:264174:1793774059391559932:3060"
+            },
+            {
+              "handle": "rGokVJbgnkKP7LhzDAhN6XEyi22_Gblf",
+              "name": "seed-0024.bin",
+              "kind": "file",
+              "size": 2734,
+              "modified_ns": 1793774059391654113,
+              "mime": "application/octet-stream",
+              "identity": "27:264175:1793774059391654113:2734"
+            },
+            {
+              "handle": "xq7gQe7wEotYBY02D3NTSCm03Wx7lVTL",
+              "name": "seed-0025.bin",
+              "kind": "file",
+              "size": 2825,
+              "modified_ns": 1793774059391706021,
+              "mime": "application/octet-stream",
+              "identity": "27:264176:1793774059391706021:2825"
+            },
+            {
+              "handle": "lJqWztN_NoBWcfnK20qakCGpITS5dm3q",
+              "name": "seed-0026.bin",
+              "kind": "file",
+              "size": 401,
+              "modified_ns": 1793774059391753362,
+              "mime": "application/octet-stream",
+              "identity": "27:264730:1793774059391753362:401"
+            },
+            {
+              "handle": "QhdszyA2FoU7SUCNEtBtfN9jX6Ccfuxf",
+              "name": "seed-0027.bin",
+              "kind": "file",
+              "size": 3339,
+              "modified_ns": 1793774059391800984,
+              "mime": "application/octet-stream",
+              "identity": "27:264733:1793774059391800984:3339"
+            },
+            {
+              "handle": "yRAGvDBAi9nNuvBX3mt616JpwJ5jqyMw",
+              "name": "seed-0028.bin",
+              "kind": "file",
+              "size": 4053,
+              "modified_ns": 1793774059391851540,
+              "mime": "application/octet-stream",
+              "identity": "27:264738:1793774059391851540:4053"
+            }
+          ],
+          "total": 146,
+          "next_offset": 35,
+          "parent": null,
+          "name": "fixture",
+          "consistency": "live; refresh after concurrent changes"
+        }
+      }
+    },
+    {
+      "scenario": "invalid-handle",
+      "verdict": "PASS",
+      "receipt": {
+        "version": "1.0",
+        "operation_id": "70eb0eb340a147dab8cf3cb2900ee884",
+        "state": "failed",
+        "error": {
+          "code": "INVALID_HANDLE",
+          "message": "This file reference has expired."
+        }
+      }
+    },
+    {
+      "scenario": "symlink-escape",
+      "verdict": "PASS",
+      "receipt": {
+        "version": "1.0",
+        "operation_id": "df5ff8335c2a4dea8bfc338e551e3cf8",
+        "state": "failed",
+        "error": {
+          "code": "UNSAFE_LINK",
+          "message": "The item is unavailable or cannot be accessed safely."
+        }
+      }
+    },
+    {
+      "scenario": "mkdir",
+      "verdict": "BLOCKED",
+      "receipt": {
+        "classification": "BLOCKED",
+        "receipt": {
+          "version": "1.0",
+          "operation_id": "ad4b2715ca094f32a293d8ec139556a1",
+          "state": "failed",
+          "error": {
+            "code": "NATIVE_CONSENT_REQUIRED",
+            "message": "This action awaits verified native folder consent and transfer safety."
+          }
+        },
+        "reason": "Native consent, Windows handle guards and mutation recovery remain unverified."
+      }
+    },
+    {
+      "scenario": "rename",
+      "verdict": "BLOCKED",
+      "receipt": {
+        "classification": "BLOCKED",
+        "receipt": {
+          "version": "1.0",
+          "operation_id": "f5ca91bbd2c749249b9e17b1b6447c46",
+          "state": "failed",
+          "error": {
+            "code": "NATIVE_CONSENT_REQUIRED",
+            "message": "This action awaits verified native folder consent and transfer safety."
+          }
+        },
+        "reason": "Native consent, Windows handle guards and mutation recovery remain unverified."
+      }
+    },
+    {
+      "scenario": "copy",
+      "verdict": "BLOCKED",
+      "receipt": {
+        "classification": "BLOCKED",
+        "receipt": {
+          "version": "1.0",
+          "operation_id": "9032820eec3a40babaf36126f30aaf2c",
+          "state": "failed",
+          "error": {
+            "code": "NATIVE_CONSENT_REQUIRED",
+            "message": "This action awaits verified native folder consent and transfer safety."
+          }
+        },
+        "reason": "Native consent, Windows handle guards and mutation recovery remain unverified."
+      }
+    },
+    {
+      "scenario": "move",
+      "verdict": "BLOCKED",
+      "receipt": {
+        "classification": "BLOCKED",
+        "receipt": {
+          "version": "1.0",
+          "operation_id": "4103dca4166245de908ba20cd1038dcc",
+          "state": "failed",
+          "error": {
+            "code": "NATIVE_CONSENT_REQUIRED",
+            "message": "This action awaits verified native folder consent and transfer safety."
+          }
+        },
+        "reason": "Native consent, Windows handle guards and mutation recovery remain unverified."
+      }
+    },
+    {
+      "scenario": "trash",
+      "verdict": "BLOCKED",
+      "receipt": {
+        "classification": "BLOCKED",
+        "receipt": {
+          "version": "1.0",
+          "operation_id": "acadbb8c699b4e0ca6f1075e5bbdc972",
+          "state": "failed",
+          "error": {
+            "code": "NATIVE_CONSENT_REQUIRED",
+            "message": "This action awaits verified native folder consent and transfer safety."
+          }
+        },
+        "reason": "Native consent, Windows handle guards and mutation recovery remain unverified."
+      }
+    },
+    {
+      "scenario": "receive",
+      "verdict": "BLOCKED",
+      "receipt": {
+        "classification": "BLOCKED",
+        "receipt": {
+          "version": "1.0",
+          "operation_id": "2c16a0347a4242908ce0f144620a1103",
+          "state": "failed",
+          "error": {
+            "code": "NATIVE_CONSENT_REQUIRED",
+            "message": "This action awaits verified native folder consent and transfer safety."
+          }
+        },
+        "reason": "Native consent, Windows handle guards and mutation recovery remain unverified."
+      }
+    },
+    {
+      "scenario": "open",
+      "verdict": "BLOCKED",
+      "receipt": {
+        "classification": "BLOCKED",
+        "receipt": {
+          "version": "1.0",
+          "operation_id": "874088f6914d4e508c67c38d60070309",
+          "state": "failed",
+          "error": {
+            "code": "NATIVE_CONSENT_REQUIRED",
+            "message": "This action awaits verified native folder consent and transfer safety."
+          }
+        },
+        "reason": "Native consent, Windows handle guards and mutation recovery remain unverified."
+      }
+    },
+    {
+      "scenario": "reveal",
+      "verdict": "BLOCKED",
+      "receipt": {
+        "classification": "BLOCKED",
+        "receipt": {
+          "version": "1.0",
+          "operation_id": "525dd5f7b82241c7a39c5bdd0dfe0ca7",
+          "state": "failed",
+          "error": {
+            "code": "NATIVE_CONSENT_REQUIRED",
+            "message": "This action awaits verified native folder consent and transfer safety."
+          }
+        },
+        "reason": "Native consent, Windows handle guards and mutation recovery remain unverified."
+      }
+    }
+  ],
+  "coverage": {
+    "registered": [
+      "capabilities",
+      "roots",
+      "list",
+      "stat",
+      "search",
+      "preview",
+      "bounded-navigation",
+      "invalid-handle",
+      "symlink-escape",
+      "mkdir",
+      "rename",
+      "copy",
+      "move",
+      "trash",
+      "receive",
+      "open",
+      "reveal"
+    ],
+    "executed": [
+      "capabilities",
+      "roots",
+      "list",
+      "stat",
+      "search",
+      "preview",
+      "bounded-navigation",
+      "invalid-handle",
+      "symlink-escape",
+      "mkdir",
+      "rename",
+      "copy",
+      "move",
+      "trash",
+      "receive",
+      "open",
+      "reveal"
+    ],
+    "gaps": [
+      "mutations/restart/cancellation",
+      "Windows locks and reparse points",
+      "live site drags",
+      "offline volumes"
+    ]
+  }
+}

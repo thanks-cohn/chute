@@ -45,6 +45,15 @@ class ChuteHandler(BaseHTTPRequestHandler):
     def store(self) -> Store:
         return self.server.store  # type: ignore[attr-defined]
 
+    def _explorer_route(self) -> bool:
+        if not urlparse(self.path).path.startswith("/api/explorer/"):
+            return False
+        adapter = getattr(self.server, "explorer_api", None)
+        if adapter is None:
+            self._json({"state": "failed", "error": {"code": "EXPLORER_DISABLED", "message": "Start a local read session to browse an approved folder."}}, HTTPStatus.FORBIDDEN)
+            return True
+        return adapter.route(self)
+
     def log_message(self, fmt: str, *args: object) -> None:
         if os.environ.get("CHUTE_QUIET") != "1":
             super().log_message(fmt, *args)
@@ -97,11 +106,15 @@ class ChuteHandler(BaseHTTPRequestHandler):
                 self.wfile.write(chunk)
 
     def do_OPTIONS(self) -> None:  # noqa: N802
+        if self._explorer_route():
+            return
         self.send_response(HTTPStatus.NO_CONTENT)
         self._cors()
         self.end_headers()
 
     def do_GET(self) -> None:  # noqa: N802
+        if self._explorer_route():
+            return
         parsed = urlparse(self.path)
         path = parsed.path
 
@@ -219,6 +232,8 @@ class ChuteHandler(BaseHTTPRequestHandler):
         self._json({"error": "not found"}, HTTPStatus.NOT_FOUND)
 
     def do_DELETE(self) -> None:  # noqa: N802
+        if self._explorer_route():
+            return
         path = urlparse(self.path).path
         if path.startswith("/api/files/"):
             item_id = unquote(path.removeprefix("/api/files/"))
@@ -228,6 +243,8 @@ class ChuteHandler(BaseHTTPRequestHandler):
         self._json({"error": "not found"}, HTTPStatus.NOT_FOUND)
 
     def do_POST(self) -> None:  # noqa: N802
+        if self._explorer_route():
+            return
         path = urlparse(self.path).path
 
         if path.startswith("/api/reveal/"):
@@ -413,11 +430,25 @@ class ChuteServer(ThreadingHTTPServer):
     def __init__(self, address: tuple[str, int], store: Store) -> None:
         super().__init__(address, ChuteHandler)
         self.store = store
+        self.explorer_api = None
 
 
-def serve(host: str = DEFAULT_HOST, port: int = DEFAULT_PORT, root: Path | None = None) -> None:
+def serve(host: str = DEFAULT_HOST, port: int = DEFAULT_PORT, root: Path | None = None, *, explorer_root: Path | None = None, explorer_origin: str | None = None) -> None:
+    engine = None
+    adapter = None
+    if explorer_root is not None:
+        from .explorer import Explorer, RootGrant, Session
+        from .explorer.api import ExplorerAPI
+        if host != DEFAULT_HOST or not explorer_origin:
+            raise ValueError("Explorer requires loopback and an exact owner-approved extension origin")
+        session = Session(explorer_origin)
+        engine = Explorer([RootGrant(explorer_root)])
+        adapter = ExplorerAPI(engine, session)
     store = Store(root)
     server = ChuteServer((host, port), store)
+    server.explorer_api = adapter
+    if adapter:
+        print("Explorer READ ONLY session (15 minutes; paste in the enrolled Shelf): " + adapter.session.token, flush=True)
     print(f"Chute is listening at http://{host}:{port}")
     print(f"Chute home: {store.root}")
     print("Press Ctrl+C to stop.")
@@ -427,3 +458,5 @@ def serve(host: str = DEFAULT_HOST, port: int = DEFAULT_PORT, root: Path | None 
         pass
     finally:
         server.server_close()
+        if engine:
+            engine.close()

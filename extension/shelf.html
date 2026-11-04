@@ -7,6 +7,7 @@
   <link rel="stylesheet" href="shared.css">
   <link rel="stylesheet" href="workspace-tabs.css">
   <link rel="stylesheet" href="explorer-shell.css">
+  <link rel="stylesheet" href="explorer-view.css">
 </head>
 <body>
   <header class="topbar">
@@ -61,10 +62,6 @@
   <footer class="footer">Clearing the live Chute never deletes history. Browse any recorded day and Recall preserved items whenever you need them.</footer>
   </section>
   <section id="chutey-explorer-view" class="chutey-explorer-shell" role="tabpanel" aria-labelledby="chutey-tab-explorer" hidden>
-    <div class="chutey-explorer-placeholder" role="note">
-      <strong>File Explorer</strong>
-      <p>Your local File Explorer will appear here.</p>
-    </div>
   </section>
   <script src="native-wake-page.js"></script>
   <script src="bridge-reconnect.js"></script>
@@ -74,5 +71,7 @@
   <script src="drag-relay.js"></script>
   <script src="calendar.js"></script>
   <script src="workspace-tabs.js"></script>
+  <script src="explorer-api.js"></script>
+  <script src="explorer-view.js"></script>
 </body>
 </html>

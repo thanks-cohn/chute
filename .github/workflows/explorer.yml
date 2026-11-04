@@ -1,0 +1,49 @@
+name: Explorer read-only security and overlay gates
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [codex/chutey-api-first-local-explorer]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  api:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install pytest==9.2.0 Pillow==13.0.0
+      - run: python -m pytest -q
+        env:
+          PYTHONPATH: src
+          CHUTE_QUIET: '1'
+      - name: Seeded production read-only laboratory (POSIX guard)
+        if: runner.os == 'Linux'
+        run: python tools/explorer_lab/chutey_explorer_lab.py run --plan tools/explorer_lab/sample-plan.json --out ${{ runner.temp }}/explorer-lab
+      - uses: actions/upload-artifact@v4
+        if: runner.os == 'Linux' && always()
+        with:
+          name: explorer-lab
+          path: ${{ runner.temp }}/explorer-lab/*.json*
+  browser:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install Pillow==13.0.0 playwright==1.62.0
+      - run: python -m playwright install --with-deps chromium
+      - name: Real Chromium production API and overlay geometry
+        run: python scripts/verify-explorer-browser.py ${{ runner.temp }}/explorer-browser
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: explorer-browser
+          path: ${{ runner.temp }}/explorer-browser/

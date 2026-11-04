@@ -1,0 +1,22 @@
+{
+  "seed": 731,
+  "scenarios": [
+    "capabilities",
+    "roots",
+    "list",
+    "stat",
+    "search",
+    "preview",
+    "bounded-navigation",
+    "invalid-handle",
+    "symlink-escape",
+    "mkdir",
+    "rename",
+    "copy",
+    "move",
+    "trash",
+    "receive",
+    "open",
+    "reveal"
+  ]
+}

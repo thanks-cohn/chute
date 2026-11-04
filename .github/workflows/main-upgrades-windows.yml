@@ -5,6 +5,7 @@ on:
   push:
     branches:
       - chute-main-2.6.1-upgrades-2026-11-03
+      - codex/chutey-api-first-local-explorer
 
 permissions:
   contents: read

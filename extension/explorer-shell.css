@@ -1,7 +1,7 @@
-/* Placeholder only: Codex owns the Explorer engine.
+/* Explorer skin tokens: presentation only.
  * Scoped, separate CSS; these theme tokens are future SKIN API inputs.
  */
-.chutey-explorer-shell {
+#chutey-explorer-view {
   --chutey-explorer-background: #11130f;
   --chutey-explorer-panel: #1a1e17;
   --chutey-explorer-border: #30362a;
@@ -12,17 +12,4 @@
   padding: 14px 12px;
   background: var(--chutey-explorer-background);
   color: var(--chutey-explorer-text);
-}
-.chutey-explorer-placeholder {
-  border: 1px dashed var(--chutey-explorer-border);
-  border-radius: 12px;
-  background: var(--chutey-explorer-panel);
-  padding: 24px 18px;
-  text-align: center;
-}
-.chutey-explorer-placeholder strong { font-size: 14px; font-weight: 750; }
-.chutey-explorer-placeholder p {
-  margin: 8px 0 0;
-  color: var(--chutey-explorer-muted);
-  font-size: 12px;
 }

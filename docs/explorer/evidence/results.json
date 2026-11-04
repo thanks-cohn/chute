@@ -1,0 +1,40 @@
+[
+  {
+    "transport": "fixture; not installed extension",
+    "width": 390,
+    "overlay_geometry": "PASS",
+    "thumbnail_original_pixels": "PASS",
+    "document_scroll": "PASS",
+    "history": "PASS including real saved PNG thumbnail",
+    "menu_keyboard": "PASS",
+    "metrics": {
+      "x": 109.1875,
+      "y": 194,
+      "width": 280.8125,
+      "height": 563,
+      "columns": "none",
+      "scroll": 4079,
+      "client": 563,
+      "workHeight": 563
+    }
+  },
+  {
+    "transport": "fixture; not installed extension",
+    "width": 900,
+    "overlay_geometry": "PASS",
+    "thumbnail_original_pixels": "PASS",
+    "document_scroll": "PASS",
+    "history": "PASS including real saved PNG thumbnail",
+    "menu_keyboard": "PASS",
+    "metrics": {
+      "x": 252,
+      "y": 194,
+      "width": 648,
+      "height": 563,
+      "columns": "124.188px 124.203px 124.203px 124.203px 124.188px",
+      "scroll": 1916,
+      "client": 563,
+      "workHeight": 563
+    }
+  }
+]
