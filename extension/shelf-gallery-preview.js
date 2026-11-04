@@ -26,6 +26,8 @@
   let sizeMode = "half";
   let processing = false, lastRequest = "", pending = null;
   let selectedRow = null;
+  let previewRequest = 0;
+  const isImage = file => /^image\//i.test(String(file.mime || "")) || /\.(png|jpe?g|gif|webp|bmp|svg|avif)$/i.test(String(file.name || ""));
 
   function resizeViewer() {
     if (viewer.hidden) return;
@@ -38,12 +40,73 @@
   }
 
   function dismiss() {
+    ++previewRequest;
     viewer.hidden = true;
-    image.hidden = true; image.removeAttribute("src");
+    image.hidden = true; image.onload = null; image.onerror = null; image.removeAttribute("src");
     message.textContent = "";
     if (selectedRow) selectedRow.classList.remove("chutey-gallery-selected");
     selectedRow = null;
   }
+
+  // Clicking a Shelf History card previews it in place; command buttons retain
+  // their own behavior. The same renderer is shared with the popup.
+  function selectRow(file, row) {
+    dismiss();
+    selectedRow = row;
+    selectedRow.classList.add("chutey-gallery-selected");
+    title.textContent = file.name || "Saved item";
+    image.alt = file.name || "Saved image";
+    viewer.hidden = false;
+    resizeViewer();
+    if (!isImage(file)) {
+      message.textContent = "This item has no image preview.";
+      return;
+    }
+    const request = ++previewRequest;
+    message.textContent = "Loading saved image…";
+    image.onload = () => {
+      if (request !== previewRequest) return;
+      image.hidden = false;
+      message.textContent = "";
+    };
+    image.onerror = () => {
+      if (request !== previewRequest) return;
+      image.hidden = true;
+      message.textContent = "Saved image unavailable. The History entry remains accessible.";
+    };
+    image.src = "http://127.0.0.1:17891/api/files/" + encodeURIComponent(file.id);
+  }
+  const previousCreateRow = createRow;
+  createRow = function shelfSelectableHistoryRow(file, index) {
+    const row = previousCreateRow(file, index);
+    row.tabIndex = 0;
+    row.classList.add("chutey-shelf-selectable");
+    row.setAttribute("aria-label", "Preview " + (file.name || "saved item"));
+    row.addEventListener("click", event => {
+      if (event.defaultPrevented || event.target.closest("button,a,input,select")) return;
+      selectRow(file,row);
+    });
+    row.addEventListener("keydown", event => {
+      if (event.target !== row || !["Enter"," "].includes(event.key)) return;
+      event.preventDefault();
+      selectRow(file,row);
+    });
+    return row;
+  };
+  document.addEventListener("keydown", event => {
+    if (viewer.hidden || gallery.hidden || !["ArrowLeft","ArrowRight","Escape"].includes(event.key)) return;
+    if (event.target.closest("input,textarea,select,[contenteditable=true]")) return;
+    if (event.key === "Escape") { event.preventDefault(); dismiss(); return; }
+    const rows = Array.from(gallery.querySelectorAll("#files .chutey-shelf-selectable"));
+    const index = rows.indexOf(selectedRow);
+    const delta = event.key === "ArrowLeft" ? -1 : 1;
+    if (index < 0 || index + delta < 0 || index + delta >= rows.length) return;
+    const target = rows[index + delta];
+    event.preventDefault();
+    target.click();
+    target.focus({preventScroll:true});
+    target.scrollIntoView({block:"nearest"});
+  });
   close.addEventListener("click",dismiss);
   size.addEventListener("click",() => {
     sizeMode = sizeMode === "full" ? "half" : "full";
@@ -104,7 +167,7 @@
     } catch (error) {
       console.warn("Chutey gallery location could not be reached:",error);
     }
-    if (intent.mime.toLowerCase().startsWith("image/")) {
+    if (isImage(intent)) {
       image.onload = () => { message.textContent = ""; image.hidden = false; };
       image.onerror = () => {
         image.hidden = true;
