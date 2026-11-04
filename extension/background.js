@@ -117,7 +117,7 @@ async function syncContextMenu(mode) {
   if (!contextEnabled(mode)) return;
   chrome.contextMenus.create({
     id: CONTEXT_MENU_ID,
-    title: "Send to Chute",
+    title: "Feed Chutey!",
     contexts: ["image", "link", "selection", "page"]
   });
 }
