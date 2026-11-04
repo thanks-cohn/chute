@@ -73,6 +73,8 @@
       if (remember && current && current !== handle) { back.push(current); forward = []; }
       observer.disconnect(); queue.length = 0;
       current = handle; parent = result.parent; selected.clear(); closePreview(); releaseThumbnails(); rows = []; list.replaceChildren();
+      // Persist opaque native handle only; never put a private filesystem path in browser storage.
+      void chrome.storage.local.set({chuteyExplorerLastHandle:handle}).catch(() => {});
     }
     rows.push(...result.entries); offset = result.next_offset;
     $(".ex-breadcrumb").textContent = result.name;
@@ -131,7 +133,15 @@
     const data = await api.command("roots"); roots = data.roots; tree.replaceChildren();
     for (const root of roots) await branch(root, tree);
     $(".ex-connect").hidden = true;
-    if (roots[0]) await load(roots[0].handle);
+    if (roots[0]) {
+      // Reopening Shelf resumes the last browsed directory while the native grant is valid.
+      // A restarted companion may invalidate opaque handles: use its approved root instead.
+      const {chuteyExplorerLastHandle:lastHandle} = await chrome.storage.local.get({chuteyExplorerLastHandle:null});
+      if (lastHandle) {
+        try { await load(lastHandle,{remember:false}); }
+        catch { await load(roots[0].handle,{remember:false}); }
+      } else await load(roots[0].handle,{remember:false});
+    }
   }
   function showMenu(x, y, row) {
     menu.replaceChildren();
@@ -158,7 +168,7 @@
   $(".ex-filter input").oninput = () => { clearTimeout(timer); timer = setTimeout(safe(() => current && load(current, {remember: false})), 180); };
   $(".ex-filter select").onchange = safe(() => current && load(current, {remember: false}));
   const actions = {
-    select: async () => { say("Choose a folder in the Windows consent dialog…"); await api.nativeSession(true); await connect(); },
+    select: async () => { say("Opening Windows folder picker…"); await api.nativeSession(true); await chrome.storage.local.remove("chuteyExplorerLastHandle"); await connect(); },
     resume: async () => { await api.nativeSession(false); await connect(); },
     refresh: () => current && load(current, {remember: false}), parent: () => parent && load(parent), roots: () => roots[0] && load(roots[0].handle), close: closePreview,
     back: async () => { if (back.length) { const target = back.pop(); forward.push(current); await load(target, {remember: false}); } },
