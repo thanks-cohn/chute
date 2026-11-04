@@ -1,0 +1,29 @@
+name: Restore Chutey real image previews — Chrome rendering
+on:
+  push:
+    branches:
+      - fix/shelf-restore-real-images-2026-11-03
+  pull_request:
+    branches: [main]
+permissions:
+  contents: read
+jobs:
+  unit-and-package:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Extension JavaScript syntax
+        run: find extension -maxdepth 1 -name '*.js' -print0 | xargs -0 -n1 node --check
+      - name: Thumbnail/icon regressions
+        run: node scripts/verify-thumbnail-icons.cjs
+      - name: Packaging and original API invariants
+        run: python scripts/verify-upgrades-package.py
+  installed-chrome-rendering:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Real Chrome HTML image load from local ChuteServer
+        run: python scripts/verify-real-image-browser.py
