@@ -65,6 +65,12 @@ function fileKind(file) {
   return "file";
 }
 
+function isPreviewableImage(file) {
+  // Source sites sometimes label images as application/octet-stream; extension is
+  // still enough to attempt a lazy preview, without changing file MIME/storage.
+  return fileKind(file) === "image";
+}
+
 function iconFor(file) {
   const kind = fileKind(file);
   const shapes = {
@@ -140,7 +146,7 @@ function canvasThumbnail(blob) {
 }
 
 async function ensureThumbnail(file, img) {
-  if (!showThumbnails || !file.mime?.startsWith("image/") || generatedThumbs.has(file.id)) return;
+  if (!showThumbnails || !isPreviewableImage(file) || generatedThumbs.has(file.id)) return;
 
   try {
     const cached = await fetch(thumbnailUrl(file), { cache: "force-cache" });
@@ -251,7 +257,7 @@ function createRow(file, index) {
 
   const icon = row.querySelector(".file-icon");
   let thumb = null;
-  if (showThumbnails && file.mime?.startsWith("image/")) {
+  if (showThumbnails && isPreviewableImage(file)) {
     thumb = document.createElement("img");
     thumb.className = "file-thumb";
     thumb.alt = "";
