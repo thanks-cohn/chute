@@ -13,6 +13,8 @@ from .preview import byte_range, preview_kind, thumbnail
 class ExplorerAPI:
     def __init__(self, engine, session):
         self.engine, self.session = engine, session
+        from .transfers import Transfers
+        self.transfers = Transfers(engine)
         self.slots = threading.BoundedSemaphore(4)
 
     def headers(self, handler, status, mime, length, extra=()):
@@ -20,7 +22,7 @@ class ExplorerAPI:
         handler.send_response(status)
         handler.send_header("Access-Control-Allow-Origin", self.session.origin)
         handler.send_header("Vary", "Origin")
-        handler.send_header("Access-Control-Allow-Headers", "Authorization, Content-Type, Range")
+        handler.send_header("Access-Control-Allow-Headers", "Authorization, Content-Type, Range, X-Chute-Destination, X-Chute-Filename, X-Chute-Operation")
         handler.send_header("Access-Control-Allow-Methods", "POST, OPTIONS")
         handler.send_header("Access-Control-Expose-Headers", "Content-Range, Accept-Ranges")
         handler.send_header("Cache-Control", "no-store")
@@ -53,7 +55,7 @@ class ExplorerAPI:
         if not path.startswith("/api/explorer/"):
             return False
         try:
-            for field in ("Host", "Origin", "Authorization", "Content-Length"):
+            for field in ("Host", "Origin", "Authorization", "Content-Length", "Content-Type", "X-Chute-Destination", "X-Chute-Filename", "X-Chute-Operation"):
                 if len(handler.headers.get_all(field, [])) > 1:
                     raise ExplorerError("INVALID_ARGUMENT", "Duplicate request headers are not allowed.")
             expected_host = f"127.0.0.1:{handler.server.server_port}"
@@ -67,6 +69,29 @@ class ExplorerAPI:
             self.session.authorize(handler.headers.get("Origin", ""), handler.headers.get("Authorization", ""))
             if handler.command != "POST":
                 raise ExplorerError("METHOD_NOT_ALLOWED", "Use an authenticated POST command.")
+            if path == "/api/explorer/v1/receive":
+                if handler.headers.get("Transfer-Encoding"):
+                    raise ExplorerError("INVALID_ARGUMENT","A known-size file is required.")
+                from urllib.parse import unquote
+                from .transfers import receive
+                size=int(handler.headers.get("Content-Length","-1"))
+                destination=handler.headers.get("X-Chute-Destination","")
+                name=unquote(handler.headers.get("X-Chute-Filename",""))
+                if len(name)>255 or len(destination)>128:
+                    raise ExplorerError("INVALID_ARGUMENT","Invalid destination metadata.")
+                operation=handler.headers.get("X-Chute-Operation","")
+                if hasattr(self,"native_state"):
+                    self.native_state('begin_transfer',{'operation_id':operation,'destination':destination})
+                handler.connection.settimeout(30)
+                with self.engine.lock:
+                    authorize=lambda: self.session.authorize(handler.headers.get("Origin",""),handler.headers.get("Authorization",""))
+                    authorize()
+                    receipt=receive(self.engine.grant_for(destination),destination,name,handler.rfile,size,authorize=authorize)
+                if hasattr(self,"native_state"):
+                    self.native_state('finish_transfer',{'operation_id':operation,'receipt':receipt})
+                    receipt['operation_id']=operation
+                self.json(handler,receipt)
+                return True
             if handler.headers.get("Transfer-Encoding") or handler.headers.get("Content-Type") != "application/json":
                 raise ExplorerError("INVALID_ARGUMENT", "A bounded JSON request is required.")
             try:
@@ -88,7 +113,44 @@ class ExplorerAPI:
             if path == "/api/explorer/v1/command":
                 if set(body) - {"command", "args"} or not isinstance(body.get("command"), str) or not isinstance(body.get("args", {}), dict):
                     raise ExplorerError("INVALID_ARGUMENT", "Invalid command envelope.")
-                result = self.engine.execute(body["command"], **body.get("args", {}))
+                if body["command"] == "capabilities":
+                    from .protocol import catalog
+                    result={"state":"completed","result":{**catalog(),"transfer":{
+                        "source_kind":"local_explorer","maximum_chunk_bytes":262144,
+                        "original_bytes":True,"one_use_export":True,
+                        "write_consent_required":True,"conflicts":["keep_both","skip"],
+                        "commands":["prepare_export","export_to_live","receive_from_live","reconcile_transfer"],
+                        "interop_enabled":False}}}
+                elif body["command"] == "prepare_export":
+                    with self.engine.lock:
+                        result={"state":"completed","result":self.transfers.prepare(**body.get("args",{}))}
+                elif body["command"] == "receive_from_live":
+                    from .transfers import receive, digest
+                    import re
+                    args=body.get("args",{})
+                    if set(args) != {"id","destination","operation_id"} or re.fullmatch(r"[a-f0-9]{32}",args.get("id","")) is None:
+                        raise ExplorerError("INVALID_ARGUMENT","A genuine Live item is required.")
+                    found=handler.server.store.get(args["id"])
+                    if not found: raise ExplorerError("NOT_FOUND","The Live item is unavailable.")
+                    item,path=found
+                    if hasattr(self,"native_state"):
+                        self.native_state('begin_transfer',{'operation_id':args['operation_id'],'destination':args['destination']})
+                    with self.engine.lock, path.open('rb') as source:
+                        expected=digest(source); source.seek(0)
+                        authorize=lambda: self.session.authorize(handler.headers.get("Origin",""),handler.headers.get("Authorization",""))
+                        authorize()
+                        result={"state":"completed","result":receive(self.engine.grant_for(args["destination"]),args["destination"],item.name,source,os.fstat(source.fileno()).st_size,expected_sha256=expected,authorize=authorize)}
+                    if hasattr(self,"native_state"):
+                        self.native_state('finish_transfer',{'operation_id':args['operation_id'],'receipt':result['result']})
+                        result['result']['operation_id']=args['operation_id']
+                elif body["command"] == "export_to_live":
+                    with self.engine.lock:
+                        self.session.authorize(handler.headers.get("Origin", ""),handler.headers.get("Authorization", ""))
+                        result={"state":"completed","result":self.transfers.to_live(store=handler.server.store,**body.get("args",{}))}
+                elif body["command"] in {"resume_location", "remember_location", "revoke_access", "reconcile_transfer", "recent_transfers"} and hasattr(self, "native_state"):
+                    result = {"state":"completed", "result":self.native_state(body["command"],body.get("args",{}))}
+                else:
+                    result = self.engine.execute(body["command"], **body.get("args", {}))
                 self.json(handler, result, 200 if result["state"] == "completed" else 400)
             elif path == "/api/explorer/v1/content":
                 if (set(body) - {"handle", "thumbnail", "identity"} or not isinstance(body.get("handle"), str)
@@ -99,6 +161,7 @@ class ExplorerAPI:
                 raise ExplorerError("NOT_FOUND", "Explorer route not found.")
         except ExplorerError as exc:
             handler.close_connection = True
+            if handler._explorer_headers_sent: return True
             status = 416 if exc.code == "INVALID_RANGE" else 403 if exc.code in {"UNAUTHORIZED", "INVALID_HOST"} else 400
             self.json(handler, {"state": "failed", "error": {"code": exc.code, "message": str(exc)}}, status)
         except (OSError, ValueError, TypeError):
@@ -142,6 +205,7 @@ class ExplorerAPI:
             os.lseek(fd, start, os.SEEK_SET)
             remaining = end - start
             while remaining:
+                self.session.authorize(handler.headers.get("Origin", ""), handler.headers.get("Authorization", ""))
                 data = os.read(fd, min(262144, remaining))
                 if not data:
                     break

@@ -49,3 +49,6 @@
 #chutey-explorer-view .ex-grid small { min-height: 12px; }
 
 #chutey-explorer-view .ex-native { display:flex; gap:6px; padding:6px 8px; }
+
+#chutey-explorer-view .ex-native { display:flex; flex-wrap:wrap; gap:4px; }
+#chutey-explorer-view .ex-drop-target { outline:2px solid var(--chutey-explorer-accent); outline-offset:-2px; }

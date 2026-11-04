@@ -15,7 +15,7 @@ class NativeConsentTests(unittest.TestCase):
         self.root=Path(self.temp.name)
         (self.root/'actual.txt').write_bytes(b'bytes')
         with patch('chute.explorer.native.private_write'):
-            self.controller=NativeExplorer()
+            self.controller=NativeExplorer(store=False)
         self.enrolled=patch('chute.native_host._allowed_extension_ids',return_value=[ORIGIN.split('//')[1]])
         self.enrolled.start()
     def tearDown(self):

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from .explorer.protocol import ExplorerError
+
 import json
 import os
 import re
@@ -62,10 +64,12 @@ class ChuteHandler(BaseHTTPRequestHandler):
                 if not 2 <= length <= 1024: raise ValueError()
                 self.connection.settimeout(120)
                 body = json.loads(self.rfile.read(length))
-                if not isinstance(body, dict) or set(body) != {"origin", "select"} or type(body["select"]) is not bool:
+                if not isinstance(body, dict) or set(body) not in ({"origin", "select"}, {"origin", "select", "writable"}) or type(body["select"]) is not bool or type(body.get("writable",False)) is not bool:
                     raise ValueError()
-                result = native.action(body["origin"], select=body["select"])
+                result = native.action(body["origin"], select=body["select"],writable=body.get("writable",False))
                 self._json(result)
+            except ExplorerError as exc:
+                self._json({'ok':False,'error':str(exc),'code':exc.code}, HTTPStatus.BAD_REQUEST)
             except Exception:
                 # Never expose a native path, session token or raw OS exception.
                 self._json({"ok": False, "error": "Folder selection was cancelled or unavailable. Select a local, non-system folder and retry."}, HTTPStatus.BAD_REQUEST)

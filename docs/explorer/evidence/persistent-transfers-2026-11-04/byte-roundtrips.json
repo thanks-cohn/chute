@@ -1,0 +1,44 @@
+[
+  {
+    "class": "PYTHON_ENGINE",
+    "direction": "local_explorer -> Live -> approved nested directory",
+    "fixture": "tiny.png",
+    "size": 79,
+    "source_sha256": "a043268388d43b8fd3017aed103a76e655ad56621ee69f42ba2c5aece3bd3854",
+    "live_sha256": "a043268388d43b8fd3017aed103a76e655ad56621ee69f42ba2c5aece3bd3854",
+    "destination_sha256": "a043268388d43b8fd3017aed103a76e655ad56621ee69f42ba2c5aece3bd3854",
+    "exact_name": "PASS",
+    "exact_directory": "PASS",
+    "source_preserved": true,
+    "operation": "copy",
+    "state": "COMMITTED"
+  },
+  {
+    "class": "PYTHON_ENGINE",
+    "direction": "local_explorer -> Live -> approved nested directory",
+    "fixture": "tiny.pdf",
+    "size": 428,
+    "source_sha256": "bbb87e53d6580d7bd16fe1119e715be3027cf7526b57e7fd8a7fb4ed9161d22e",
+    "live_sha256": "bbb87e53d6580d7bd16fe1119e715be3027cf7526b57e7fd8a7fb4ed9161d22e",
+    "destination_sha256": "bbb87e53d6580d7bd16fe1119e715be3027cf7526b57e7fd8a7fb4ed9161d22e",
+    "exact_name": "PASS",
+    "exact_directory": "PASS",
+    "source_preserved": true,
+    "operation": "copy",
+    "state": "COMMITTED"
+  },
+  {
+    "class": "PYTHON_ENGINE",
+    "direction": "local_explorer -> Live -> approved nested directory",
+    "fixture": "tiny.txt",
+    "size": 20,
+    "source_sha256": "1e7fab9501a33d0d31b6993f2b314f6fc4ba2d7563f7ad1eb5414f1887e79750",
+    "live_sha256": "1e7fab9501a33d0d31b6993f2b314f6fc4ba2d7563f7ad1eb5414f1887e79750",
+    "destination_sha256": "1e7fab9501a33d0d31b6993f2b314f6fc4ba2d7563f7ad1eb5414f1887e79750",
+    "exact_name": "PASS",
+    "exact_directory": "PASS",
+    "source_preserved": true,
+    "operation": "copy",
+    "state": "COMMITTED"
+  }
+]

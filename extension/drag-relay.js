@@ -9,6 +9,7 @@ function decodeChuteRelayToken(value) {
     const item = JSON.parse(decodeURIComponent(text.slice(CHUTE_RELAY_PREFIX.length)));
     if (!item?.id || !item?.name) return null;
     return {
+      source_kind: item.source_kind === "local_explorer" ? "local_explorer" : "chute_store",
       id: String(item.id),
       name: String(item.name),
       mime: String(item.mime || "")

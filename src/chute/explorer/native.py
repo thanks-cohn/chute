@@ -43,25 +43,54 @@ def private_write(path, data):
     os.replace(temporary,path)
 
 
-def choose_folder():
-    import tkinter as tk
-    from tkinter import filedialog
-    root=tk.Tk(); root.withdraw()
+def choose_folder(*, writable=False):
+    """Windows Shell picker on the request thread, without importing/booting Tk."""
+    if os.name != 'nt':
+        raise ExplorerError('UNSUPPORTED_PLATFORM','The native folder picker requires Windows.')
+    title=('Allow Chutey to READ AND WRITE this folder (remembered; revocable)' if writable
+           else 'Remember approval for Chutey to browse this folder (read only; revocable)')
+    class BrowseInfo(ctypes.Structure):
+        _fields_=[('owner',W.HWND),('root',ctypes.c_void_p),('display',W.LPWSTR),
+                  ('title',W.LPCWSTR),('flags',W.UINT),('callback',ctypes.c_void_p),
+                  ('param',ctypes.c_ssize_t),('image',ctypes.c_int)]
+    ole=ctypes.WinDLL('ole32',use_last_error=True)
+    ole.OleInitialize.argtypes=[ctypes.c_void_p]; ole.OleInitialize.restype=ctypes.c_long
+    initialized=ole.OleInitialize(None)
+    if initialized not in (0,1):
+        raise ExplorerError('PICKER_UNAVAILABLE','The Windows picker could not initialize. Reconnect and retry.')
+    shell=ctypes.WinDLL('shell32',use_last_error=True)
+    shell.SHBrowseForFolderW.argtypes=[ctypes.POINTER(BrowseInfo)]; shell.SHBrowseForFolderW.restype=ctypes.c_void_p
+    shell.SHGetPathFromIDListEx.argtypes=[ctypes.c_void_p,W.LPWSTR,W.DWORD,W.DWORD]; shell.SHGetPathFromIDListEx.restype=W.BOOL
+    ole.CoTaskMemFree.argtypes=[ctypes.c_void_p]
+    display=ctypes.create_unicode_buffer(32768)
+    info=BrowseInfo(None,None,ctypes.cast(display,W.LPWSTR),title,0x51,None,0,0)
+    selected=None
     try:
-        root.attributes('-topmost',True)
-        return filedialog.askdirectory(parent=root,title='Allow Chutey to browse this local folder (read only)',mustexist=True)
-    finally: root.destroy()
+        selected=shell.SHBrowseForFolderW(ctypes.byref(info))
+        if not selected: return ''
+        path=ctypes.create_unicode_buffer(32768)
+        if not shell.SHGetPathFromIDListEx(selected,path,len(path),0):
+            raise ExplorerError('UNSAFE_ROOT','Select a local filesystem folder.')
+        return path.value
+    finally:
+        if selected: ole.CoTaskMemFree(selected)
+        ole.OleUninitialize()
 
 
 class NativeExplorer:
-    def __init__(self):
+    def __init__(self, *, store=None):
+        from .grant_store import GrantStore
+        self.store = store if store is not None else (GrantStore() if os.name == "nt" else None)
+        self.descriptors = {}
         self.token=secrets.token_urlsafe(32)
         self.adapters={}
         self.lock=threading.Lock()
         private_write(control_path(),json.dumps({'token':self.token}).encode())
 
-    def action(self, origin, *, select):
+    def action(self, origin, *, select, writable=False):
         from ..native_host import _allowed_extension_ids
+        import time
+        started=time.perf_counter()
         session=Session(origin)
         if origin.removeprefix('chrome-extension://') not in _allowed_extension_ids():
             raise ExplorerError('UNAUTHORIZED','This Chutey installation is not enrolled.')
@@ -70,20 +99,126 @@ class NativeExplorer:
         try:
             old=self.adapters.get(origin)
             if select:
-                path=choose_folder()
+                path=choose_folder(writable=True) if writable else choose_folder()
                 if not path: raise ExplorerError('CANCELLED','No folder was selected. Existing access is unchanged.')
-                engine=Explorer([RootGrant(Path(path))])
+                from .grant_store import describe
+                grant=RootGrant(Path(path),writable=writable)
+                descriptor=describe(grant,path)
+                try:
+                    if self.store: self.store.save(origin,descriptor)
+                except BaseException:
+                    grant.close(); raise
+                self.descriptors[origin]=descriptor
+                engine=Explorer([grant])
                 adapter=ExplorerAPI(engine,session)
-                # Leave in-flight old reads alive; old sessions expire naturally.
+                # Replacing consent invalidates previous sessions immediately.
                 self.adapters[origin]=adapter
-                if old: old.engine.close()
+                if old:
+                    old.session.expires=0
+                    with old.engine.lock: old.engine.close()
             elif old:
                 # Reopening Shelf renews same root without broadening scope.
+                grant=next(iter(old.engine.grants.values()))
+                grant.stat(grant.id)  # Revalidate the original guarded root.
                 adapter=ExplorerAPI(old.engine,session)
+                adapter.resume_handle=getattr(old,'resume_handle',grant.id)
+                old.session.expires=0
+                self.adapters[origin]=adapter
+            elif self.store:
+                from .grant_store import restore
+                descriptor=self.store.load(origin)
+                grant,handle=restore(descriptor)
+                engine=Explorer([grant])
+                adapter=ExplorerAPI(engine,session)
+                adapter.resume_handle=handle
+                self.descriptors[origin]=descriptor
                 self.adapters[origin]=adapter
             else:
                 raise ExplorerError('NEEDS_SELECTION','Select a folder to begin browsing.')
-            return {'ok':True,'token':session.token,'expires_in':900,'read_only':True}
+            adapter.native_state=lambda command,args: self.state(origin,command,args)
+            return {'ok':True,'token':session.token,'expires_in':900,'read_only':not next(iter(adapter.engine.grants.values())).writable,
+                    'native_roundtrip_ms':round((time.perf_counter()-started)*1000,2),
+                    'protocol':'1.1','persistent':bool(self.store)}
         finally: self.lock.release()
+
+    def state(self, origin, command, args):
+        adapter=self.adapters[origin]
+        with self.lock, adapter.engine.lock:
+            if command == 'recent_transfers':
+                if args: raise ExplorerError('INVALID_ARGUMENT','Unexpected receipt arguments.')
+                operations=self.descriptors[origin].get('operations',{})
+                return {'operations':[{key:value for key,value in entry.items() if key != 'location'} for entry in operations.values()]}
+            if command in {'begin_transfer','finish_transfer','reconcile_transfer'}:
+                import re
+                operation=args.get('operation_id','')
+                if re.fullmatch(r'[a-f0-9]{32}',operation) is None:
+                    raise ExplorerError('INVALID_ARGUMENT','Invalid operation identity.')
+                descriptor=self.descriptors[origin]
+                operations=dict(descriptor.get('operations',{}))
+                if command == 'begin_transfer':
+                    if operation in operations:
+                        raise ExplorerError('RECONCILE_REQUIRED','This operation already exists. Reconcile before retrying.')
+                    if len(operations)>=64:
+                        raise ExplorerError('JOURNAL_FULL','Reconcile existing transfers before starting more.')
+                    grant=adapter.engine.grant_for(args['destination'])
+                    if not grant.writable:
+                        raise ExplorerError('WRITE_CONSENT_REQUIRED','Approve writes first.')
+                    operations[operation]={'state':'UNCERTAIN','operation_id':operation,
+                                           'location':list(grant.parts(args['destination']))}
+                elif command == 'finish_transfer':
+                    entry=operations.get(operation)
+                    if entry is None: raise ExplorerError('NOT_FOUND','Operation unavailable.')
+                    receipt=args['receipt']
+                    operations[operation]={**entry,**{key:receipt[key] for key in ('state','name','size','sha256') if key in receipt}}
+                else:
+                    entry=operations.get(operation)
+                    if entry is None: raise ExplorerError('NOT_FOUND','Operation unavailable.')
+                    result={key:value for key,value in entry.items() if key != 'location'}
+                    if entry['state']=='COMMITTED':
+                        from .transfers import digest
+                        grant=next(iter(adapter.engine.grants.values()))
+                        handle=grant.handle(tuple(entry['location'])+(entry['name'],))
+                        try:
+                            with grant.open(handle) as fd, os.fdopen(os.dup(fd),'rb') as stream:
+                                if digest(stream)!=entry['sha256']: result['state']='UNCERTAIN'
+                        except (OSError,ExplorerError): result['state']='UNCERTAIN'
+                    return result
+                descriptor={**descriptor,'operations':operations}
+                if self.store: self.store.save(origin,descriptor)
+                self.descriptors[origin]=descriptor
+                return {'recorded':True}
+            if command == 'resume_location':
+                if args: raise ExplorerError('INVALID_ARGUMENT','Unexpected location arguments.')
+                grant=next(iter(adapter.engine.grants.values()))
+                handle=getattr(adapter,'resume_handle',grant.id)
+                try:
+                    with grant.open(handle,directory=True): pass
+                except (OSError,ExplorerError): handle=grant.id
+                return {'handle':handle,
+                        'view':self.descriptors.get(origin,{}).get('view',{})}
+            if command == 'revoke_access':
+                if args: raise ExplorerError('INVALID_ARGUMENT','Unexpected revoke arguments.')
+                if self.store: self.store.revoke(origin)
+                adapter.session.expires=0
+                adapter.engine.close()
+                self.adapters.pop(origin,None)
+                self.descriptors.pop(origin,None)
+                return {'revoked':True}
+            if command != 'remember_location' or set(args) != {'handle','view'}:
+                raise ExplorerError('INVALID_ARGUMENT','Invalid location command.')
+            view=args['view']
+            if (not isinstance(view,dict) or set(view)-{'sort','query','grid','scroll'}
+                    or view.get('sort','name') not in {'name','size','date','type'}
+                    or not isinstance(view.get('query',''),str) or len(view.get('query',''))>256
+                    or type(view.get('grid',False)) is not bool
+                    or type(view.get('scroll',0)) is not int or not 0<=view.get('scroll',0)<=10000000):
+                raise ExplorerError('INVALID_ARGUMENT','Invalid view settings.')
+            grant=adapter.engine.grant_for(args['handle'])
+            with grant.open(args['handle'],directory=True): pass
+            descriptor={**self.descriptors[origin], 'location':list(grant.parts(args['handle'])), 'view':view}
+            if self.store: self.store.save(origin,descriptor)
+            self.descriptors[origin]=descriptor
+            adapter.resume_handle=args['handle']
+            return {'remembered':True}
 
     def adapter(self, origin): return self.adapters.get(origin)

@@ -13,8 +13,12 @@
     return response;
   }
   window.ChuteyExplorerAPI = Object.freeze({
-    async nativeSession(select = false) {
-      const response = await chrome.runtime.sendNativeMessage("com.thankscohn.chute", {action: select ? "explorer_select_folder" : "explorer_resume"});
+    async nativeSession(select = false, writable = false) {
+      const capabilities = await chrome.runtime.sendNativeMessage("com.thankscohn.chute", {action:"get_native_capabilities"});
+      if (!capabilities?.ok || capabilities.explorer_protocol !== "1.1") {
+        throw new Error("Your Windows companion needs updating. Install the Windows EXE and Chrome extension from the same test pair.");
+      }
+      const response = await chrome.runtime.sendNativeMessage("com.thankscohn.chute", {action: select ? (writable ? "explorer_select_write_folder" : "explorer_select_folder") : "explorer_resume"});
       if (!response?.ok || !response.token) throw new Error(response?.error || "Select a folder using the matching Windows companion.");
       token = response.token;
       return response;
@@ -24,6 +28,14 @@
       const receipt = await (await request("command", {command, args})).json();
       if (receipt.state !== "completed") throw new Error(receipt.error?.message || "Command failed.");
       return receipt.result;
+    },
+    async receive(destination, file) {
+      const response = await fetch(base + "receive", {method:"POST",cache:"no-store",
+        headers:{Authorization:"Bearer " + token,"Content-Type":"application/octet-stream",
+          "X-Chute-Operation":crypto.randomUUID().replaceAll("-",""),"X-Chute-Destination":destination,"X-Chute-Filename":encodeURIComponent(file.name)},body:file});
+      const receipt = await response.json();
+      if (!response.ok || receipt.state !== "COMMITTED") throw new Error(receipt.error?.message || "Copy did not commit. Check the destination before retrying.");
+      return receipt;
     },
     async content(row, {thumbnail = false, signal} = {}) {
       return (await request("content", {handle: row.handle, identity: row.identity, thumbnail}, signal)).blob();

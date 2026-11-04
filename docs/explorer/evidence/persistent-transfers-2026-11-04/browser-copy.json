@@ -1,0 +1,14 @@
+{
+  "class": "CHROME_FIXTURE",
+  "native_consent": "injected disposable grant; not Windows picker/DPAPI proof",
+  "copy_to_live": "PASS",
+  "typed_existing_relay": "PASS",
+  "actual_file_drop_exact_nested_folder": "PASS",
+  "live_drop_exact_nested_folder": "PASS",
+  "receipt_revalidation": "PASS",
+  "revoke_clears_view": "PASS",
+  "source_sha256": "70caf8c40833fb0701a662ec1dc900e938644a2695da3556b72e20ad7a0d4402",
+  "destination_sha256": "70caf8c40833fb0701a662ec1dc900e938644a2695da3556b72e20ad7a0d4402",
+  "site_delivery": "NOT_TESTED",
+  "installed_extension": "NOT_TESTED"
+}

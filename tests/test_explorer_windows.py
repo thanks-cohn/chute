@@ -51,7 +51,7 @@ class WindowsBrowseTests(unittest.TestCase):
         from chute.explorer.native import NativeExplorer
         origin='chrome-extension://abcdefghijklmnopabcdefghijklmnop'
         with patch('chute.explorer.native.private_write'):
-            controller=NativeExplorer()
+            controller=NativeExplorer(store=False)
         with patch('chute.native_host._allowed_extension_ids',return_value=[origin.split('//')[1]]):
             with self.assertRaises(ExplorerError): controller.action(origin,select=False)
             with patch('chute.explorer.native.choose_folder',return_value=str(self.root)):

@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import filecmp
 import json
 import os
 import re
@@ -396,7 +395,14 @@ def native_main() -> int:
         if message is None:
             return 0
         action = str(message.get("action") or "")
-        if action in {"explorer_select_folder", "explorer_resume"}:
+        if action == "get_native_capabilities":
+            origin = sys.argv[1].rstrip("/") if len(sys.argv) > 1 else ""
+            if origin.removeprefix("chrome-extension://") not in _allowed_extension_ids():
+                _write_message({"ok":False,"error":"Unenrolled native caller"})
+            else:
+                _write_message({"ok":True,"explorer_protocol":"1.1","persistent_consent":True})
+            continue
+        if action in {"explorer_select_folder", "explorer_select_write_folder", "explorer_resume"}:
             try:
                 # Chrome supplies the caller origin as argv[1]; ignore message-supplied origins/paths.
                 origin = sys.argv[1].rstrip("/") if len(sys.argv) > 1 else ""
@@ -407,11 +413,17 @@ def native_main() -> int:
                 config = json.loads(control_path().read_text(encoding="utf-8"))
                 request = urllib.request.Request(
                     f"http://{DEFAULT_HOST}:{DEFAULT_PORT}/api/explorer/native/session",
-                    json.dumps({"origin": origin, "select": action == "explorer_select_folder"}).encode(),
+                    json.dumps({"origin": origin, "select": action != "explorer_resume", "writable":action == "explorer_select_write_folder"}).encode(),
                     {"Content-Type": "application/json", "Authorization": "Bearer " + config["token"]})
                 opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
                 with opener.open(request, timeout=120) as response:
                     _write_message(json.load(response))
+            except urllib.error.HTTPError as exc:
+                try:
+                    receipt=json.load(exc)
+                    _write_message({"ok":False,"error":receipt.get("error","Folder access unavailable."),"code":receipt.get("code","UNAVAILABLE")})
+                except (ValueError, OSError):
+                    _write_message({"ok":False,"error":"Folder access unavailable."})
             except Exception:
                 _write_message({"ok": False, "error": "Select a folder using the matching Chutey companion. Selection may have been cancelled."})
             continue
@@ -434,7 +446,9 @@ def _same_file_contents(source: Path, target: Path) -> bool:
     try:
         if source.stat().st_size != target.stat().st_size:
             return False
-        return filecmp.cmp(source, target, shallow=False)
+        import hashlib
+        with source.open('rb') as left, target.open('rb') as right:
+            return hashlib.file_digest(left,'sha256').digest() == hashlib.file_digest(right,'sha256').digest()
     except OSError:
         return False
 
@@ -450,14 +464,19 @@ def install_bundled_native_host(bundle_root: Path) -> Path:
     # builds can have the same length, and leaving the old helper installed can
     # strand a browser on an obsolete recovery protocol after an update.
     if not target.is_file() or not _same_file_contents(source, target):
+        import tempfile
+        fd, name = tempfile.mkstemp(prefix='.chute-native-',suffix='.exe',dir=target.parent)
+        os.close(fd)
+        staged=Path(name)
         try:
-            shutil.copy2(source, target)
-        except PermissionError:
-            # A one-shot native host can briefly be locked while it is waking
-            # Chute.exe. Keep the existing registered helper for this launch;
-            # the next ordinary Chute start will retry the replacement.
-            if not target.is_file():
-                raise
+            shutil.copy2(source,staged)
+            if not _same_file_contents(source,staged):
+                raise OSError('Native companion verification failed; existing host preserved.')
+            os.replace(staged,target)
+        finally:
+            staged.unlink(missing_ok=True)
+    if not _same_file_contents(source,target):
+        raise OSError('Installed native host does not match this companion. Close Chrome and retry the paired installer.')
 
     register_native_host(target)
     return target

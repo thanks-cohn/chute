@@ -23,7 +23,8 @@ def component(name: str) -> str:
 
 class RootGrant:
     """Grant only from trusted Python/native code, never from an HTTP path."""
-    def __init__(self, root: Path, *, label: str | None = None):
+    def __init__(self, root: Path, *, label: str | None = None, writable: bool = False):
+        self.writable = writable
         self.windows = None
         if os.name == "nt":
             from .windows_fs import WindowsFS
@@ -67,8 +68,12 @@ class RootGrant:
     def open(self, handle: str, *, directory: bool = False):
         parts = self.parts(handle)
         if self.windows:
-            with self.windows.open(parts) as fd:
-                yield fd
+            if directory:
+                with self.windows.guard(parts, directory=True):
+                    yield None  # Directory HANDLE stays owned by the Windows guard.
+            else:
+                with self.windows.open(parts) as fd:
+                    yield fd
             return
         if self.fd is None:
             raise ExplorerError("EXPIRED", "Reconnect to the local companion.")

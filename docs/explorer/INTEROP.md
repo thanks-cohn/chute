@@ -20,3 +20,13 @@ One stream at a time, consumer-driven backpressure, 256 KiB chunks, known size, 
 Before binding this interface to HTTP/native messaging: verify enrolled identities on **both** sides through an authenticated native handoff; bind root/participant/action/expiry/nonce; prevent replay; enforce native Windows no-follow handles; add persistent operation ledger, size/hash quotas, staging recovery and explicit conflict resolution. Old REDOWN extensions do not understand this schema. Do not expose the local read-session bearer token to REDOWN or web pages. The current Shelf rejects drops explicitly.
 
 Required joint acceptance remains BLOCKED: independently hash PNG/PDF/video R2→selected local nested folder and local→selected R2 nested folder; test Drive, Dropbox and OneDrive separately with approved credentials; classify real cross-extension drag separately from explicit Send to/Save to fallback; test interruption, disk full, revocation, duplicate delivery, source survival and traversal/reparse attempts. No live provider writes were attempted in this task.
+
+## Implemented adapter foundation (review build, still disabled)
+
+`AdapterBridge` now implements the trusted-code lifecycle and `NativeTransferAdapter`
+connects bounded original-byte reads and independently verified writes to the existing
+Python root guards. The wire schema remains 1.0. Participant names must already be
+registered by trusted native code; a wire intent, `user_gesture` flag or peer string
+never enrolls a browser extension. No HTTP or external-message activation exists.
+See [test-pair evidence and limitations](PERSISTENT_TRANSFERS_TEST.md), especially
+process-local cross-app ledger state and the absence of an installed REDOWN adapter.

@@ -42,8 +42,15 @@ jobs:
       - run: python -m playwright install --with-deps chromium
       - name: Real Chromium production API and overlay geometry
         run: python scripts/verify-explorer-browser.py ${{ runner.temp }}/explorer-browser
+      - name: Actual Explorer bytes, typed relay, nested drops and revocation
+        run: python scripts/verify-explorer-copy-browser.py
+      - name: Popup captions, lightbox and every gallery density
+        run: python scripts/verify-explorer-gallery.py
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: explorer-browser
-          path: ${{ runner.temp }}/explorer-browser/
+          path: |
+            ${{ runner.temp }}/explorer-browser/
+            /tmp/chute-gallery/
+            /tmp/chute-copy-browser/

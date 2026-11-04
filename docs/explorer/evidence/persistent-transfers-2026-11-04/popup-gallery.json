@@ -1,0 +1,34 @@
+[
+  {
+    "class": "CHROME_FIXTURE",
+    "density": "4x4",
+    "width": 390,
+    "nonoverlap": "PASS",
+    "lightbox": "PASS",
+    "no_implicit_shelf_open": "PASS"
+  },
+  {
+    "class": "CHROME_FIXTURE",
+    "density": "5x4",
+    "width": 390,
+    "nonoverlap": "PASS",
+    "lightbox": "PASS",
+    "no_implicit_shelf_open": "PASS"
+  },
+  {
+    "class": "CHROME_FIXTURE",
+    "density": "5x5",
+    "width": 390,
+    "nonoverlap": "PASS",
+    "lightbox": "PASS",
+    "no_implicit_shelf_open": "PASS"
+  },
+  {
+    "class": "CHROME_FIXTURE",
+    "density": "6x5",
+    "width": 390,
+    "nonoverlap": "PASS",
+    "lightbox": "PASS",
+    "no_implicit_shelf_open": "PASS"
+  }
+]
