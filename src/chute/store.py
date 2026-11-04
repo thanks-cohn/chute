@@ -154,6 +154,37 @@ class Store:
         dates.sort(reverse=True)
         return dates
 
+    def history_month_counts(self, month: str) -> dict[str, int]:
+        """Count original saves per UTC history date, independent of live basket.
+
+        This reads preserved 'add' events, not queue.json: clearing and recalling
+        items never reduces or increases the number of original saves.
+        """
+        if (
+            len(month) != 7
+            or month[4] != "-"
+            or not (month[:4].isdigit() and month[5:].isdigit())
+            or not 1 <= int(month[5:]) <= 12
+        ):
+            raise ValueError("month must be YYYY-MM")
+
+        counts: dict[str, int] = {}
+        for day in self.history_dates():
+            if not day.startswith(month + "-"):
+                continue
+            seen: set[str] = set()
+            path = self.history_dir / f"{day}.tsv"
+            for line in path.read_text(encoding="utf-8").splitlines():
+                parsed = self._parse_history_line(line)
+                if parsed is None:
+                    continue
+                _timestamp, event, item = parsed
+                if event == "add":
+                    seen.add(item.id)
+            if seen:
+                counts[day] = len(seen)
+        return counts
+
     def history_day(self, day: str | None = None) -> list[QueueItem]:
         dates = self.history_dates()
         if day is None:
