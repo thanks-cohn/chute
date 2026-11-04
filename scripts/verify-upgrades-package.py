@@ -60,4 +60,16 @@ server = (ROOT / "src/chute/server.py").read_text(encoding="utf-8")
 for api in ("/api/browse", "/api/calendar", "/api/reveal/"):
     assert api in server, f"Companion is missing required development endpoint {api}"
 
+# Images previously had an IntersectionObserver on a hidden IMG, so none loaded.
+# Open success must not inject a developer-style status line into the Shelf.
+shelf = (EXT / "shelf.js").read_text(encoding="utf-8")
+css = (EXT / "shared.css").read_text(encoding="utf-8")
+assert "thumbObserver.observe(icon)" in shelf
+assert "thumbObserver.observe(thumb)" not in shelf
+assert 'const icon = entry.target;' in shelf
+assert "Showing ${file.name} in your file manager" not in shelf
+assert "Opened folder containing ${file.name}" not in shelf
+assert 'class="file-type-svg"' in shelf
+assert '.file-fallback' in css
+
 print("PASS: main-based v2.6.1 native boot and upgraded API contract")
