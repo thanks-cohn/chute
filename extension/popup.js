@@ -75,10 +75,17 @@ displayLimitInput?.addEventListener("change", async () => {
 
 accessModeSelect?.addEventListener("change", async () => {
   const mode = accessModeSelect.value;
-  await chrome.storage.sync.set({
+  const update = {
     chuteAccessMode: mode,
     chuteBinVisible: mode === "floating" || mode === "both"
-  });
+  };
+  if (mode === "context") {
+    // Explicitly choosing right-click-only takes precedence over Always.
+    update.chuteAutoHide = true;
+    const behavior = document.querySelector("#floating-behavior");
+    if (behavior) behavior.value = "auto-hide";
+  }
+  await chrome.storage.sync.set(update);
 });
 
 dragOutModeSelect?.addEventListener("change", async () => {

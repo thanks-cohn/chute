@@ -5,6 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Chutey</title>
   <link rel="stylesheet" href="shared.css">
+  <link rel="stylesheet" href="workspace-tabs.css">
+  <link rel="stylesheet" href="explorer-shell.css">
 </head>
 <body>
   <header class="topbar">
@@ -14,10 +16,15 @@
     </div>
     <div class="actions">
       <button id="refresh" class="icon-button" title="Refresh">↻</button>
-      <button id="clear" class="secondary-button">Clear live chute</button>
+      <button id="clear" class="icon-button chute-clear-button" type="button" title="Clear Live Chutey" aria-label="Clear Live Chutey"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h16M10 4h4M6.5 7l1 13h9l1-13M10 11v6M14 11v6"/></svg></button>
     </div>
   </header>
 
+  <nav id="chutey-workspace-tabs" class="chutey-workspace-tabs" role="tablist" aria-label="Chutey workspace">
+    <button id="chutey-tab-history" class="chutey-tab is-active" type="button" role="tab" aria-controls="chutey-history-view" aria-selected="true" tabindex="0">History</button>
+    <button id="chutey-tab-explorer" class="chutey-tab" type="button" role="tab" aria-controls="chutey-explorer-view" aria-selected="false" tabindex="-1">File Explorer</button>
+  </nav>
+  <section id="chutey-history-view" role="tabpanel" aria-labelledby="chutey-tab-history">
   <div class="history-nav">
     <button id="history-prev" class="icon-button" type="button" title="Older day">‹</button>
     <input id="history-date" type="date" aria-label="Selected history date" hidden>
@@ -43,7 +50,7 @@
     <button id="history-next" class="icon-button" type="button" title="Newer day">›</button>
   </div>
 
-  <div id="status" class="status">Connecting…</div>
+  <div id="status" class="status" role="status" aria-live="polite" hidden>Connecting…</div>
   <main id="files" class="file-list"></main>
   <nav id="history-pagination" class="history-pagination" aria-label="Browse file pages" hidden>
     <button id="history-page-prev" class="secondary-button" type="button">‹ Previous</button>
@@ -52,6 +59,13 @@
   </nav>
   <div id="history-sentinel" class="history-sentinel" aria-hidden="true"></div>
   <footer class="footer">Clearing the live Chute never deletes history. Browse any recorded day and Recall preserved items whenever you need them.</footer>
+  </section>
+  <section id="chutey-explorer-view" class="chutey-explorer-shell" role="tabpanel" aria-labelledby="chutey-tab-explorer" hidden>
+    <div class="chutey-explorer-placeholder" role="note">
+      <strong>File Explorer</strong>
+      <p>Your local File Explorer will appear here.</p>
+    </div>
+  </section>
   <script src="native-wake-page.js"></script>
   <script src="bridge-reconnect.js"></script>
   <script src="shelf.js"></script>
@@ -59,5 +73,6 @@
   <script src="workflow-fixes.js"></script>
   <script src="drag-relay.js"></script>
   <script src="calendar.js"></script>
+  <script src="workspace-tabs.js"></script>
 </body>
 </html>

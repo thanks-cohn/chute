@@ -35,12 +35,15 @@ button, input, select { font: inherit; }
 .logo:has(img) {
   transform: none;
   overflow: hidden;
-  background: #d7ff3f;
+  background: #11130f;
+  border-radius: 0;
+  width: 30px;
+  height: 30px;
 }
 .logo img {
   display: block;
-  width: 27px;
-  height: 27px;
+  width: 30px;
+  height: 30px;
   object-fit: contain;
   image-rendering: pixelated;
 }
@@ -151,6 +154,10 @@ button, input, select { font: inherit; }
   border-bottom: 1px solid #262a22;
 }
 .status.error { color: #ff9f8a; }
+.status[hidden] { display: none; }
+.chute-clear-button { display: inline-grid; place-items: center; padding: 0; }
+.chute-clear-button svg { display: block; }
+.chute-clear-button[hidden] { display: none; }
 
 .file-list { padding: 8px; display: grid; gap: 7px; }
 .file-row {

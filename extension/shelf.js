@@ -370,6 +370,7 @@ function setStatus(message, error = false) {
   if (!statusElement || dragOutActive) return;
   statusElement.textContent = message;
   statusElement.classList.toggle("error", error);
+  if (location.pathname.endsWith("/shelf.html")) statusElement.hidden = !error;
 }
 
 async function loadSettings() {
@@ -539,6 +540,7 @@ loadSettings().then(() => resetHistory());
 
 async function refreshLatestIfChanged() {
   if (latestHistoryCheckInFlight || dragOutActive || selectedDay || currentPage !== 0 ||
+      document.querySelector("#chutey-explorer-view:not([hidden])") ||
       location.pathname.endsWith("/popup.html") || window.scrollY >= 8) return;
   latestHistoryCheckInFlight = true;
   try {

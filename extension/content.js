@@ -41,6 +41,7 @@
 
   let supportHover = false;
   let accessMode = "floating";
+  let autoHide = true;
   let pageDragSource = null;
   let clearDragTimer = null;
   let dragRouting = false;
@@ -63,7 +64,9 @@
   }
 
   function renderVisibility() {
-    host.style.display = floatingEnabled(accessMode) ? "block" : "none";
+    // If the user explicitly selected Always visible, reveal Chutey even
+    // when a stale right-click-only access preference is present.
+    host.style.display = (!autoHide || floatingEnabled(accessMode)) ? "block" : "none";
   }
 
   function renderSize() {
@@ -380,23 +383,23 @@
 
   chrome.storage.sync.get({
     chuteAccessMode: null,
-    chuteBinVisible: true
-  }, ({ chuteAccessMode, chuteBinVisible }) => {
+    chuteBinVisible: true,
+    chuteAutoHide: true
+  }, ({ chuteAccessMode, chuteBinVisible, chuteAutoHide }) => {
     accessMode = chuteAccessMode || (chuteBinVisible ? "floating" : "context");
+    autoHide = chuteAutoHide !== false;
     renderVisibility();
   });
 
   chrome.storage.onChanged.addListener((changes, area) => {
     if (area !== "sync") return;
+    if (changes.chuteAutoHide) autoHide = changes.chuteAutoHide.newValue !== false;
     if (changes.chuteAccessMode) {
       accessMode = changes.chuteAccessMode.newValue || "floating";
-      renderVisibility();
-      return;
-    }
-    if (changes.chuteBinVisible) {
+    } else if (changes.chuteBinVisible) {
       accessMode = changes.chuteBinVisible.newValue ? "floating" : "context";
-      renderVisibility();
     }
+    renderVisibility();
   });
 
   function mount() {

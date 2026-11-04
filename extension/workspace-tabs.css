@@ -1,0 +1,33 @@
+/* Chutey tab strip: independent from History and from the future Explorer skin. */
+.chutey-workspace-tabs {
+  display: flex;
+  align-items: stretch;
+  gap: 0;
+  padding: 0 10px;
+  min-height: 39px;
+  background: #131610;
+  border-bottom: 1px solid #353e2e;
+}
+.chutey-tab {
+  border: 0;
+  border-bottom: 2px solid transparent;
+  background: transparent;
+  color: #929e87;
+  padding: 9px 15px 8px;
+  text-align: center;
+  font-family: inherit;
+  font-size: 12px;
+  line-height: 1.25;
+  font-weight: 700;
+  cursor: pointer;
+  min-width: 112px;
+  white-space: nowrap;
+}
+.chutey-tab:hover { color: #ecf3e3; background: #1b2118; }
+.chutey-tab[aria-selected="true"] {
+  color: #f4f5ee;
+  border-bottom-color: #d7ff3f;
+  background: #1c2219;
+}
+.chutey-tab:focus-visible { outline: 2px solid #d7ff3f; outline-offset: -3px; }
+#chutey-history-view[hidden], #chutey-explorer-view[hidden] { display: none !important; }

@@ -25,7 +25,7 @@
   let lastPointerY = null;
 
   function floatingEnabled(mode) {
-    return mode === "floating" || mode === "both";
+    return mode === "floating" || mode === "both" || !autoHide;
   }
 
   function clearHideTimer() {
