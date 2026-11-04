@@ -114,6 +114,52 @@ class ChuteHandler(BaseHTTPRequestHandler):
             self._json({"files": [public_item(item, active=True) for item in active]})
             return
 
+        if path == "/api/browse":
+            query = parse_qs(parsed.query)
+            scope = (query.get("scope") or ["history"])[0]
+            requested_day = (query.get("date") or [None])[0]
+            try:
+                page = int((query.get("page") or ["0"])[0])
+                limit = int((query.get("limit") or ["40"])[0])
+                if not 0 <= page <= 1_000_000 or not 1 <= limit <= 500:
+                    raise ValueError("invalid page or limit")
+                if scope not in ("live", "history"):
+                    raise ValueError("invalid browse scope")
+                if scope == "live" and requested_day is not None:
+                    raise ValueError("date does not apply to live browsing")
+                if requested_day is not None:
+                    import datetime
+                    if len(requested_day) != 10 or datetime.date.fromisoformat(requested_day).isoformat() != requested_day:
+                        raise ValueError("date must be YYYY-MM-DD")
+            except ValueError as exc:
+                self._json({"error": str(exc)}, HTTPStatus.BAD_REQUEST)
+                return
+
+            offset = page * limit
+            if scope == "live":
+                items, has_more = self.store.live_page(offset, limit)
+                self._json({
+                    "scope": scope, "page": page, "limit": limit,
+                    "files": [public_item(item, active=True) for item in items],
+                    "has_more": has_more,
+                    "date": None, "previous_date": None, "next_date": None
+                })
+                return
+
+            dates = self.store.history_dates()
+            current_day = requested_day or (dates[0] if dates else None)
+            items, has_more = self.store.history_page(offset, limit, requested_day)
+            active_ids = self.store.active_ids()
+            self._json({
+                "scope": scope, "page": page, "limit": limit,
+                "files": [public_item(item, active=item.id in active_ids) for item in items],
+                "has_more": has_more,
+                "date": current_day,
+                "previous_date": self.store.previous_history_date(current_day) if current_day else None,
+                "next_date": self.store.next_history_date(current_day) if current_day else None,
+            })
+            return
+
         if path == "/api/calendar":
             month = (parse_qs(parsed.query).get("month") or [""])[0]
             try:
