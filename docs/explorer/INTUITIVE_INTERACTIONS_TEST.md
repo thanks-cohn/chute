@@ -65,8 +65,8 @@ Branding uses Your Everything, DRAG ME!, and the existing Feed Chutey! action.
 
 ## Executed checks and evidence
 
-- Complete pinned pytest 9.2.0 suite: 77 passed, 8 Windows-only skips, 37 subtests passed (Linux).
-- Python unittest discovery: 75 run, 67 passed, 8 Windows-only skips (Linux).
+- Complete pinned pytest 9.2.0 suite: 77 passed, 9 Windows-only skips, 37 subtests passed (Linux).
+- Python unittest discovery: 76 run, 67 passed, 9 Windows-only skips (Linux).
 - New regressions: 20 resumes without picker; expiry rotation; cancel preserves session
   and location; bridge failure category; authenticated exact binary export without Live
   mutation, stale identity and unauthorized reads rejected.
@@ -104,6 +104,13 @@ SHA-256 and framed native protocol, then uploads ONE artifact named
 `Chutey-Windows-Chrome-Explorer-TEST-<full SHA>`.
 It contains the EXE, Chrome ZIP, SOURCE-COMMIT.txt, SHA256SUMS.txt and this evidence guide.
 It does not publish a release. A green CI run still does not satisfy interactive gates.
+The earlier successful run [41838687885](https://github.com/thanks-cohn/chute/actions/runs/41838687885)
+built a matched pair at `5f6057c647d394f42563986b440a5ff844b5d564` (85 cases, zero failures,
+14 platform skips). The follow-up source adds a real Shell picker open/count/cancel
+Windows test; it explicitly skips if no input desktop is accessible. Even a pass is a
+Windows runner UI check, not Windows 11/Chrome user acceptance. Use the artifact pinned
+to the final commit being reviewed, not files mixed from different runs.
+
 No locally built Windows EXE is claimed: the current development machine is Linux.
 
 Before installation, verify all hashes and the source SHA in the matched artifact.

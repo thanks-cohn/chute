@@ -101,3 +101,58 @@ class WindowsBrowseTests(unittest.TestCase):
         self.assertEqual(file['identity'],self.command('stat',handle=file['handle'])['identity'])
         with self.grant.open(file['handle']) as fd:
             self.assertEqual(file['identity'],self.grant.windows.file_identity(self.grant.parts(file['handle']),fd=fd))
+
+    def test_real_shell_picker_has_one_dialog_and_cancels(self):
+        """Real Windows Shell UI, not a mocked chooser or a Chrome acceptance claim."""
+        import ctypes
+        from ctypes import wintypes as W
+        import sys
+        import time
+        user=ctypes.WinDLL('user32',use_last_error=True)
+        user.OpenInputDesktop.argtypes=[W.DWORD,W.BOOL,W.DWORD]
+        user.OpenInputDesktop.restype=W.HANDLE
+        user.CloseDesktop.argtypes=[W.HANDLE]
+        desktop=user.OpenInputDesktop(0,False,0x1)  # DESKTOP_READOBJECTS
+        if not desktop:
+            self.skipTest('WINDOWS_UI: no accessible input desktop; picker UI remains unverified')
+        user.CloseDesktop(desktop)
+        callback_type=ctypes.WINFUNCTYPE(W.BOOL,W.HWND,W.LPARAM)
+        user.EnumWindows.argtypes=[callback_type,W.LPARAM]
+        user.GetWindowThreadProcessId.argtypes=[W.HWND,ctypes.POINTER(W.DWORD)]
+        user.IsWindowVisible.argtypes=[W.HWND]
+        user.GetClassNameW.argtypes=[W.HWND,W.LPWSTR,ctypes.c_int]
+        user.PostMessageW.argtypes=[W.HWND,W.UINT,W.WPARAM,W.LPARAM]
+        process=subprocess.Popen([sys.executable,'-c',
+            'from chute.explorer.native import choose_folder; assert choose_folder() == ""'],
+            stdout=subprocess.PIPE,stderr=subprocess.PIPE,creationflags=subprocess.CREATE_NO_WINDOW)
+        windows=[]
+        @callback_type
+        def collect(hwnd,_):
+            pid=W.DWORD()
+            user.GetWindowThreadProcessId(hwnd,ctypes.byref(pid))
+            if pid.value==process.pid and user.IsWindowVisible(hwnd):
+                name=ctypes.create_unicode_buffer(128)
+                user.GetClassNameW(hwnd,name,len(name))
+                windows.append((hwnd,name.value))
+            return True
+        try:
+            deadline=time.monotonic()+15
+            while time.monotonic()<deadline:
+                windows.clear(); user.EnumWindows(collect,0)
+                if windows or process.poll() is not None: break
+                time.sleep(.1)
+            self.assertEqual([name for _,name in windows],['#32770'],
+                             'Expected exactly one Shell dialog and no visible helper window')
+            # Allow delayed helper/owner windows to surface before counting again.
+            time.sleep(.3)
+            windows.clear(); user.EnumWindows(collect,0)
+            self.assertEqual([name for _,name in windows],['#32770'])
+            self.assertTrue(user.PostMessageW(windows[0][0],0x10,0,0))  # WM_CLOSE = cancel
+            _,errors=process.communicate(timeout=10)
+            self.assertEqual(process.returncode,0,errors.decode(errors='replace'))
+        finally:
+            if process.poll() is None:
+                for hwnd,_ in windows: user.PostMessageW(hwnd,0x10,0,0)
+                try: process.wait(timeout=3)
+                except subprocess.TimeoutExpired: process.kill(); process.wait(timeout=3)
+            process.stdout.close(); process.stderr.close()
