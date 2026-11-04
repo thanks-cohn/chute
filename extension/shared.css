@@ -308,3 +308,27 @@ code { color: #d7ff3f; }
 @media (prefers-reduced-motion: reduce) {
   .calendar-day { transition: none; }
 }
+
+/* Only one window of history rows is rendered at once. */
+.history-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 11px;
+  margin: 4px 10px 12px;
+  padding: 9px 7px;
+  border: 1px solid #30362a;
+  border-radius: 10px;
+  background: #181d16;
+}
+.history-pagination[hidden] { display: none; }
+.history-pagination button { min-width: 84px; font-size: 11px; font-weight: 750; }
+.history-pagination button:disabled { cursor: default; opacity: .4; }
+.history-pagination .page-position {
+  min-width: 64px;
+  color: #c6d2b8;
+  text-align: center;
+  font-size: 11px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
