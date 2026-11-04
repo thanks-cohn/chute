@@ -1,0 +1,41 @@
+name: Chute development regression checks
+
+on:
+  push:
+    branches:
+      - development-2026-11-03
+  pull_request:
+    branches:
+      - development-2026-11-03
+
+permissions:
+  contents: read
+
+jobs:
+  python-tests:
+    name: Python tests (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Test persisted history, reveal endpoint and calendar
+        env:
+          PYTHONPATH: src
+        run: python -m unittest discover -s tests -v
+
+  extension-syntax:
+    name: Extension JavaScript syntax
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check modified UI scripts
+        run: |
+          node --check extension/calendar.js
+          node --check extension/shelf.js
+          node --check extension/background.js
