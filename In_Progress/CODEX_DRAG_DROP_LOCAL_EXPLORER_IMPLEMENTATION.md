@@ -1,8 +1,8 @@
 # CODEX IMPLEMENTATION REQUEST — Chutey Premium Local File Explorer
 
-**Repository:** \`thanks-cohn/chute\`  
-**Base:** current \`main\` (inspect its HEAD when starting, don't assume a stale SHA)  
-**Deliverable:** implement on a new focused \`codex/chutey-api-first-local-explorer\` branch, run tests, and open a reviewable PR. **Do not auto-merge to main or change the known-working release.**  
+**Repository:** `thanks-cohn/chute`  
+**Base:** current `main` (inspect its HEAD when starting, don't assume a stale SHA)  
+**Deliverable:** implement on a new focused `codex/chutey-api-first-local-explorer` branch, run tests, and open a reviewable PR. **Do not auto-merge to main or change the known-working release.**  
 **Owner directive:** "Drag and drop. Simple."  
 **Status of this file:** IMPLEMENTATION PROMPT — not a claim that an Explorer or Python test game currently exists.
 
@@ -23,28 +23,28 @@ Do not claim that a visual success animation is proof of a successful write.
 
 ## 2. Read the current architecture and reuse existing workers
 
-Start with [\`worker/README.md\`](../worker/README.md). There is **already** a Chrome MV3 worker at \`extension/background-entry.js\` and an existing Python Windows companion in \`src/chute/\`. **Do not create another background worker, Windows service, or native host just for Explorer.** Extend the current Python companion using focused modules and route a scoped adapter through the current localhost bridge.
+Start with [`worker/README.md`](../worker/README.md). There is **already** a Chrome MV3 worker at `extension/background-entry.js` and an existing Python Windows companion in `src/chute/`. **Do not create another background worker, Windows service, or native host just for Explorer.** Extend the current Python companion using focused modules and route a scoped adapter through the current localhost bridge.
 
 Inspect all of the following current sources, recording actual behavior and limitations:
 
-- \`extension/manifest.json\`, \`background-entry.js\`, \`background-native.js\`, \`native-wake-page.js\`, \`bridge-reconnect.js\`
-- \`extension/shelf.html\`, \`workspace-tabs.js\`, \`workspace-tabs.css\`, \`explorer-shell.css\`, \`shelf.js\`, \`workflow-fixes.js\`, \`shared.css\`
-- \`extension/content.js\`, \`drag-relay.js\`, \`bin.js\`, \`direct-drop-google-yandex.js\`, \`content-image-resolver.js\`, \`bin-image-resolver.js\`, \`drop-lifecycle.js\`
-- \`src/chute/server.py\`, \`store.py\`, \`windows_app.py\`, \`native_host.py\`, \`browser_extensions.py\`, \`reveal.py\`
-- \`tests/\`, \`scripts/verify-worker-boot.cjs\`, \`verify-real-image-browser.py\`, \`verify-thumbnail-icons.cjs\`, \`verify-chutey-tabs-and-mascot.cjs\`, all applicable existing CI.
+- `extension/manifest.json`, `background-entry.js`, `background-native.js`, `native-wake-page.js`, `bridge-reconnect.js`
+- `extension/shelf.html`, `workspace-tabs.js`, `workspace-tabs.css`, `explorer-shell.css`, `shelf.js`, `workflow-fixes.js`, `shared.css`
+- `extension/content.js`, `drag-relay.js`, `bin.js`, `direct-drop-google-yandex.js`, `content-image-resolver.js`, `bin-image-resolver.js`, `drop-lifecycle.js`
+- `src/chute/server.py`, `store.py`, `windows_app.py`, `native_host.py`, `browser_extensions.py`, `reveal.py`
+- `tests/`, `scripts/verify-worker-boot.cjs`, `verify-real-image-browser.py`, `verify-thumbnail-icons.cjs`, `verify-chutey-tabs-and-mascot.cjs`, all applicable existing CI.
 
-Read \`In_Progress/LOCAL_EXPLORER_AND_IMAGE_TRANSFORMS_API.md\` and \`In_Progress/CHUTEY_WORKSPACE_TABS_AND_SKIN_API.md\`.
+Read `In_Progress/LOCAL_EXPLORER_AND_IMAGE_TRANSFORMS_API.md` and `In_Progress/CHUTEY_WORKSPACE_TABS_AND_SKIN_API.md`.
 
 ### REDOWN references (patterns, NOT copied provider code)
 
-Inspect from \`thanks-cohn/REDOWN\`:
+Inspect from `thanks-cohn/REDOWN`:
 
-- \`docs/beta/EXPLORER.md\`
-- \`extension/beta/explorer.mjs\`
-- \`extension/explorer-destination-menu.js\`
-- \`docs/EXPLORER_CONTEXT_MENU_REPORT.md\`
-- \`tools/lab/redown_lab.py\`, \`tools/lab/README.md\`
-- \`IMPORTANT/UNIVERSAL_AGENTIC_TEST_CORPUS_AND_PIPELINE.md\`
+- `docs/beta/EXPLORER.md`
+- `extension/beta/explorer.mjs`
+- `extension/explorer-destination-menu.js`
+- `docs/EXPLORER_CONTEXT_MENU_REPORT.md`
+- `tools/lab/redown_lab.py`, `tools/lab/README.md`
+- `IMPORTANT/UNIVERSAL_AGENTIC_TEST_CORPUS_AND_PIPELINE.md`
 
 Reuse *ideas*: one operation dispatcher; nested destination trees; copy/move internal clipboard; dynamic folder loading; clear status/uncertainty; testable real engine; scenario inventory/hash oracle; native and browser evidence separated. Do **not** transplant Cloudflare Worker, cloud APIs, secrets, provider-specific routes or their constraints.
 
@@ -54,7 +54,7 @@ Create a concise source-audit table in the PR, especially explaining which exist
 
 The file engine belongs to the **existing Windows Python companion**, and must run headlessly in unit and scenario tests. Create well-bounded modules, e.g.:
 
-\`\`\`
+```
 src/chute/explorer/
   __init__.py
   core.py                 # allowed roots, list, paginated browse, stat, search
@@ -63,7 +63,7 @@ src/chute/explorer/
   security.py             # sessions, root capabilities, handles, path guards
   protocol.py             # versioned schemas, error codes, receipts
   api.py                  # companion HTTP adapter to the SAME core methods
-\`\`\`
+```
 
 Module names may change after audit, but the separation and testability may not. Keep existing Chute storage/History code authoritative for its existing resources.
 
@@ -78,13 +78,13 @@ Implement a versioned capability catalog and **one command route** (or a small s
 - Interruption/restart handling: never report finished while transfer is still pending. Staging + flush/verification + atomic destination publication where supported; on crash, preserve safe evidence and offer reconciliation instead of blind replay.
 - Scalable navigation: empty folder, thousands of items, deep branches, Unicode, long paths, locked/permission denied, offline volumes, reparse points, duplicate filenames and concurrent changes.
 
-**Critical security requirement:** Current \`server.py\` accepts any \`chrome-extension://\` origin on some existing routes. That is NOT an adequate authorization boundary for new arbitrary filesystem writes. Before adding a local Explorer mutation/ingest route, use verified enrolled Chutey extension identity, authenticated short-lived root-scoped capabilities, explicit user-selected directory consent, restrictive Origin/CSRF and DNS-rebinding defenses, non-guessable handle references and safe origin checks. Never let an untrusted page submit an absolute local path and have Chutey write there. Deny traversal, symlink/junction/reparse escapes, unsupported UNC/network locations, forbidden Windows names, special files/devices and unapproved privilege escalation. Limit memory, bytes, concurrency and dangerous content. Keep the actual filesystem access inside Python; no Chrome remote scripting or arbitrary shell commands.
+**Critical security requirement:** Current `server.py` accepts any `chrome-extension://` origin on some existing routes. That is NOT an adequate authorization boundary for new arbitrary filesystem writes. Before adding a local Explorer mutation/ingest route, use verified enrolled Chutey extension identity, authenticated short-lived root-scoped capabilities, explicit user-selected directory consent, restrictive Origin/CSRF and DNS-rebinding defenses, non-guessable handle references and safe origin checks. Never let an untrusted page submit an absolute local path and have Chutey write there. Deny traversal, symlink/junction/reparse escapes, unsupported UNC/network locations, forbidden Windows names, special files/devices and unapproved privilege escalation. Limit memory, bytes, concurrency and dangerous content. Keep the actual filesystem access inside Python; no Chrome remote scripting or arbitrary shell commands.
 
 A single Python engine must serve keyboard, menu, drag/drop, test CLI and GUI commands. **No competing JS semantics.**
 
 ## 4. The actual File Explorer GUI — polished, separate and skinnable
 
-Mount inside existing \`#chutey-explorer-view\`. Do not recreate or replace the existing tabs, and preserve the previously implemented behavior: the active tab moves to the left and \`chrome.storage.local.chuteyShelfActiveTab\` remembers what the user left open.
+Mount inside existing `#chutey-explorer-view`. Do not recreate or replace the existing tabs, and preserve the previously implemented behavior: the active tab moves to the left and `chrome.storage.local.chuteyShelfActiveTab` remembers what the user left open.
 
 Inside File Explorer:
 
@@ -96,7 +96,7 @@ Inside File Explorer:
 - No unnecessary pop-out page to browse ordinary files. A file dialog can be used when native OS authorization genuinely requires it.
 - Loading state, empty folder, permission error, operation progress/cancellation and completed result are clear without large constant debug banners.
 
-**CSS contract:** All Explorer-specific selectors belong to separate \`extension/explorer-*.css\` scoped under \`#chutey-explorer-view\`; use the already present \`--chutey-explorer-*\` tokens in \`explorer-shell.css\`. Separate DOM layout, event logic, file operation logic and skin tokens. The eventual SKIN API should allow new colors, typography, icons and animation presets with a validated declarative theme, without granting filesystem/network privileges or injecting arbitrary JS/HTML. Premium finish is required, but skin work must not block correctness.
+**CSS contract:** All Explorer-specific selectors belong to separate `extension/explorer-*.css` scoped under `#chutey-explorer-view`; use the already present `--chutey-explorer-*` tokens in `explorer-shell.css`. Separate DOM layout, event logic, file operation logic and skin tokens. The eventual SKIN API should allow new colors, typography, icons and animation presets with a validated declarative theme, without granting filesystem/network privileges or injecting arbitrary JS/HTML. Premium finish is required, but skin work must not block correctness.
 
 ## 5. Preview behavior — BOTTOM OVERLAY, NEVER COMPRESS THE EXPLORER
 
@@ -120,16 +120,16 @@ The user specifically requires:
 
 A user drags an Explorer image and drops it on a supported upload area in another Chrome page/window. **Use the existing Chutey file token, relay, native data fetch and site-specific compatibility code**, adding a narrow Explorer adapter for real local files (not only already-saved Chute basket IDs).
 
-Inspect the working flow in \`drag-relay.js\`, \`content.js\`, \`direct-drop-google-yandex.js\` and \`bin.js\`. Keep real filename, MIME, bytes and visible status. For a saved local file, use a safe opaque reference to read bytes and build an actual \`File\` on the receiving side only when permitted. Synthetic \`DragEvent\` may not count as a trusted cross-window drag or be accepted by site upload APIs. Test real user drags on Google, ChatGPT and Yandex independently; report per-site support status and browser limitations **without pretending success**. Where Chrome prevents true direct drag, supply a clear user-initiated fallback through the native file picker / clipboard / existing Chutey basket route, not an invisible fake upload.
+Inspect the working flow in `drag-relay.js`, `content.js`, `direct-drop-google-yandex.js` and `bin.js`. Keep real filename, MIME, bytes and visible status. For a saved local file, use a safe opaque reference to read bytes and build an actual `File` on the receiving side only when permitted. Synthetic `DragEvent` may not count as a trusted cross-window drag or be accepted by site upload APIs. Test real user drags on Google, ChatGPT and Yandex independently; report per-site support status and browser limitations **without pretending success**. Where Chrome prevents true direct drag, supply a clear user-initiated fallback through the native file picker / clipboard / existing Chutey basket route, not an invisible fake upload.
 
 Do not disclose a local filesystem absolute path in third-party site data. Preserve normal webpage drag behavior.
 
 ### B. Browser page → Explorer target folder
 
-A user drags a webpage image, downloaded file, link or text onto **an explicitly selected local directory**. The hovered folder is the destination. Preserve nested paths correctly; show confirmation and the actual resulting file. Do not always send it to \`~/Chute/files\` or the generic Live basket.
+A user drags a webpage image, downloaded file, link or text onto **an explicitly selected local directory**. The hovered folder is the destination. Preserve nested paths correctly; show confirmation and the actual resulting file. Do not always send it to `~/Chute/files` or the generic Live basket.
 
-- Prefer direct actual \`File\`/Blob bytes; for an image URL resolve bytes through existing authorized Chutey capture where supported, checking MIME, response status, size, filename and contents.
-- If a URL cannot be fetched, **do not silently save a \`.url\` and call it an image**. Offer a distinct "Save link shortcut" action or a visible unsupported reason.
+- Prefer direct actual `File`/Blob bytes; for an image URL resolve bytes through existing authorized Chutey capture where supported, checking MIME, response status, size, filename and contents.
+- If a URL cannot be fetched, **do not silently save a `.url` and call it an image**. Offer a distinct "Save link shortcut" action or a visible unsupported reason.
 - Never allow an arbitrary web page to pick a filesystem destination via an untrusted path; the chosen target must be a scoped capability originally granted through Chutey.
 - Stage/verify write and check the exact path/file content before reporting success. On naming conflicts use a clear KEEP BOTH/SKIP/explicit REPLACE rule.
 - Support multiple files and robust error feedback; prevent downloads from executing, opening or rendering active content unsafely.
@@ -142,7 +142,7 @@ Make supported actions discoverable through icon affordances and the in-app righ
 
 ## 7. Explorer-specific RIGHT-CLICK MENU — REDOWN approach, LOCAL semantics
 
-Within \`#chutey-explorer-view\`, implement a polished custom context menu **only for Explorer file/folder/background surfaces**. Do not globally replace the browser/OS right-click menu. Reuse REDOWN's thoughtful UX principles, not its R2 adapter.
+Within `#chutey-explorer-view`, implement a polished custom context menu **only for Explorer file/folder/background surfaces**. Do not globally replace the browser/OS right-click menu. Reuse REDOWN's thoughtful UX principles, not its R2 adapter.
 
 Context-aware actions:
 - Files: **Preview**, **Open**, **Reveal in Windows**, **Copy**, **Cut**, **Copy to…**, **Move to…**, **Rename**, **Duplicate**, **Properties**, **Delete/Move to Recycle Bin** (confirmation); add applicable supported actions (e.g., image transform) in later phases.
@@ -157,9 +157,9 @@ Context-aware actions:
 
 **Build the testing harness as part of the feature, not as an optional later project.** REDOWN's Python universal file API testing experiment is the design reference, but this harness must exercise *Chutey's actual production local Explorer engine*, not an imitation.
 
-Suggested \`tools/explorer_lab/chutey_explorer_lab.py\` commands:
+Suggested `tools/explorer_lab/chutey_explorer_lab.py` commands:
 
-\`\`\`
+```
 doctor
 capabilities
 inventory --root <approved-fixture-root>
@@ -172,18 +172,18 @@ diff --before <file> --after <file>
 report --run <run-dir>
 retry --run <old-run> --scenario <id> --plan <new-plan> --out <new-run>
 cleanup --run <run-dir> [--execute]
-\`\`\`
+```
 
-Keep tests reproducible, read-only by default, and confined to explicitly created owner-approved **temporary test roots**. No real Desktop, Documents, Downloads or \`~/Chute\` history mutation. Provide a documented sample corpus with images, video/PDF/text fixtures when license/size allows; seeded generated trees containing Unicode, deep nesting, long names, empty files, duplicate names, large files (sparse fixtures), permission-denied cases, symlinks/junctions/reparse points, locked files, missing drives, invalid paths, repeated drops and destination conflicts. Support randomized *bounded* state-machine generation and replayable seeds; maintain an extensible operation registry.
+Keep tests reproducible, read-only by default, and confined to explicitly created owner-approved **temporary test roots**. No real Desktop, Documents, Downloads or `~/Chute` history mutation. Provide a documented sample corpus with images, video/PDF/text fixtures when license/size allows; seeded generated trees containing Unicode, deep nesting, long names, empty files, duplicate names, large files (sparse fixtures), permission-denied cases, symlinks/junctions/reparse points, locked files, missing drives, invalid paths, repeated drops and destination conflicts. Support randomized *bounded* state-machine generation and replayable seeds; maintain an extensible operation registry.
 
 Every operation's test declares:
 - Preconditions, allowed states and transitions.
 - Independent expected outcome (reference filesystem model / oracle), not the production API's own receipt as proof.
 - Before/after tree snapshots, forbidden side effects, source and target identity/metadata, byte-stream SHA-256 or real decoder checks.
-- Error/timeout/interruption/recovery behavior and honest \`PASS\`, \`FAIL\`, \`BLOCKED\`, \`UNSUPPORTED\`, \`UNKNOWN\` classifications.
-- A durable journal (intent/operation ID/receipt/verdict), \`results.csv\`, \`summary.json\`, \`before.json\`, \`after.json\`, \`diff.json\`, \`journal.jsonl\` and concise human report.
+- Error/timeout/interruption/recovery behavior and honest `PASS`, `FAIL`, `BLOCKED`, `UNSUPPORTED`, `UNKNOWN` classifications.
+- A durable journal (intent/operation ID/receipt/verdict), `results.csv`, `summary.json`, `before.json`, `after.json`, `diff.json`, `journal.jsonl` and concise human report.
 
-**No automatic retry after an uncertain filesystem mutation.** Never call a pass because \`mkdir\` returned HTTP 200 or the UI displayed an animation; verify the actual directory, file contents, source survival/deletion and allowed-root boundaries.
+**No automatic retry after an uncertain filesystem mutation.** Never call a pass because `mkdir` returned HTTP 200 or the UI displayed an animation; verify the actual directory, file contents, source survival/deletion and allowed-root boundaries.
 
 Test adapters should allow every newly implemented operation to be registered without rewriting the harness. Track contract coverage, branches, transitions, failure cases and scenario seeds. "All possible situations" means exhaustive coverage only of *declared bounded state models*, plus targeted/property/fuzz scenarios for unbounded real filesystem conditions; report coverage gaps honestly.
 
@@ -197,7 +197,7 @@ Acceptance suites:
 
 ## 9. Future transformations and SKIN API boundaries
 
-**Do not conflate "rename extension" with file conversion.** The next iteration will allow images resized to explicit width × height (with preserve-aspect, fit, crop, stretch and quality modes) and converted among **real supported formats**. The architecture should reserve a transformation operator family and independent test oracle, but shipping arbitrary conversion is *not required to call this Explorer MVP complete*. See \`In_Progress/LOCAL_EXPLORER_AND_IMAGE_TRANSFORMS_API.md\`. Limit dimensions/resources realistically; leave original intact by default.
+**Do not conflate "rename extension" with file conversion.** The next iteration will allow images resized to explicit width × height (with preserve-aspect, fit, crop, stretch and quality modes) and converted among **real supported formats**. The architecture should reserve a transformation operator family and independent test oracle, but shipping arbitrary conversion is *not required to call this Explorer MVP complete*. See `In_Progress/LOCAL_EXPLORER_AND_IMAGE_TRANSFORMS_API.md`. Limit dimensions/resources realistically; leave original intact by default.
 
 Similarly, create a sane scoped CSS custom-property token foundation for eventual component-local **SKIN API**, but don't introduce arbitrary executable themes or write access from skins. An alternate theme must not change API behavior.
 
@@ -214,6 +214,6 @@ Similarly, create a sane scoped CSS custom-property token foundation for eventua
 9. Re-run all existing boot/native/Shelf/history/image-preview regressions; build/test updated Windows EXE and Chrome ZIP in CI **without replacing the known-good public release**.
 10. Produce PR with source audit, architecture map, user walkthrough, screenshot(s) at narrow/wide Shelf widths, tests + commands, scenario report, coverage/gaps, and an exact list of unverified live-site or installed-Windows behaviors.
 
-**Hard stop:** if security for arbitrary directory writes or reliable actual byte transfer is not proven, do **not** ship that endpoint as writable and do not fabricate results. Still deliver tested read-only Explorer, preview and Python harness with clear \`BLOCKED\` entries, and include the next specific work needed.
+**Hard stop:** if security for arbitrary directory writes or reliable actual byte transfer is not proven, do **not** ship that endpoint as writable and do not fabricate results. Still deliver tested read-only Explorer, preview and Python harness with clear `BLOCKED` entries, and include the next specific work needed.
 
 **Definition of success:** A real local PNG can be discovered through the Python API, displayed in Chutey's premium Explorer, previewed by a bottom OVERLAY without shrinking the tree, transferred with a legitimate user interaction to a supported web uploader, and a user-approved image drop can be written to an exact local folder with a verified byte hash. The identical filesystem API can be invoked by independent Python scripts on disposable fixtures, and Chutey's pre-existing Shelf and native boot remain intact.
