@@ -468,12 +468,14 @@ pagePrevButton?.addEventListener("click", async () => {
   if (currentPage === 0 || dragOutActive) return;
   currentPage -= 1;
   await resetHistory();
+  window.scrollTo(0, 0);
 });
 
 pageNextButton?.addEventListener("click", async () => {
   if (!hasMorePages || dragOutActive) return;
   currentPage += 1;
   await resetHistory();
+  window.scrollTo(0, 0);
 });
 
 clearButton?.addEventListener("click", async () => {
