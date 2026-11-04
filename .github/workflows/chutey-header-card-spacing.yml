@@ -1,7 +1,7 @@
 name: Chutey Chrome header and compact Shelf
 on:
   push:
-    branches: [fix/chutey-chrome-sidepanel-name-2026-11-04]
+    branches: [fix/chutey-chrome-sidepanel-name-2026-11-04, fix/chutey-calendar-row-alignment-2026-11-04]
   pull_request:
     branches: [main]
 permissions:
