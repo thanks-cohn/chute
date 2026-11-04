@@ -131,24 +131,33 @@
 
       const response = await api(`/api/files/${encodeURIComponent(file.id)}`);
       const source = await response.blob();
-      let thumbnail;
-      try {
-        thumbnail = await canvasThumbnail(source);
-      } catch {
-        thumbnail = await imageElementThumbnail(source);
-      }
+      if (!source.size) throw new Error("Image file has no bytes");
 
+      // Display the ACTUAL locally saved image first. Never gate the picture
+      // behind WebP generation, the 256 KiB thumbnail cache, or a successful
+      // POST. Those optimizations are optional, not prerequisites to rendering.
       if (!showThumbnails || !img.isConnected) return;
-      if (!await showThumbnail(img, thumbnail)) return;
+      if (!await showThumbnail(img, source)) return;
+      generatedThumbs.add(file.id);
       thumbnailRetries.delete(img);
 
-      if (await persistThumbnail(file, thumbnail)) {
-        generatedThumbs.add(file.id);
-      } else {
-        console.warn(`Chute showed thumbnail for ${file.name}, but could not persist it yet.`);
+      // Cache a compact preview for the next visit. A failure to generate or
+      // persist the cache must not remove an image that is already visible.
+      try {
+        let thumbnail;
+        try {
+          thumbnail = await canvasThumbnail(source);
+        } catch {
+          thumbnail = await imageElementThumbnail(source);
+        }
+        if (thumbnail && !await persistThumbnail(file, thumbnail)) {
+          console.warn(`Chute showed the original image for ${file.name}; thumbnail cache unavailable.`);
+        }
+      } catch (thumbnailError) {
+        console.warn(`Chute displayed the original image without a generated preview for ${file.name}:`, thumbnailError);
       }
     } catch (error) {
-      console.warn("Chute thumbnail generation will retry:", error);
+      console.warn("Chute could not display locally saved image; retrying:", error);
       scheduleThumbnailRetry(file, img);
     } finally {
       thumbnailInFlight.delete(img);
