@@ -1,0 +1,89 @@
+name: Publish the verified Chute Windows companion as latest release
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/publish-known-good-release.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  actions: read
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+      REPO: ${{ github.repository }}
+      TAG: chute-v2.6.1-main-upgrades-2026-11-03-working
+      SOURCE_SHA: 8fc7a3f698632ffa42f2f14db59fa5be7d271e86
+      WINDOWS_RUN: "41770688623"
+      CHROME_RUN: "41770688602"
+      TESTS_RUN: "41770688697"
+    steps:
+      - name: Verify the original user-confirmed build SHA and source tag
+        shell: bash
+        run: |
+          set -euo pipefail
+          tag_object="$(gh api "repos/$REPO/git/ref/tags/$TAG" --jq .object.sha)"
+          tag_target="$(gh api "repos/$REPO/git/tags/$tag_object" --jq .object.sha)"
+          test "$tag_target" = "$SOURCE_SHA"
+          for id in "$WINDOWS_RUN" "$CHROME_RUN" "$TESTS_RUN"; do
+            sha="$(gh api "repos/$REPO/actions/runs/$id" --jq .head_sha)"
+            conclusion="$(gh api "repos/$REPO/actions/runs/$id" --jq .conclusion)"
+            test "$sha" = "$SOURCE_SHA"
+            test "$conclusion" = success
+          done
+          echo "PASS: both exact artifacts come from user-verified source $SOURCE_SHA"
+
+      - name: Download the original tested Windows EXE and Chrome extension
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p dist/windows dist/chrome dist/release
+          gh run download "$WINDOWS_RUN" --repo "$REPO" \
+            -n Chute-2.6.1-Main-Upgrades-Windows-TEST -D dist/windows
+          gh run download "$CHROME_RUN" --repo "$REPO" \
+            -n Chute-Chrome-Web-Store-v2.6.1 -D dist/chrome
+          exe="$(find dist/windows -type f -name Chute-Setup.exe -print -quit)"
+          hashfile="$(find dist/windows -type f -name Chute-Setup.exe.sha256 -print -quit)"
+          chromezip="$(find dist/chrome -type f -name 'chute-chrome-2.6.1.zip' -print -quit)"
+          test -n "$exe" && test -n "$hashfile" && test -n "$chromezip"
+          cp "$exe" dist/release/Chute-Setup.exe
+          cp "$hashfile" dist/release/Chute-Setup.exe.sha256
+          cp "$chromezip" dist/release/Chute-Chrome-Working-2.6.1.zip
+          (cd dist/release && sha256sum -c Chute-Setup.exe.sha256)
+          (cd dist/release && sha256sum Chute-Chrome-Working-2.6.1.zip > Chute-Chrome-Working-2.6.1.zip.sha256)
+          echo "PASS: checksum verified for the exact original Windows EXE"
+
+      - name: Publish stable release and make it GitHub's latest
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat > release-notes.md <<EOF
+          ## Chute v2.6.1 — November 3 confirmed working pair
+
+          **Windows companion:** \`Chute-Setup.exe\` — exact build from Actions run $WINDOWS_RUN.
+          **Chrome MV3 extension:** \`Chute-Chrome-Working-2.6.1.zip\` — exact matching build from run $CHROME_RUN.
+          **Source tag:** \`$TAG\`.
+          **Pinned commit:** \`$SOURCE_SHA\`.
+          **Source development branch:** \`chute-main-2.6.1-upgrades-2026-11-03\`.
+
+          This is the **user-confirmed working Windows executable and matching Chrome worker**, with passing Windows installation/native host, Linux and worker boot checks ($TESTS_RUN).
+
+          **After this checkpoint**, main also received a Shelf-only patch to suppress internal Open status messages and load thumbnail previews from visible icon containers, plus cleaner vector fallback icons. That Shelf patch is part of main; it does not modify the pinned companion executable. For those UI fixes, load the extension folder from current main instead of the older bundled Chrome ZIP.
+
+          Do not confuse this build with the older public \`chute-windows-v2.6.1-rc1\`.
+          Back up your installed Chute.exe and %USERPROFILE%\\Chute before replacing anything.
+          EOF
+          if gh release view "$TAG" --repo "$REPO" >/dev/null 2>&1; then
+            gh release upload "$TAG" dist/release/* --repo "$REPO" --clobber
+            gh release edit "$TAG" --repo "$REPO" --notes-file release-notes.md --prerelease=false --latest
+          else
+            gh release create "$TAG" dist/release/* --repo "$REPO" \
+              --title "Chute v2.6.1 — November 3 Working Pair" \
+              --notes-file release-notes.md --latest
+          fi
+          gh release view "$TAG" --repo "$REPO" --json url,isLatest,isPrerelease,tagName
