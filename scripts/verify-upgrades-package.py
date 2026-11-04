@@ -72,4 +72,16 @@ assert "Opened folder containing ${file.name}" not in shelf
 assert 'class="file-type-svg"' in shelf
 assert '.file-fallback' in css
 
+# Chrome Load unpacked must display Chute's own artwork, not generic puzzle icon.
+for size in ("16", "32", "48", "128"):
+    path = f"icons/icon{size}.png"
+    assert manifest["icons"][size] == path
+    assert manifest["action"]["default_icon"][size] == path
+    icon = EXT / path
+    assert icon.is_file(), path
+    data = icon.read_bytes()
+    assert data.startswith(b"\\x89PNG\\r\\n\\x1a\\n"), path
+    assert int.from_bytes(data[16:20], "big") == int(size)
+    assert int.from_bytes(data[20:24], "big") == int(size)
+
 print("PASS: main-based v2.6.1 native boot and upgraded API contract")

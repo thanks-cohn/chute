@@ -156,7 +156,10 @@ def main() -> int:
     icons = {}
     for size in (16, 32, 48, 128):
         rel = f"icons/icon{size}.png"
-        make_icon(size, package_dir / rel)
+        # The same checked-in mascot icons must work for Load unpacked and
+        # Chrome Web Store packages; never inject icons only into the ZIP.
+        if not (EXTENSION / rel).is_file():
+            raise SystemExit(f"Missing versioned Chute extension icon: {rel}")
         icons[str(size)] = rel
 
     packaged_manifest = json.loads((package_dir / "manifest.json").read_text(encoding="utf-8"))
