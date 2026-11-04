@@ -49,6 +49,12 @@ Read and honor `worker/README.md`, `In_Progress/CODEX_DRAG_DROP_LOCAL_EXPLORER_I
 
 **Do not finish this phase by returning another documentation-only read-only POSIX report.** If Windows executable/build environment is blocked, still complete independently possible real code and CI, provide the exact blocker and working test artifacts when attainable.
 
+## P1 UI correction, November 4 — Preview browsing never collapses
+
+Owner's new instruction **overrides** earlier preview height wording. See [the scoped implementation report](../bugs/CHUTEY_EXPLORER_HALF_HEIGHT_BROWSING_EXPANDING_PREVIEW_AND_ARROW_GALLERY_2026-11-04.md).
+
+When the preview opens, the **allocated** tree/file browsing workspace changes to roughly the upper half of the available Explorer content height, retaining independent scrolling. The bottom viewer can be resized upward as far as immediately below protected top calendar/navigation controls; beyond the half split it **overlays** the Explorer, never compressing its allocated browsing workspace below 50%. Close preview to restore full browsing height and scroll. Provide clickable and keyboard Left/Right image navigation in current sort/filter order, including pagination. Update the old `before == after` height test to reflect this new requirement. Fix within current Shelf JS/CSS, preserving Python/native behavior.
+
 ## 3. P0-B — MAKE IT A GENUINE FILE EXPLORER
 
 After the first Windows-browse milestone is available for owner debugging, implement operations in the same production Python API and wire their actual results to UI affordances:
