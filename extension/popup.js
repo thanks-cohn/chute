@@ -16,6 +16,12 @@ function clampDimension(value, fallback = 512) {
 }
 
 openShelfButton?.addEventListener("click", async () => {
+  // A Chrome action popup cannot remain open while the Shelf has focus.
+  // Tear off a persistent, left-positioned gallery instead of hiding it.
+  if (typeof window.chuteyOpenShelfWithGallery === "function") {
+    await window.chuteyOpenShelfWithGallery();
+    return;
+  }
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
   if (!chrome.sidePanel?.open || !tab?.windowId) {
     console.error("Chute Shelf requires browser side-panel support.");
