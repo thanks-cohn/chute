@@ -1,0 +1,20 @@
+name: Chute Shelf icon and thumbnail regression
+on:
+  push:
+    branches:
+      - fix/chute-shelf-image-icons-2026-11-03
+  pull_request:
+    branches: [main]
+permissions:
+  contents: read
+jobs:
+  icon-smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Syntax check all extension JavaScript
+        run: find extension -maxdepth 1 -name '*.js' -print0 | xargs -0 -n1 node --check
+      - name: Test icon and thumbnail behavior
+        run: node scripts/verify-thumbnail-icons.cjs
+      - name: Validate Chute product contract
+        run: python scripts/verify-upgrades-package.py
