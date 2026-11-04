@@ -206,8 +206,8 @@
         return;
       }
 
-      for (const file of files) {
-        listElement.append(createRow(file, loadedCount));
+      for (const [index, file] of files.entries()) {
+        listElement.append(createRow(file, index));
       }
       const first = currentPage * displayLimit + 1;
       setStatus(`Live Chute · ${first}–${first + files.length - 1} · page ${currentPage + 1}`);
