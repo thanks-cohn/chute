@@ -6,13 +6,33 @@
   const retryDelays = [250, 600, 1200, 2500, 5000, 9000];
 
   function showThumbnail(img, blob) {
-    // Release local blob URLs after the image is decoded so page navigation
-    // does not retain previews from every previous page in memory.
-    const url = URL.createObjectURL(blob);
-    img.addEventListener("load", () => URL.revokeObjectURL(url), { once: true });
-    img.addEventListener("error", () => URL.revokeObjectURL(url), { once: true });
-    img.src = url;
-    img.hidden = false;
+    // Keep the vector fallback visible until the browser ACTUALLY decodes the
+    // thumbnail. A nonempty but corrupt cached WebP must never obscure it.
+    return new Promise((resolve, reject) => {
+      if (!img.isConnected) return resolve(false);
+      const url = URL.createObjectURL(blob);
+      let finished = false;
+      const finish = (ok) => {
+        if (finished) return;
+        finished = true;
+        URL.revokeObjectURL(url);
+        img.onload = null;
+        img.onerror = null;
+        if (ok && img.isConnected) {
+          img.hidden = false;
+          img.closest(".file-icon")?.classList.add("has-thumbnail");
+          resolve(true);
+        } else {
+          img.hidden = true;
+          img.closest(".file-icon")?.classList.remove("has-thumbnail");
+          if (ok) resolve(false);
+          else reject(new Error("Thumbnail could not be decoded"));
+        }
+      };
+      img.onload = () => finish(true);
+      img.onerror = () => finish(false);
+      img.src = url;
+    });
   }
 
   function sleep(ms) {
@@ -83,7 +103,7 @@
   }
 
   ensureThumbnail = async function(file, img) {
-    if (!showThumbnails || !file?.mime?.startsWith("image/") || !img?.isConnected || !img.hidden) return;
+    if (!showThumbnails || !isPreviewableImage(file) || !img?.isConnected || !img.hidden) return;
     if (thumbnailInFlight.has(img)) return;
     thumbnailInFlight.add(img);
 
@@ -93,10 +113,18 @@
         if (cached.ok) {
           const blob = await cached.blob();
           if (blob.size) {
-            showThumbnail(img, blob);
-            generatedThumbs.add(file.id);
-            thumbnailRetries.delete(img);
-            return;
+            // If a cached thumbnail is corrupted or no longer decodes, fetch
+            // the original image and rebuild instead of displaying a blank box.
+            try {
+              if (await showThumbnail(img, blob)) {
+                generatedThumbs.add(file.id);
+                thumbnailRetries.delete(img);
+                return;
+              }
+              return; // Page changed while decoding; no more work needed.
+            } catch {
+              // Ignore the corrupted cache and reconstruct the thumbnail.
+            }
           }
         }
       } catch {}
@@ -111,7 +139,7 @@
       }
 
       if (!showThumbnails || !img.isConnected) return;
-      showThumbnail(img, thumbnail);
+      if (!await showThumbnail(img, thumbnail)) return;
       thumbnailRetries.delete(img);
 
       if (await persistThumbnail(file, thumbnail)) {
