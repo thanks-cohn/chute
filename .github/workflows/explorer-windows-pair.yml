@@ -68,8 +68,11 @@ jobs:
           Copy-Item dist/chrome-store/chute-chrome-2.6.1.zip dist/pair/
           Copy-Item docs/explorer/WINDOWS_P0.md dist/pair/INSTALL-AND-EVIDENCE.md
           git rev-parse HEAD | Out-File dist/pair/SOURCE-COMMIT.txt -Encoding ascii
-          $checksums = @(Get-ChildItem dist/pair -File -Exclude SHA256SUMS.txt | Sort-Object Name | ForEach-Object { "$((Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLower())  $($_.Name)" })
-          [System.IO.File]::WriteAllLines((Join-Path (Resolve-Path dist/pair).Path 'SHA256SUMS.txt'), [string[]]$checksums, [System.Text.Encoding]::ASCII)
+          $pairPath = (Resolve-Path dist/pair).Path
+          $files = @(Get-ChildItem -Path (Join-Path $pairPath '*') -File | Where-Object { $_.Name -ne 'SHA256SUMS.txt' } | Sort-Object Name)
+          if ($files.Count -lt 4) { throw 'Missing matched files: refusing empty checksum manifest' }
+          $checksums = @($files | ForEach-Object { "$((Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLower())  $($_.Name)" })
+          [System.IO.File]::WriteAllLines((Join-Path $pairPath 'SHA256SUMS.txt'), [string[]]$checksums, [System.Text.Encoding]::ASCII)
       - uses: actions/upload-artifact@v4
         with:
           name: Chutey-Windows-Chrome-Explorer-TEST-${{ github.sha }}
