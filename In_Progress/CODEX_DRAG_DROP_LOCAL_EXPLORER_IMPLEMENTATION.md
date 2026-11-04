@@ -98,6 +98,8 @@ Inside File Explorer:
 
 **CSS contract:** All Explorer-specific selectors belong to separate `extension/explorer-*.css` scoped under `#chutey-explorer-view`; use the already present `--chutey-explorer-*` tokens in `explorer-shell.css`. Separate DOM layout, event logic, file operation logic and skin tokens. The eventual SKIN API should allow new colors, typography, icons and animation presets with a validated declarative theme, without granting filesystem/network privileges or injecting arbitrary JS/HTML. Premium finish is required, but skin work must not block correctness.
 
+> **OWNER SUPERSEDING PREVIEW CORRECTION — NOVEMBER 4, 2026:** The previous “never compress/shrink” requirement and its unchanged-height geometry test below are **historical and superseded**. The current authoritative specification is [the half-height Explorer + expandable preview + Left/Right gallery bug](../bugs/CHUTEY_EXPLORER_HALF_HEIGHT_BROWSING_EXPANDING_PREVIEW_AND_ARROW_GALLERY_2026-11-04.md): on preview open allocate roughly half of available Explorer content height for an independently scrollable browser; the preview card may rise nearly to protected top/calendar controls, and beyond the half split it must **overlay**, not further shrink the browser. The file Explorer must never collapse below its 50% allocated size. Closing restores full height/scroll. Left/Right moves through image files and pagination without closing preview. This correction takes precedence over conflicting instructions in this section and old browser tests.
+
 ## 5. Preview behavior — BOTTOM OVERLAY, NEVER COMPRESS THE EXPLORER
 
 The user specifically requires:
