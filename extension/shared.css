@@ -159,14 +159,16 @@ button, input, select { font: inherit; }
 .chute-clear-button svg { display: block; }
 .chute-clear-button[hidden] { display: none; }
 
-.file-list { padding: 8px; display: grid; gap: 7px; }
+/* Keep a clear gutter beside the native Chrome side-panel scrollbar. */
+.file-list { padding: 8px 20px 9px 9px; display: grid; gap: 6px; min-width: 0; }
 .file-row {
   display: grid;
   grid-template-columns: 42px minmax(0, 1fr) auto;
-  gap: 10px;
+  gap: 7px;
   align-items: center;
-  min-height: 62px;
-  padding: 8px;
+  min-width: 0;
+  min-height: 59px;
+  padding: 7px;
   border: 1px solid #30362a;
   border-radius: 11px;
   background: #1a1e17;
@@ -218,7 +220,7 @@ button, input, select { font: inherit; }
 .file-meta { margin-top: 3px; color: #8f9882; font-size: 11px; }
 .file-state { color: #d7ff3f; font-size: 10px; text-transform: uppercase; letter-spacing: .08em; }
 .file-tools { display: flex; gap: 5px; }
-.file-tools button { padding: 6px 8px; font-size: 11px; }
+.file-tools button { padding: 5px 7px; font-size: 11px; }
 
 .empty { padding: 34px 18px 40px; color: #9ca58d; text-align: center; }
 .empty strong { display: block; margin-bottom: 8px; color: #f4f5ee; }
