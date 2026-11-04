@@ -114,6 +114,16 @@ class ChuteHandler(BaseHTTPRequestHandler):
             self._json({"files": [public_item(item, active=True) for item in active]})
             return
 
+        if path == "/api/calendar":
+            month = (parse_qs(parsed.query).get("month") or [""])[0]
+            try:
+                counts = self.store.history_month_counts(month)
+            except ValueError as exc:
+                self._json({"error": str(exc)}, HTTPStatus.BAD_REQUEST)
+                return
+            self._json({"month": month, "counts": counts})
+            return
+
         if path == "/api/history":
             query = parse_qs(parsed.query)
             requested_day = (query.get("date") or [None])[0]
