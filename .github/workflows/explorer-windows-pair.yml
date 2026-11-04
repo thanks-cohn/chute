@@ -31,6 +31,32 @@ jobs:
         run: |
           powershell -ExecutionPolicy Bypass -File scripts/build-windows.ps1
           python scripts/build-chrome-store.py
+      - name: Installed test EXE startup in isolated CI home
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $env:USERPROFILE = Join-Path $env:RUNNER_TEMP 'chutey-pair-home'
+          $env:LOCALAPPDATA = Join-Path $env:RUNNER_TEMP 'chutey-pair-local'
+          New-Item -ItemType Directory -Force $env:USERPROFILE, $env:LOCALAPPDATA | Out-Null
+          try {
+            Start-Process -FilePath (Resolve-Path dist/windows/Chute-Windows.exe).Path -Wait
+            $ready = $false
+            for ($i=0; $i -lt 40; $i++) {
+              try {
+                $health = Invoke-RestMethod 'http://127.0.0.1:17891/health' -TimeoutSec 1
+                if ($health.service -eq 'chute') { $ready = $true; break }
+              } catch {}
+              Start-Sleep -Milliseconds 250
+            }
+            if (-not $ready) { throw 'Packaged companion did not start' }
+            $control = Join-Path $env:LOCALAPPDATA 'Chute/explorer-control.json'
+            if (-not (Test-Path $control)) { throw 'Native Explorer control initialization failed' }
+            $native = Join-Path $env:LOCALAPPDATA 'Programs/Chute/Chute-NativeHost.exe'
+            if (-not (Test-Path $native)) { throw 'Bundled native host missing' }
+            Write-Output 'PASS: packaged companion health, protected control initialization and bundled native host'
+          } finally {
+            Get-Process Chute -ErrorAction SilentlyContinue | Stop-Process -Force
+          }
       - name: Stage a single matched review artifact with checksums
         shell: pwsh
         run: |

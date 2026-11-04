@@ -1,4 +1,6 @@
-# Explorer v1 read-only checkpoint — not the complete Windows MVP
+# Explorer v1 read-only checkpoint — historical foundation
+
+**Current Windows milestone:** see [WINDOWS_P0.md](WINDOWS_P0.md) for native consent, Windows guards and paired test builds. The remainder records the earlier POSIX checkpoint.
 
 Based on current main `6b53747184b1d32e9c2d4933c7e7dd3d1d473ff1`. The implementation follows the hard stop in `In_Progress/CODEX_DRAG_DROP_LOCAL_EXPLORER_IMPLEMENTATION.md`: unproven native consent/write safety must not become a writable endpoint. The known-working release and existing History/native/drag routes remain intact. **This branch is a review checkpoint, not a claim that the requested full drag-and-drop product is finished.**
 
