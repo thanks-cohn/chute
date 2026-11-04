@@ -31,6 +31,19 @@ button, input, select { font: inherit; }
   font-weight: 900;
   transform: rotate(-5deg);
 }
+/* Keep the original SNES-style Chute pixel art crisp at Shelf scale. */
+.logo:has(img) {
+  transform: none;
+  overflow: hidden;
+  background: #d7ff3f;
+}
+.logo img {
+  display: block;
+  width: 27px;
+  height: 27px;
+  object-fit: contain;
+  image-rendering: pixelated;
+}
 .title { font-size: 15px; font-weight: 800; letter-spacing: .02em; }
 .subtitle { color: #9ca58d; font-size: 11px; }
 
