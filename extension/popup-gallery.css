@@ -1,0 +1,69 @@
+/* Popup-only gallery: no changes to Shelf History or File Explorer styles. */
+body.chutey-gallery-popup { width:390px; max-height:600px; overflow-y:auto; overflow-x:hidden; }
+.chutey-gallery-popup .gallery-density-control { display:flex; justify-content:flex-end; align-items:center; gap:8px; }
+.chutey-gallery-popup #gallery-density { width:116px; min-width:0; accent-color:#d7ff3f; cursor:ew-resize; }
+.chutey-gallery-popup #gallery-density-value { color:#e3f0d6; font-size:11px; min-width:40px; text-align:right; font-variant-numeric:tabular-nums; }
+.chutey-gallery-popup .settings-panel[open] { max-height:325px; overflow-y:auto; }
+.chutey-gallery-popup #files {
+  display:grid; grid-template-columns:repeat(var(--chutey-gallery-columns,4),minmax(0,1fr));
+  align-content:start; align-items:start; gap:6px; padding:8px 10px;
+  width:100%; height:386px; min-height:0; max-height:386px;
+  overflow-y:auto; overflow-x:hidden; overscroll-behavior:contain;
+  scrollbar-gutter:stable;
+}
+.chutey-gallery-popup #files .chutey-gallery-tile {
+  position:relative; display:block; aspect-ratio:1 / 1; height:auto; width:100%;
+  min-width:0; min-height:0; padding:0; gap:0; overflow:hidden;
+  border:1px solid #3e4c36; border-radius:9px; cursor:pointer; isolation:isolate;
+  contain:layout paint style;
+}
+.chutey-gallery-popup #files .chutey-gallery-tile:focus-visible { outline:2px solid #d7ff3f; outline-offset:-3px; }
+.chutey-gallery-popup #files .chutey-gallery-tile .file-icon {
+  position:absolute; inset:0; width:100%; height:100%; border-radius:inherit;
+  background:radial-gradient(circle at 30% 30%,#364837,#1c2820 62%,#151d18);
+}
+.chutey-gallery-popup #files .chutey-gallery-tile .file-icon::before,
+.chutey-gallery-popup #files .chutey-gallery-tile .file-icon::after {
+  content:""; position:absolute; pointer-events:none; z-index:0;
+  inset:15%; border:1px solid #acd28b61; border-radius:34%;
+}
+.chutey-gallery-popup #files .chutey-gallery-tile .file-icon::before {
+  transform:rotate(30deg);
+  background:repeating-conic-gradient(from 15deg,transparent 0deg 25deg,#bada9c19 25deg 28deg);
+  animation:chute-gallery-turn 13s linear infinite;
+}
+.chutey-gallery-popup #files .chutey-gallery-tile .file-icon::after {
+  inset:27%; border-radius:50%;
+  box-shadow:0 0 0 7px #91af7820,0 0 0 16px #bada9c10;
+  animation:chute-gallery-turn 19s linear infinite reverse;
+}
+.chutey-gallery-popup #files .chutey-gallery-tile .file-icon.has-thumbnail::before,
+.chutey-gallery-popup #files .chutey-gallery-tile .file-icon.has-thumbnail::after { opacity:0; animation:none; }
+.chutey-gallery-popup #files .chutey-gallery-tile .file-thumb { z-index:1; width:100%; height:100%; }
+.chutey-gallery-popup #files .chutey-gallery-tile .file-fallback {
+  position:relative; z-index:1; width:40%; height:40%; filter:drop-shadow(0 2px 4px #050a07b9);
+}
+.chutey-gallery-popup #files .chutey-gallery-tile .file-fallback svg { width:100%; height:100%; }
+.chutey-gallery-popup #files .chutey-gallery-tile .file-info {
+  position:absolute; left:0; right:0; bottom:0; z-index:2; padding:9px 4px 4px;
+  background:linear-gradient(transparent,#090e0bde 45%,#090e0bf5);
+  pointer-events:none;
+}
+.chutey-gallery-popup #files .chutey-gallery-tile .file-name { color:#f3f9eb; font-size:9px; font-weight:600; }
+.chutey-gallery-popup #files .chutey-gallery-tile .file-meta { display:none; }
+.chutey-gallery-popup #files .chutey-gallery-tile .file-tools {
+  position:absolute; right:3px; top:3px; z-index:3; display:none;
+  flex-direction:column; align-items:end; gap:2px;
+}
+.chutey-gallery-popup #files .chutey-gallery-tile:hover .file-tools,
+.chutey-gallery-popup #files .chutey-gallery-tile:focus-within .file-tools { display:flex; }
+.chutey-gallery-popup #files .chutey-gallery-tile .file-tools button { padding:2px 3px; font-size:9px; min-height:20px; }
+.chutey-gallery-popup #files .chutey-gallery-tile.archived { opacity:1; }
+.chutey-gallery-popup #files .empty { grid-column:1 / -1; }
+.chutey-gallery-popup .history-pagination { margin:3px 10px 4px; padding:5px 6px; position:sticky; bottom:0; z-index:5; }
+.chutey-gallery-popup .popup-note { padding-bottom:6px; }
+@keyframes chute-gallery-turn { to { transform:rotate(390deg); } }
+@media (prefers-reduced-motion:reduce) {
+  .chutey-gallery-popup #files .chutey-gallery-tile .file-icon::before,
+  .chutey-gallery-popup #files .chutey-gallery-tile .file-icon::after { animation:none; }
+}

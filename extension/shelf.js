@@ -380,8 +380,9 @@ async function loadSettings() {
     chuteDragOutMode: "file"
   });
   const next = Number(settings.chutePageSize);
-  displayLimit = Number.isFinite(next) && next >= 1
-    ? Math.min(500, Math.trunc(next)) : 40;
+  displayLimit = location.pathname.endsWith("/popup.html") ? 30
+    : Number.isFinite(next) && next >= 1
+      ? Math.min(500, Math.trunc(next)) : 40;
   showThumbnails = settings.chuteThumbnails !== false;
   dragOutMode = settings.chuteDragOutMode === "source" ? "source" : "file";
 }

@@ -48,7 +48,7 @@ async function loadPopupSettings() {
     ? settings.chuteBrowserImageCapture === "thumbnail"
     : settings.chuteBrowserImageSaveCustom === true;
 
-  displayLimitInput.value = String(Number.isFinite(limit) && limit > 0 ? Math.min(500, Math.trunc(limit)) : 40);
+  if (displayLimitInput) displayLimitInput.value = String(Number.isFinite(limit) && limit > 0 ? Math.min(500, Math.trunc(limit)) : 40);
   accessModeSelect.value = mode;
   dragOutModeSelect.value = settings.chuteDragOutMode === "source" ? "source" : "file";
   saveFullToggle.checked = migratedFull;
