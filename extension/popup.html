@@ -61,11 +61,11 @@
         <input id="browser-image-height" type="number" min="1" step="1" value="512" aria-label="Custom image maximum height">
       </div>
 
-      <div class="setting-label">History shown</div>
+      <div class="setting-label">Items per page</div>
       <div class="limit-control">
-        <input id="display-limit" type="number" min="1" step="1" inputmode="numeric" value="50" aria-label="Number of history entries shown">
-        <button id="display-unlimited" class="infinity-button" type="button" title="Bottomless history">∞</button>
+        <input id="display-limit" type="number" min="1" max="500" step="1" inputmode="numeric" value="40" aria-label="Number of entries on each page">
       </div>
+      <div class="settings-note">40 items per page by default. Previous and Next let you keep browsing without an archive limit; images load only when their rows appear on screen.</div>
 
       <label>
         <span>Generated menu thumbnails</span>
@@ -110,6 +110,11 @@
 
   <div id="status" class="status">Connecting…</div>
   <main id="files" class="file-list"></main>
+  <nav id="history-pagination" class="history-pagination" aria-label="Browse file pages" hidden>
+    <button id="history-page-prev" class="secondary-button" type="button">‹ Previous</button>
+    <span id="history-page-label" class="page-position" aria-live="polite">Page 1</span>
+    <button id="history-page-next" class="secondary-button" type="button">Next ›</button>
+  </nav>
   <div id="history-sentinel" class="history-sentinel" aria-hidden="true"></div>
   <div class="popup-note">Latest is your live working Chute. Dated history stays on disk and remains available in the Shelf or by choosing a date.</div>
 
