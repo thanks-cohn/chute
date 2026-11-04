@@ -267,7 +267,18 @@ function createRow(file, index) {
     thumb.draggable = false;
     thumb.__chuteFile = file;
     icon.append(thumb);
-    thumbObserver.observe(icon);
+
+    // Browser side panels, popups and headless Chrome can defer an
+    // IntersectionObserver callback until after the user sees the Shelf.
+    // Eagerly load only the first visible rows; later rows stay lazy.
+    // Defer until the row is in the DOM and workflow-fixes.js has loaded.
+    if (index < 8) {
+      queueMicrotask(() => {
+        if (thumb.isConnected) ensureThumbnail(file, thumb);
+      });
+    } else {
+      thumbObserver.observe(icon);
+    }
   }
 
   const tools = row.querySelector(".file-tools");
@@ -445,8 +456,8 @@ async function resetHistory(day = selectedDay || null) {
       return;
     }
 
-    for (const file of payload.files) {
-      listElement.append(createRow(file, loadedCount));
+    for (const [index, file] of payload.files.entries()) {
+      listElement.append(createRow(file, index));
     }
     const from = currentPage * displayLimit + 1;
     const to = from + loadedCount - 1;
