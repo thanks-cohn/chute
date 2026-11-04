@@ -41,54 +41,160 @@
     }
   });
 
-  async function openItem(file, index) {
-    if (opening || !/^[0-9a-f]{32}$/i.test(String(file.id || ""))) return;
+  // Preview is local to the popup. Shelf handoff requires an explicit click.
+  const lightbox = document.createElement("section");
+  lightbox.className = "chutey-lightbox";
+  lightbox.hidden = true;
+  lightbox.setAttribute("role","dialog");
+  lightbox.setAttribute("aria-modal","true");
+  lightbox.setAttribute("aria-label","Image preview");
+  lightbox.innerHTML = `
+    <header><strong class="chutey-lightbox-title"></strong><button class="chutey-lightbox-close" type="button" aria-label="Close preview">×</button></header>
+    <div class="chutey-lightbox-stage">
+      <button type="button" class="chutey-lightbox-prev" aria-label="Previous image">‹</button>
+      <img class="chutey-lightbox-image" alt="">
+      <button type="button" class="chutey-lightbox-next" aria-label="Next image">›</button>
+      <p class="chutey-lightbox-error" hidden>Image unavailable. The History entry is preserved.</p>
+    </div>
+    <footer><span class="chutey-lightbox-count"></span><button type="button" class="secondary-button chutey-lightbox-shelf">Open in Shelf</button></footer>`;
+  document.body.append(lightbox);
+  const preview = lightbox.querySelector(".chutey-lightbox-image");
+  const errorText = lightbox.querySelector(".chutey-lightbox-error");
+  const prev = lightbox.querySelector(".chutey-lightbox-prev");
+  const next = lightbox.querySelector(".chutey-lightbox-next");
+  let activeId = null, returnFocus = null, serial = 0;
+  function imageTiles() {
+    return Array.from(document.querySelectorAll("#files .chutey-gallery-tile"))
+      .filter(tile => tile.__galleryFile && isPreviewableImage(tile.__galleryFile));
+  }
+  function activeFile() {
+    return imageTiles().find(tile => tile.__galleryFile.id === activeId)?.__galleryFile;
+  }
+  function showImage(id) {
+    const tiles = imageTiles();
+    const index = tiles.findIndex(tile => tile.__galleryFile.id === id);
+    if (index < 0) return;
+    const file = tiles[index].__galleryFile;
+    activeId = id;
+    const token = ++serial;
+    errorText.hidden = true;
+    errorText.textContent = "Image unavailable. The History entry is preserved.";
+    preview.hidden = false;
+    preview.removeAttribute("src");
+    preview.alt = file.name || "Saved image";
+    lightbox.querySelector(".chutey-lightbox-title").textContent = file.name || "Saved image";
+    lightbox.querySelector(".chutey-lightbox-count").textContent = (index + 1) + " / " + tiles.length;
+    prev.disabled = index === 0;
+    next.disabled = index === tiles.length - 1;
+    preview.onerror = () => {
+      if (token !== serial) return;
+      preview.hidden = true; errorText.hidden = false;
+    };
+    preview.src = fileUrl(file);
+  }
+  function openPreview(file, source) {
+    if (!isPreviewableImage(file)) return;
+    returnFocus = source;
+    lightbox.hidden = false;
+    document.body.classList.add("chutey-lightbox-open");
+    showImage(file.id);
+    lightbox.querySelector(".chutey-lightbox-close").focus();
+  }
+  function closePreview() {
+    if (lightbox.hidden) return;
+    lightbox.hidden = true;
+    document.body.classList.remove("chutey-lightbox-open");
+    ++serial;
+    preview.removeAttribute("src");
+    activeId = null;
+    if (returnFocus?.isConnected) returnFocus.focus({preventScroll:true});
+    returnFocus = null;
+  }
+  function move(delta) {
+    const tiles = imageTiles();
+    const index = tiles.findIndex(tile => tile.__galleryFile.id === activeId);
+    if (index + delta >= 0 && index + delta < tiles.length) showImage(tiles[index + delta].__galleryFile.id);
+  }
+  lightbox.querySelector(".chutey-lightbox-close").addEventListener("click",closePreview);
+  prev.addEventListener("click",() => move(-1));
+  next.addEventListener("click",() => move(1));
+  document.addEventListener("keydown",event => {
+    if (lightbox.hidden) return;
+    if (event.key === "Escape") { event.preventDefault(); closePreview(); }
+    else if (event.key === "ArrowLeft") { event.preventDefault(); move(-1); }
+    else if (event.key === "ArrowRight") { event.preventDefault(); move(1); }
+    else if (event.key === "Tab") {
+      const controls = Array.from(lightbox.querySelectorAll("button:not(:disabled)"));
+      const first = controls[0], last = controls[controls.length - 1];
+      if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); }
+      else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
+    }
+  },true);
+  lightbox.querySelector(".chutey-lightbox-shelf").addEventListener("click",async () => {
+    if (opening) return;
+    const file = activeFile();
+    if (!file || !/^[0-9a-f]{32}$/i.test(String(file.id || ""))) return;
     opening = true;
     const day = selectedDay || String(file.created_at || "").slice(0,10);
     const intent = {
       id:file.id, name:String(file.name || "Saved image").slice(0,256),
       mime:String(file.mime || ""), day:/^\d{4}-\d{2}-\d{2}$/.test(day) ? day : "",
-      page:currentPage, index:index, scope:selectedDay ? "history" : "live",
+      page:currentPage, index:imageTiles().findIndex(tile => tile.__galleryFile.id === file.id),
+      scope:selectedDay ? "history" : "live",
       requestId:String(Date.now()) + "-" + Math.random().toString(36).slice(2,9),
       issuedAt:Date.now()
     };
     try {
       const tabs = await chrome.tabs.query({active:true,currentWindow:true});
-      const tab = tabs[0];
-      if (!chrome.sidePanel?.open || !tab?.windowId) throw new Error("Shelf not available");
-      intent.windowId = tab.windowId;
-      // Start both user-gesture-sensitive operations without an extra await
-      // between them. The Shelf handles either the initial stored intent or
-      // the session change event if it was already open.
-      const storeIntent = chrome.storage.session.set({chuteyPopupOpenItem:intent});
-      const openPanel = chrome.sidePanel.open({windowId:tab.windowId});
-      await Promise.all([storeIntent,openPanel]);
+      if (!chrome.sidePanel?.open || !tabs[0]?.windowId) throw new Error("Shelf unavailable");
+      intent.windowId = tabs[0].windowId;
+      await Promise.all([
+        chrome.storage.session.set({chuteyPopupOpenItem:intent}),
+        chrome.sidePanel.open({windowId:tabs[0].windowId})
+      ]);
       window.close();
     } catch (error) {
-      if (popupStatus) {
-        popupStatus.textContent = "Could not open this image in the Shelf.";
-        popupStatus.classList.add("error");
-      }
-      console.warn("Chutey popup gallery handoff failed:",error);
-    } finally {
-      opening = false;
-    }
-  }
+      errorText.textContent = "Could not open the Shelf. Preview remains available.";
+      errorText.hidden = false;
+      console.warn("Explicit Shelf handoff failed:", error);
+    } finally { opening = false; }
+  });
+  new MutationObserver(() => {
+    if (!lightbox.hidden && !activeFile()) closePreview();
+  }).observe(document.querySelector("#files"),{childList:true});
+
   const original = createRow;
   createRow = function galleryRow(file,index) {
     const row = original(file,index);
+    row.__galleryFile = file;
     row.classList.add("chutey-gallery-tile");
     row.tabIndex = 0;
     row.title = file.name;
-    row.setAttribute("aria-label","Open " + file.name + " in Chutey Shelf");
+    row.setAttribute("aria-label","Select " + file.name + " in History");
+    row.setAttribute("aria-expanded","false");
+    const icon = row.querySelector(".file-icon");
+    if (isPreviewableImage(file) && icon) {
+      icon.setAttribute("role","button");
+      icon.tabIndex = 0;
+      icon.setAttribute("aria-label","Preview " + file.name);
+      icon.addEventListener("click",event => { event.stopPropagation(); openPreview(file,icon); });
+      icon.addEventListener("keydown",event => {
+        if (!["Enter"," "].includes(event.key)) return;
+        event.preventDefault(); event.stopPropagation(); openPreview(file,icon);
+      });
+    }
+    function toggle() {
+      const expanded = !row.classList.contains("chutey-gallery-expanded");
+      row.classList.toggle("chutey-gallery-expanded",expanded);
+      row.setAttribute("aria-expanded",String(expanded));
+    }
     row.addEventListener("click",event => {
-      if (event.defaultPrevented || event.target.closest("button,input,a,select")) return;
-      void openItem(file,index);
+      if (event.defaultPrevented || event.target.closest("button,input,a,select,.file-icon")) return;
+      toggle();
     });
     row.addEventListener("keydown",event => {
-      if (!["Enter"," "].includes(event.key) || event.target.closest("button,input,a,select")) return;
-      event.preventDefault();
-      void openItem(file,index);
+      if (!["Enter"," "].includes(event.key) || event.target !== row) return;
+      event.preventDefault(); toggle();
     });
     return row;
   };
