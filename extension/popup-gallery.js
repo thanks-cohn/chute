@@ -206,7 +206,7 @@
       row.setAttribute("aria-expanded",String(expanded));
     }
     row.addEventListener("click",event => {
-      if (event.defaultPrevented || event.target.closest("button,input,a,select,.file-icon")) return;
+      if (event.defaultPrevented || event.target.closest("button,input,a,select") || (isPreviewableImage(file) && event.target.closest(".file-icon"))) return;
       toggle();
     });
     row.addEventListener("keydown",event => {
