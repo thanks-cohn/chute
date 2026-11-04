@@ -190,6 +190,29 @@
     row.setAttribute("aria-label","Select " + file.name + " in History");
     row.setAttribute("aria-expanded","false");
     const icon = row.querySelector(".file-icon");
+    // A web shortcut is NOT an image. Show the Chutey mascot rather than
+    // a generic chain glyph, without pretending we downloaded image bytes.
+    // While a real image is loading (or if it cannot decode), the same mascot
+    // stays visible beneath the eventual thumbnail.
+    if (icon && (fileKind(file) === "link" || isPreviewableImage(file))) {
+      const fallback = icon.querySelector(".file-fallback");
+      if (fallback) {
+        const mascot = document.createElement("img");
+        mascot.className = "chutey-tile-mascot";
+        mascot.src = "icons/icon32.png";
+        mascot.alt = "";
+        mascot.draggable = false;
+        fallback.replaceChildren(mascot);
+        icon.classList.add("chutey-mascot-fallback");
+        if (fileKind(file) === "link") {
+          const kindLabel = document.createElement("span");
+          kindLabel.className = "chutey-shortcut-kind";
+          kindLabel.textContent = "LINK";
+          kindLabel.setAttribute("aria-hidden", "true");
+          icon.append(kindLabel);
+        }
+      }
+    }
     if (isPreviewableImage(file) && icon) {
       icon.setAttribute("role","button");
       icon.tabIndex = 0;
