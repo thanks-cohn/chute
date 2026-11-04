@@ -21,6 +21,8 @@ else:
             title=(case.get('classname','')+'.'+case.get('name','')).replace(',','_').replace(':','_')
             print(f'::error title={title}::{annotation}')
             failures.append(f"### {case.get('classname','')}.{case.get('name','')}\n\n```text\n{detail}\n```\n")
+    skipped=sum(case.find('skipped') is not None for case in cases)
+    print(f'::notice title=Explorer pytest XML result::cases={len(cases)}; failing={len(failures)}; skipped={skipped}')
     text=f'## Explorer tests\n\nCurrent-run cases: {len(cases)}; failing cases: {len(failures)}. Platform skips remain skips.\n\n'+''.join(failures)
 summary=os.environ.get('GITHUB_STEP_SUMMARY')
 if summary:

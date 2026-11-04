@@ -78,6 +78,7 @@ jobs:
           $files = @(Get-ChildItem -Path (Join-Path $pairPath '*') -File | Where-Object { $_.Name -ne 'SHA256SUMS.txt' } | Sort-Object Name)
           if ($files.Count -lt 4) { throw 'Missing matched files: refusing empty checksum manifest' }
           $checksums = @($files | ForEach-Object { "$((Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLower())  $($_.Name)" })
+          foreach ($checksum in $checksums) { Write-Output "::notice title=Matched TEST pair SHA-256::$checksum" }
           [System.IO.File]::WriteAllLines((Join-Path $pairPath 'SHA256SUMS.txt'), [string[]]$checksums, [System.Text.Encoding]::ASCII)
       - uses: actions/upload-artifact@v4
         with:

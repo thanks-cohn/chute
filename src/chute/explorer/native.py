@@ -85,6 +85,7 @@ class NativeExplorer:
         self.token=secrets.token_urlsafe(32)
         self.adapters={}
         self.lock=threading.Lock()
+        self.selection_lock=threading.Lock()
         private_write(control_path(),json.dumps({'token':self.token}).encode())
 
     def action(self, origin, *, select, writable=False):
@@ -94,52 +95,56 @@ class NativeExplorer:
         session=Session(origin)
         if origin.removeprefix('chrome-extension://') not in _allowed_extension_ids():
             raise ExplorerError('UNAUTHORIZED','This Chutey installation is not enrolled.')
-        if not self.lock.acquire(blocking=False):
+        if not self.selection_lock.acquire(blocking=False):
             raise ExplorerError('BUSY','A folder selection is already open.')
         try:
-            old=self.adapters.get(origin)
-            if select:
-                path=choose_folder(writable=True) if writable else choose_folder()
-                if not path: raise ExplorerError('CANCELLED','No folder was selected. Existing access is unchanged.')
-                from .grant_store import describe
-                grant=RootGrant(Path(path),writable=writable)
-                descriptor=describe(grant,path)
-                try:
-                    if self.store: self.store.save(origin,descriptor)
-                except BaseException:
-                    grant.close(); raise
-                self.descriptors[origin]=descriptor
-                engine=Explorer([grant])
-                adapter=ExplorerAPI(engine,session)
-                # Replacing consent invalidates previous sessions immediately.
-                self.adapters[origin]=adapter
-                if old:
+            # Native consent UI must not hold the authorization/state lock.
+            # Existing browsing and view persistence remain available while it is open.
+            path=(choose_folder(writable=True) if writable else choose_folder()) if select else None
+            if select and not path:
+                raise ExplorerError('CANCELLED','No folder was selected. Existing access is unchanged.')
+            with self.lock:
+                old=self.adapters.get(origin)
+                if select:
+                    from .grant_store import describe
+                    grant=RootGrant(Path(path),writable=writable)
+                    descriptor=describe(grant,path)
+                    try:
+                        if self.store: self.store.save(origin,descriptor)
+                    except BaseException:
+                        grant.close(); raise
+                    self.descriptors[origin]=descriptor
+                    engine=Explorer([grant])
+                    adapter=ExplorerAPI(engine,session)
+                    # Replacing consent invalidates previous sessions immediately.
+                    self.adapters[origin]=adapter
+                    if old:
+                        old.session.expires=0
+                        with old.engine.lock: old.engine.close()
+                elif old:
+                    # Reopening Shelf renews same root without broadening scope.
+                    grant=next(iter(old.engine.grants.values()))
+                    grant.stat(grant.id)  # Revalidate the original guarded root.
+                    adapter=ExplorerAPI(old.engine,session)
+                    adapter.resume_handle=getattr(old,'resume_handle',grant.id)
                     old.session.expires=0
-                    with old.engine.lock: old.engine.close()
-            elif old:
-                # Reopening Shelf renews same root without broadening scope.
-                grant=next(iter(old.engine.grants.values()))
-                grant.stat(grant.id)  # Revalidate the original guarded root.
-                adapter=ExplorerAPI(old.engine,session)
-                adapter.resume_handle=getattr(old,'resume_handle',grant.id)
-                old.session.expires=0
-                self.adapters[origin]=adapter
-            elif self.store:
-                from .grant_store import restore
-                descriptor=self.store.load(origin)
-                grant,handle=restore(descriptor)
-                engine=Explorer([grant])
-                adapter=ExplorerAPI(engine,session)
-                adapter.resume_handle=handle
-                self.descriptors[origin]=descriptor
-                self.adapters[origin]=adapter
-            else:
-                raise ExplorerError('NEEDS_SELECTION','Select a folder to begin browsing.')
-            adapter.native_state=lambda command,args: self.state(origin,command,args)
-            return {'ok':True,'token':session.token,'expires_in':900,'read_only':not next(iter(adapter.engine.grants.values())).writable,
-                    'native_roundtrip_ms':round((time.perf_counter()-started)*1000,2),
-                    'protocol':'1.1','persistent':bool(self.store)}
-        finally: self.lock.release()
+                    self.adapters[origin]=adapter
+                elif self.store:
+                    from .grant_store import restore
+                    descriptor=self.store.load(origin)
+                    grant,handle=restore(descriptor)
+                    engine=Explorer([grant])
+                    adapter=ExplorerAPI(engine,session)
+                    adapter.resume_handle=handle
+                    self.descriptors[origin]=descriptor
+                    self.adapters[origin]=adapter
+                else:
+                    raise ExplorerError('NEEDS_SELECTION','Select a folder to begin browsing.')
+                adapter.native_state=lambda command,args: self.state(origin,command,args)
+                return {'ok':True,'token':session.token,'expires_in':900,'read_only':not next(iter(adapter.engine.grants.values())).writable,
+                        'native_roundtrip_ms':round((time.perf_counter()-started)*1000,2),
+                        'protocol':'1.1','persistent':bool(self.store)}
+        finally: self.selection_lock.release()
 
     def state(self, origin, command, args):
         adapter=self.adapters[origin]

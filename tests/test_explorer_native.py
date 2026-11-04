@@ -44,3 +44,25 @@ class NativeConsentTests(unittest.TestCase):
             self.assertEqual(native_main(),0)
             self.assertFalse(send.call_args.args[0]['ok'])
             wake.assert_not_called()
+
+    def test_existing_browse_state_does_not_wait_for_open_picker(self):
+        import threading
+        with patch('chute.explorer.native.choose_folder',return_value=str(self.root)):
+            self.controller.action(ORIGIN,select=True)
+        entered=threading.Event();release=threading.Event();returned=threading.Event()
+        def choose():
+            entered.set();release.wait(3);return ''
+        def selection():
+            try:self.controller.action(ORIGIN,select=True)
+            except ExplorerError:pass
+        def browse():
+            self.controller.state(ORIGIN,'resume_location',{});returned.set()
+        with patch('chute.explorer.native.choose_folder',side_effect=choose):
+            picker=threading.Thread(target=selection);picker.start()
+            try:
+                self.assertTrue(entered.wait(1))
+                reader=threading.Thread(target=browse);reader.start()
+                self.assertTrue(returned.wait(1),'Existing browse state blocked behind native picker')
+            finally:
+                release.set();picker.join(3)
+                if 'reader' in locals():reader.join(3)
