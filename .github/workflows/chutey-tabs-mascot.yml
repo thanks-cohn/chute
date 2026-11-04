@@ -1,0 +1,23 @@
+name: Chutey tabs and mascot visibility
+on:
+  push:
+    branches:
+      - fix/chutey-mascot-tabs-black-logo-2026-11-03
+  pull_request:
+    branches: [main]
+permissions:
+  contents: read
+jobs:
+  tabs-and-mascot:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Chrome extension syntax
+        run: find extension -maxdepth 1 -name '*.js' -print0 | xargs -0 -n1 node --check
+      - name: Chutey tab state, preferences and mascot timing
+        run: node scripts/verify-chutey-tabs-and-mascot.cjs
+      - name: Preserve real image preview and native host contracts
+        run: |
+          node scripts/verify-thumbnail-icons.cjs
+          node scripts/verify-worker-boot.cjs
+          python scripts/verify-upgrades-package.py
