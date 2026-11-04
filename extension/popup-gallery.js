@@ -57,8 +57,12 @@
       const tab = tabs[0];
       if (!chrome.sidePanel?.open || !tab?.windowId) throw new Error("Shelf not available");
       intent.windowId = tab.windowId;
-      await chrome.storage.session.set({chuteyPopupOpenItem:intent});
-      await chrome.sidePanel.open({windowId:tab.windowId});
+      // Start both user-gesture-sensitive operations without an extra await
+      // between them. The Shelf handles either the initial stored intent or
+      // the session change event if it was already open.
+      const storeIntent = chrome.storage.session.set({chuteyPopupOpenItem:intent});
+      const openPanel = chrome.sidePanel.open({windowId:tab.windowId});
+      await Promise.all([storeIntent,openPanel]);
       window.close();
     } catch (error) {
       if (popupStatus) {
