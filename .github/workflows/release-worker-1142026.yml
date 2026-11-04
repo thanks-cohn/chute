@@ -1,0 +1,112 @@
+name: Publish Chutey worker-1142026 matched Explorer test release
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'worker-1142026/**'
+      - '.github/workflows/release-worker-1142026.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  actions: read
+
+jobs:
+  publish:
+    if: github.repository == 'thanks-cohn/chute'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      GH_TOKEN: ${{ github.token }}
+      REPO: ${{ github.repository }}
+      TAG: chutey-worker-1142026
+      PAIRED_SOURCE: a6214d494e4db89f765717b85ac03f69391b454a
+      PAIRED_RUN: '41795692460'
+      PAIRED_ARTIFACT: Chutey-Windows-Chrome-Explorer-TEST-a6214d494e4db89f765717b85ac03f69391b454a
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Verify copied worker and companion bytes against canonical and tested sources
+        shell: bash
+        run: |
+          set -euo pipefail
+          git merge-base --is-ancestor "$PAIRED_SOURCE" HEAD
+          count=0
+          while IFS=$'\t' read -r source snapshot blob; do
+            [[ "$source" == '#'* || -z "$source" ]] && continue
+            test -f "$source"
+            test -f "$snapshot"
+            cmp "$source" "$snapshot"
+            git show "$PAIRED_SOURCE:$source" | cmp - "$snapshot"
+            test "$(git hash-object "$snapshot")" = "$blob"
+            count=$((count + 1))
+          done < worker-1142026/SOURCE-MAP.tsv
+          test "$count" -ge 20
+          node scripts/verify-worker-boot.cjs
+          echo "PASS: $count snapshot files equal canonical source and matched Windows/Chrome build source"
+
+      - name: Verify successful paired build and download its original tested artifacts
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(gh api "repos/$REPO/actions/runs/$PAIRED_RUN" --jq .head_sha)" = "$PAIRED_SOURCE"
+          test "$(gh api "repos/$REPO/actions/runs/$PAIRED_RUN" --jq .conclusion)" = success
+          mkdir -p dist/source-pair dist/release
+          gh run download "$PAIRED_RUN" --repo "$REPO" -n "$PAIRED_ARTIFACT" -D dist/source-pair
+          test "$(tr -d '\r\n' < dist/source-pair/SOURCE-COMMIT.txt)" = "$PAIRED_SOURCE"
+          (cd dist/source-pair && sha256sum -c SHA256SUMS.txt)
+          test -s dist/source-pair/Chute-Windows-Explorer-TEST.exe
+          test -s dist/source-pair/chute-chrome-2.6.1.zip
+          cp dist/source-pair/Chute-Windows-Explorer-TEST.exe dist/release/
+          cp dist/source-pair/chute-chrome-2.6.1.zip dist/release/
+          cp dist/source-pair/SOURCE-COMMIT.txt dist/release/PAIRED-BUILD-SOURCE.txt
+          (cd . && zip -q -r dist/release/Chutey-Worker-1142026-source.zip worker-1142026)
+          (cd dist/release && sha256sum Chute-Windows-Explorer-TEST.exe chute-chrome-2.6.1.zip Chutey-Worker-1142026-source.zip > SHA256SUMS.txt)
+          git rev-parse HEAD > dist/release/WORKER-SNAPSHOT-COMMIT.txt
+
+      - name: Create immutable annotated worker checkpoint tag and GitHub prerelease
+        shell: bash
+        run: |
+          set -euo pipefail
+          if gh api "repos/$REPO/git/ref/tags/$TAG" >/dev/null 2>&1; then
+            echo "Refusing to overwrite existing worker checkpoint tag $TAG"
+            exit 1
+          fi
+          if gh release view "$TAG" --repo "$REPO" >/dev/null 2>&1; then
+            echo "Refusing to overwrite an existing release"
+            exit 1
+          fi
+          tag_sha="$(gh api --method POST "repos/$REPO/git/tags" \
+            -f tag="$TAG" \
+            -f message="Chutey November 4 working Explorer worker snapshot; paired Windows+Chrome test build source $PAIRED_SOURCE; release source $GITHUB_SHA" \
+            -f object="$GITHUB_SHA" -f type=commit --jq .sha)"
+          gh api --method POST "repos/$REPO/git/refs" \
+            -f ref="refs/tags/$TAG" -f sha="$tag_sha" >/dev/null
+          cat > release-notes.md <<EOF
+          ## Chutey November 4 — working worker + Windows Explorer test pair
+
+          - Tag: $TAG
+          - Snapshot commit: $GITHUB_SHA
+          - Verified matching EXE and Chrome extension build source: $PAIRED_SOURCE
+          - Successful Actions run: https://github.com/$REPO/actions/runs/$PAIRED_RUN
+          - Source snapshot folder: worker-1142026/ (not installed by Chrome)
+          - The release includes the compiled Windows Explorer test companion, a matching Chrome extension ZIP, a source-snapshot ZIP and SHA256 checksums.
+
+          This is a working **P0-A Windows Explorer TEST prerelease**, not a new stable latest or a claim that local write, clipboard, full directory transfer, or all live-site drag paths are implemented.
+
+          Install the Windows test EXE and unpacked Chrome extension as a matched pair. Back up existing Chutey data before replacing installed binaries, avoid running different Chutey extension versions simultaneously, and preserve the prior stable release.
+          EOF
+          gh release create "$TAG" \
+            dist/release/Chute-Windows-Explorer-TEST.exe \
+            dist/release/chute-chrome-2.6.1.zip \
+            dist/release/Chutey-Worker-1142026-source.zip \
+            dist/release/SHA256SUMS.txt \
+            dist/release/PAIRED-BUILD-SOURCE.txt \
+            dist/release/WORKER-SNAPSHOT-COMMIT.txt \
+            --repo "$REPO" \
+            --verify-tag --prerelease \
+            --title 'Chutey — Working Worker + Explorer (November 4 TEST)' \
+            --notes-file release-notes.md
+          gh release view "$TAG" --repo "$REPO" --json tagName,isPrerelease,url
