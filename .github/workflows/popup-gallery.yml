@@ -1,0 +1,33 @@
+name: Chutey popup gallery — live density and Shelf handoff
+on:
+  push:
+    branches: [codex/chutey-popup-gallery-4x4-to-6x5-2026-11-04]
+  pull_request:
+    branches: [main]
+permissions:
+  contents: read
+jobs:
+  gallery:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Parse all extension scripts
+        run: find extension -maxdepth 1 -name '*.js' -print0 | xargs -0 -n1 node --check
+      - name: Instant density and Shelf routing fixture tests
+        run: node scripts/verify-popup-gallery.cjs
+      - name: Existing worker, thumbnails, tab and packaging contracts
+        run: |
+          node scripts/verify-worker-boot.cjs
+          node scripts/verify-thumbnail-icons.cjs
+          node scripts/verify-chutey-tabs-and-mascot.cjs
+          python scripts/verify-upgrades-package.py
+      - name: Build Chrome extension gallery test package
+        run: |
+          python scripts/build-chrome-store.py
+          unzip -l dist/chrome-store/chute-chrome-2.6.1.zip | grep -F 'popup-gallery.js'
+          unzip -l dist/chrome-store/chute-chrome-2.6.1.zip | grep -F 'shelf-gallery-preview.js'
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Chutey-Popup-Gallery-Chrome-TEST
+          path: dist/chrome-store/chute-chrome-2.6.1.zip
