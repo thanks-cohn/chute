@@ -148,3 +148,32 @@ Deliver: focused implementation PR; concise root-cause report of repeated picker
 > **“Drag and drop must always be dependable and just as standardized as regular drag and droppers. The user should NEVER struggle with drag and drop.”**
 
 Codex must design every implementation choice and acceptance test around this promise. The intuitive mental model is **hover → click/hold → drag → drop → file actually arrives**. If any supported workflow forces a second attempt, an unexplained Copy-to-Live intermediary, guessing where to drop, or wondering whether a save actually happened, **that workflow is not finished**. This standard overrides shortcuts that merely make the UI look interactive. Confirm with real Windows user-gesture testing, provider/target-specific evidence and truthful constraints; do not ship deceptive fake parity for destinations the browser cannot support.
+
+
+## ADDENDUM — P0: ONE native Windows folder-picker, absolutely NO Python/debug/installer-looking popup (2026-11-04)
+
+**Owner's observed regression:** Choosing a location appears to launch an additional Python or debug-looking `Chutey.exe`/helper window, displaying a little installer-style icon on the Windows taskbar/Start interface. This is confusing, alarming, and unacceptable. The user wants **one single standard Windows File Explorer folder-selection dialog** after an intentional Browse/Choose Folder action—nothing else. The owner does **not** consent to a second visible helper, console, debug window or separate faux-folder explorer.
+
+### Required exact user experience
+
+1. **User explicitly chooses Browse/Choose Folder in CHUTE.** Open only the recognizable Windows Shell folder picker—prefer modern native `IFileOpenDialog` with `FOS_PICKFOLDERS`, search/navigation, expected Windows look and correct owner/focus behavior. Return the selected directory to the already-open CHUTE Explorer.
+2. **NO extra visible Python/Chutey helper process window**, console, black command prompt, debug UI, separate window, “setup/installer” shell, surprise app icon or extra taskbar/window switcher entry. The user should see CHUTE plus the **single requested standard OS picker**—not an additional app launch.
+3. Native companion, Python backend, native-messaging bridge and process startup may continue **quietly in the background** when required. Do not remove or break them; make the packaging/startup mode genuinely non-console and non-UI where appropriate. Do not use stealth techniques, security bypasses or interfere with genuine Windows security prompts.
+4. **Never create a new Start Menu entry/desktop shortcut during folder selection.** Existing explicitly installed app shortcuts are separate from picker UI; audit whether the reported “little install icon” is an actual taskbar window/button, startup notification, an installer invocation, or a Start Menu entry. Avoid pretending they are the same without evidence.
+5. Valid prior authorization must resume silently, across extension reopen, Python companion restart and Windows login; **no picker unless the user actively selects a different folder or must genuinely reauthorize an invalid/revoked grant**. No repeating once a day, every few minutes, on token refresh, or on navigation.
+6. On cancel, return silently to the existing Explorer and preserve the last approved folder. No repeating popups, broken Shelf, or browser tab redirects.
+
+### Diagnose the executable/window, rather than only hiding an icon
+
+Before changing code, capture redacted process name/path/build SHA, parent-child tree, window class/title, taskbar/window-switcher behavior, OS dialog modality, Chrome message action and actual trigger sequence using the installed matching pair. Distinguish **`Chute.exe` installer/launcher**, installed companion **`Chute-NativeHost.exe`**, a Python console host, legacy **`SHBrowseForFolderW`**, and genuine Windows security UI. Identify which one the owner sees; don't merely hide a real permission/security warning or rename an EXE.
+
+Inspect Windows packaging/PyInstaller boot mode, `scripts/build-windows.ps1`, `src/chute/native_host.py`, `src/chute/explorer/native.py::choose_folder`, Chrome `explorer_resume` and explicit `explorer_select_folder` dispatch, process wake, window ownership and single-instance handling. Ensure COM/apartment/threading and foreground focus for a proper dialog. Do not trigger the app's installer each time a directory is selected.
+
+### Stop-ship acceptance tests
+
+- On Windows 11, after explicit Browse, **exactly one expected OS folder-selection dialog**, no extra visible Python/debug/Chute window and no new taskbar/Start Menu icon/shortcut due to the picker.
+- Browse, search, choose, cancel, rapidly repeat and switch windows; picker stays correctly modal/foreground, without duplicate windows or orphaned processes.
+- With a valid saved grant, **20 Shelf reopens, popup reopens, companion restarts and token refreshes produce zero spontaneous pickers and zero visible helper windows**.
+- Report before/after short screen recordings or screenshots **including the Windows taskbar**, actual window/process evidence and paired Windows/Chrome build verification. No “fixed” claim without observing it on the installed Windows system.
+
+**Priority:** Execute alongside section 0 (recurrent picker), **before** aesthetic changes or transfer features. This addendum overrides any interpretation that merely reducing prompts while keeping a visible extra Python/debug window is acceptable.
