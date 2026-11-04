@@ -22,7 +22,8 @@
   const image = document.createElement("img"); image.alt = ""; image.hidden = true;
   body.append(image,message);
   viewer.append(bar,body);
-  gallery.append(viewer);
+  // Keep the preview in document flow under the calendar, never over History cards.
+  gallery.querySelector("#files")?.before(viewer);
   let sizeMode = "half";
   let processing = false, lastRequest = "", pending = null;
   let selectedRow = null;
