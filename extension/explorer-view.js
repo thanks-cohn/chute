@@ -4,11 +4,11 @@
   const host = document.querySelector("#chutey-explorer-view");
   if (!host) return;
   const api = window.ChuteyExplorerAPI;
-  host.innerHTML = `<div class="ex-native"><button type="button" data-action="select" aria-label="Choose another Windows folder" title="Browse for another folder">▰ Browse</button><button type="button" data-action="resume" aria-label="Reconnect folder" title="Reconnect">↻</button><details class="ex-more-settings"><summary title="Folder access and transfers" aria-label="More file options">⋯ <span>More</span></summary><div class="ex-advanced-actions"><button type="button" data-action="write">Allow saving here…</button><button type="button" data-action="live">Copy selected to Chutey</button><button type="button" data-action="reconcile">Check transfer</button><button type="button" data-action="revoke">Remove folder access</button></div></details></div><form class="ex-connect" hidden><label>Local read session <input type="password" autocomplete="off" aria-label="Local read session token" required></label><button title="Connect" aria-label="Connect">↗</button></form>
+  host.innerHTML = `<div class="ex-native"><button type="button" data-action="select" aria-label="Choose another Windows folder" title="Browse for another folder">▰ Browse</button><details class="ex-more-settings"><summary title="Folder access and transfers" aria-label="More file options">⚙ <span>Folder Access</span></summary><div class="ex-advanced-actions"><button type="button" data-action="resume">Retry connection</button><button type="button" data-action="write">Allow saving here…</button><button type="button" data-action="live">Copy selected to Chutey</button><button type="button" data-action="reconcile">Check transfer</button><button type="button" data-action="revoke">Remove folder access</button></div></details></div><form class="ex-connect" hidden><label>Local read session <input type="password" autocomplete="off" aria-label="Local read session token" required></label><button title="Connect" aria-label="Connect">↗</button></form>
     <div class="ex-toolbar"><button data-action="back" title="Back" aria-label="Back">‹</button><button data-action="forward" title="Forward" aria-label="Forward">›</button><button data-action="parent" title="Parent folder" aria-label="Parent folder">↑</button><button data-action="roots" title="Approved folders" aria-label="Approved folders">⌂</button><button data-action="refresh" title="Refresh" aria-label="Refresh">↻</button><span class="ex-breadcrumb">Local files</span><button data-action="grid" title="Toggle grid" aria-label="Toggle grid">▦</button></div>
     <div class="ex-filter"><input type="search" placeholder="Search this folder" aria-label="Search this folder"><select aria-label="Sort files"><option value="name">Name</option><option value="type">Type</option><option value="date">Date</option><option value="size">Size</option></select></div>
     <div class="ex-workspace"><aside class="ex-tree" aria-label="Folder navigator"></aside><div class="ex-column-resize" role="separator" tabindex="0" aria-label="Resize folders and files columns" aria-orientation="vertical" aria-valuemin="15" aria-valuemax="75" aria-valuenow="36" title="Drag to resize folders"></div><div class="ex-list" role="listbox" aria-label="Local files" aria-multiselectable="true" tabindex="0"></div></div>
-    <div class="ex-status" role="status" aria-live="polite">Start an owner-approved local read session. Folder writes and browser transfers await native safety validation.</div>
+    <div class="ex-status" role="status" aria-live="polite">Choose Browse once to access a local folder.</div>
     <section class="ex-preview" aria-label="File preview" hidden><div class="ex-resize" role="separator" aria-label="Resize preview" aria-orientation="horizontal" tabindex="0"></div><header><strong></strong><button data-action="close" title="Close preview" aria-label="Close preview">×</button></header><div class="ex-preview-body"></div></section><div class="ex-menu" role="menu" hidden></div>`;
   const $ = selector => host.querySelector(selector);
   const list = $(".ex-list"), tree = $(".ex-tree"), preview = $(".ex-preview"), status = $(".ex-status"), menu = $(".ex-menu");
@@ -57,9 +57,9 @@
   }).catch(() => {});
   const thumbnails = new Map();
   const liveCopies = new Map();
-  let writable = false;
+  let writable = false, anchor = null, clipboardFile = null;
   const say = text => { status.textContent = text; };
-  const safe = fn => (...args) => { try { return Promise.resolve(fn(...args)).catch(error => say(error.message)); } catch (error) { say(error.message); } };
+  const safe = fn => (...args) => { const previousStatus = status.textContent; try { return Promise.resolve(fn(...args)).catch(error => { say(error.code === "CANCELLED" ? previousStatus : error.message); }); } catch (error) { say(error.message); } };
   function button(label, text, fn) {
     const node = document.createElement("button"); node.type = "button"; node.title = label; node.setAttribute("aria-label", label); node.textContent = text; node.onclick = safe(fn); return node;
   }
@@ -71,10 +71,11 @@
     ++previewId; abort?.abort(); abort = null;
     $(".ex-preview-body").querySelectorAll("video").forEach(video => { video.pause(); video.removeAttribute("src"); video.load(); });
     $(".ex-preview-body").replaceChildren();
-    for (const url of urls) URL.revokeObjectURL(url); urls = []; preview.hidden = true;
+    for (const url of urls) URL.revokeObjectURL(url); urls = []; preview.hidden = true; host.append(preview);
   }
   async function showPreview(row) {
     closePreview(); const id = previewId; preview.hidden = false;
+    positionPreview(row);
     $(".ex-preview strong").textContent = row.name;
     const body = $(".ex-preview-body"); body.textContent = "Loading preview…";
     abort = new AbortController(); const signal = abort.signal;
@@ -101,21 +102,69 @@
       node.src = url; body.append(node);
     } catch (error) { if (id === previewId && error.name !== "AbortError") body.textContent = error.message; }
   }
-  function select(row, event = {}) {
-    if (!event.ctrlKey && !event.metaKey) selected.clear();
-    if (selected.has(row.handle)) selected.delete(row.handle); else selected.add(row.handle);
-    for (const node of list.querySelectorAll("[role=option]")) node.setAttribute("aria-selected", String(selected.has(node.dataset.handle)));
-    if (row.kind === "file") void showPreview(row);
+  function positionPreview(row) {
+    const cards = [...list.querySelectorAll(".ex-row")];
+    const card = cards.find(node => node.dataset.handle === row.handle);
+    if (!card) return;
+    // Remove the full-width panel before measuring row geometry.
+    host.append(preview);
+    let after = card;
+    if (grid) for (const node of cards.slice(cards.indexOf(card)+1)) {
+      if (Math.abs(node.offsetTop-card.offsetTop)>2) break;
+      after = node;
+    }
+    after.after(preview);
   }
-  async function load(handle, {remember = true, append = false} = {}) {
+  function select(row, event = {}) {
+    if (row.kind === "blocked") return;
+    const eligible = rows.filter(value => value.kind !== "blocked");
+    if (event.shiftKey && anchor) {
+      const start = eligible.findIndex(value => value.handle === anchor);
+      const end = eligible.indexOf(row);
+      if (!event.ctrlKey && !event.metaKey) selected.clear();
+      for (const value of eligible.slice(Math.min(start,end), Math.max(start,end)+1)) selected.add(value.handle);
+    } else {
+      if (!event.ctrlKey && !event.metaKey) selected.clear();
+      if ((event.ctrlKey || event.metaKey) && selected.has(row.handle)) selected.delete(row.handle);
+      else selected.add(row.handle);
+      anchor = row.handle;
+    }
+    paintSelection();
+  }
+  function paintSelection() {
+    for (const node of list.querySelectorAll("[role=option]")) node.setAttribute("aria-selected", String(selected.has(node.dataset.handle)));
+    say(`${selected.size} selected · ${rows.length} loaded${offset !== null ? " · More items available" : ""}`);
+  }
+  function transferSelection() {
+    const items = rows.filter(row => selected.has(row.handle) && row.kind === "file");
+    if (items.length !== 1) throw Error("Choose one file. Bulk transfers require verified Premium support.");
+    return items[0];
+  }
+  async function copySelection() {
+    const row = transferSelection();
+    clipboardFile = new File([await api.content(row,{original:true})],row.name,{type:row.mime || "application/octet-stream"});
+    say("Copied for Paste inside Chutey. This is not the Windows file clipboard.");
+  }
+  async function pasteSelection(destination = current) {
+    if (!writable) throw Error("To save here, approve this folder in Folder Access settings.");
+    if (!clipboardFile) throw Error("Copy a file in Chutey first, or paste actual files from your clipboard.");
+    const receipt = await api.receive(destination,clipboardFile);
+    await load(current,{remember:false}); say("Verified copy: " + receipt.name);
+  }
+  async function load(handle, {remember = true, append = false, recovery = true} = {}) {
     const id = ++requestId;
     say("Loading…");
-    const result = await api.command("list", {handle, offset: append ? offset : 0, limit: 100, sort: $(".ex-filter select").value, query: $(".ex-filter input").value});
+    let result;
+    try { result = await api.command("list", {handle, offset:append ? offset : 0,limit:100,sort:$(".ex-filter select").value,query:$(".ex-filter input").value}); }
+    catch (error) {
+      if (recovery && error.code === "INVALID_HANDLE") { await connect(false); return; }
+      throw error;
+    }
     if (id !== requestId) return;
     if (!append) {
       if (remember && current && current !== handle) { back.push(current); forward = []; }
       observer.disconnect(); queue.length = 0;
-      current = handle; parent = result.parent; selected.clear(); closePreview(); releaseThumbnails(); rows = []; list.replaceChildren();
+      current = handle; parent = result.parent; selected.clear(); anchor = null; closePreview(); releaseThumbnails(); rows = []; list.replaceChildren();
       await rememberView();
     }
     rows.push(...result.entries); offset = result.next_offset;
@@ -124,29 +173,45 @@
     for (const row of result.entries) {
       const node = document.createElement("div"); node.className = "ex-row"; node.tabIndex = 0; node.role = "option"; node.dataset.handle = row.handle; node.setAttribute("aria-selected", "false");
       const icon = document.createElement("span"); icon.className = "ex-icon"; icon.textContent = row.kind === "directory" ? "▰" : row.kind === "blocked" ? "⊘" : "▤"; icon.setAttribute("aria-hidden", "true");
-      const name = document.createElement("span"); name.className = "ex-name"; name.textContent = row.name;
+      const name = document.createElement("span"); name.className = "ex-name"; name.textContent = row.name; name.title = row.name;
       const size = document.createElement("small"); size.textContent = row.kind === "directory" ? "Folder" : `${row.size.toLocaleString()} B`;
       node.append(icon, name, size); list.append(node);
       if (row.kind === "file") {
         node.draggable = true;
         node.ondragstart = event => {
-          const copied = liveCopies.get(row.identity + row.handle);
-          if (!copied) {
-            event.preventDefault();
-            void safe(async () => { await copyToLive([row]); say("Original bytes copied to Live. Drag again to use the existing browser transport."); })();
-            return;
-          }
-          event.dataTransfer.effectAllowed = "copy";
-          event.dataTransfer.setData("application/x-chute-item", "CHUTE_ITEM:" + encodeURIComponent(JSON.stringify({...copied,source_kind:"local_explorer"})));
+          try {
+            if (!selected.has(row.handle)) select(row);
+            const source = transferSelection();
+            if (source.size > 64 * 1024 * 1024) throw Error("Use the file picker for files larger than 64 MiB.");
+            const id = "explorer-" + crypto.randomUUID();
+            event.dataTransfer.effectAllowed = "copy";
+            const token = "CHUTE_ITEM:" + encodeURIComponent(JSON.stringify({id,name:source.name,mime:source.mime,source_kind:"local_explorer"}));
+            event.dataTransfer.setData("application/x-chute-item", token);
+            event.dataTransfer.setData("text/plain", token);
+            // Registration exports no bytes. The receiving adapter reads the
+            // guarded original on this first drop, including on a cold worker.
+            void chrome.runtime.sendMessage({type:"chutey-register-explorer-drag",id,row:source}).catch(error => { say(error.code === "CANCELLED" ? previousStatus : error.message); });
+          } catch (error) { event.preventDefault(); say(error.message); }
         };
       }
       node.onclick = event => select(row, event);
       node.ondblclick = safe(() => row.kind === "directory" ? load(row.handle) : showPreview(row));
-      node.oncontextmenu = event => { event.preventDefault(); select(row); showMenu(event.clientX, event.clientY, row); };
+      node.oncontextmenu = event => { event.preventDefault(); if (!selected.has(row.handle)) select(row); showMenu(event.clientX, event.clientY, row); };
       node.onkeydown = safe(async event => {
         if (event.key === "Enter") { event.preventDefault(); if (row.kind === "directory") await load(row.handle); else await showPreview(row); }
         if (event.key === " " ) { event.preventDefault(); select(row, event); }
-        if (event.key === "ArrowDown" || event.key === "ArrowUp") { event.preventDefault(); (event.key === "ArrowDown" ? node.nextElementSibling : node.previousElementSibling)?.focus(); }
+        if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+          event.preventDefault();
+          const cards = [...list.querySelectorAll(".ex-row")];
+          const columns = grid ? Math.max(1,cards.filter(card => Math.abs(card.offsetTop-cards[0].offsetTop)<2).length) : 1;
+          const index = Math.max(0,Math.min(cards.length-1,cards.indexOf(node)+(event.key === "ArrowDown" ? columns : -columns)));
+          const target = cards[index], next = rows.find(value => value.handle === target.dataset.handle);
+          const open = !preview.hidden;
+          select(next,event); target.focus({preventScroll:true});
+          if (open && next.kind === "file") await showPreview(next);
+          else if (open) closePreview();
+          target.scrollIntoView({block:"nearest"});
+        }
         if (event.key === "Home") list.firstElementChild?.focus();
         if (event.key === "End") list.lastElementChild?.focus();
         if (event.key === "ContextMenu" || (event.shiftKey && event.key === "F10")) { event.preventDefault(); const rect = node.getBoundingClientRect(); showMenu(rect.left + 20, rect.top, row); }
@@ -184,7 +249,7 @@
     for (const row of data.entries) if (row.kind === "directory") await branch(row, children);
     if (data.next_offset !== null) { const more = button("More folders", "···", async () => { await treePage(handle, children, data.next_offset); more.remove(); }); children.append(more); }
   }
-  async function connect() {
+  async function connect(recovery = true) {
     const data = await api.command("roots"); roots = data.roots; tree.replaceChildren();
     for (const root of roots) await branch(root, tree);
     $(".ex-connect").hidden = true;
@@ -196,7 +261,7 @@
       $(".ex-filter select").value = view.sort || "name";
       $(".ex-filter input").value = view.query || "";
       grid = view.grid ?? grid; list.classList.toggle("ex-grid", grid);
-      await load(restored?.handle || roots[0].handle, {remember:false});
+      await load(restored?.handle || roots[0].handle, {remember:false,recovery});
       list.scrollTop = view.scroll || 0;
 
     }
@@ -205,7 +270,11 @@
     menu.replaceChildren();
     const actions = row ? [[row.kind === "directory" ? "Open folder" : "Preview", () => row.kind === "directory" ? load(row.handle) : showPreview(row)], ["Properties", async () => { const meta = await api.command("stat", {handle: row.handle}); say(`${meta.name} · ${meta.size.toLocaleString()} bytes · ${new Date(meta.modified_ns / 1e6).toLocaleString()}`); }]] : [["Refresh", () => current && load(current, {remember: false})]];
     for (const [name, fn] of actions) { const node = button(name, name, async () => { menu.hidden = true; await fn(); }); node.role = "menuitem"; menu.append(node); }
-    const blocked = button("Native consent required for writes and OS actions", "File actions await native consent", () => {}); blocked.disabled = true; blocked.role = "menuitem"; menu.append(blocked);
+    for (const [label, fn] of [["Copy",copySelection],["Paste",() => pasteSelection(row?.kind === "directory" ? row.handle : current)]]) {
+      const node = button(label,label,async () => { menu.hidden=true; await fn(); }); node.role="menuitem";
+      node.disabled = label === "Copy" ? !rows.some(value => selected.has(value.handle) && value.kind === "file") : !writable || !clipboardFile;
+      menu.append(node);
+    }
     menu.hidden = false;
     const bounds = host.getBoundingClientRect();
     menu.style.left = `${Math.max(0, Math.min(x - bounds.left, bounds.width - menu.offsetWidth))}px`;
@@ -218,6 +287,15 @@
   };
   host.addEventListener("contextmenu", event => { if (event.target === list) { event.preventDefault(); showMenu(event.clientX, event.clientY); } });
   document.addEventListener("pointerdown", event => { if (!menu.contains(event.target)) menu.hidden = true; });
+  list.addEventListener("click",event => { if (event.target === list) { selected.clear(); anchor=null; paintSelection(); } });
+  host.addEventListener("keydown", safe(async event => {
+    if (event.target.closest("input,textarea,select,[contenteditable=true]")) return;
+    if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "a") {
+      event.preventDefault(); selected = new Set(rows.filter(row => row.kind !== "blocked").map(row => row.handle)); paintSelection();
+    }
+    if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "c") { event.preventDefault(); await copySelection(); }
+    if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "v" && clipboardFile) { event.preventDefault(); await pasteSelection(); }
+  }));
   host.addEventListener("keydown", event => { if (event.key === "Escape") { menu.hidden = true; closePreview(); list.focus(); } });
   function dropDestination(event) {
     const branch = event.target.closest("[data-destination]");
@@ -239,6 +317,7 @@
   list.addEventListener("paste", safe(async event => {
     if (!writable || !current || !event.clipboardData?.files.length) return;
     event.preventDefault(); event.stopPropagation();
+    if (event.clipboardData.files.length > 1) throw Error("Choose one file. Bulk transfers require verified Premium support.");
     for (const file of event.clipboardData.files) await api.receive(current,file);
     await load(current,{remember:false});
   }));
@@ -250,6 +329,7 @@
     const destination = dropDestination(event);
     if (!destination) return;
     const files = [...event.dataTransfer.files];
+    if (files.length > 1) throw Error("Choose one file. Bulk transfers require verified Premium support.");
     if (files.length) {
       for (const file of files) {
         say("Receiving " + file.name + "…");
@@ -260,7 +340,11 @@
       const text = event.dataTransfer.getData("application/x-chute-item");
       if (!text.startsWith("CHUTE_ITEM:")) { say("No bytes saved. Drop actual files or a Live item; links alone are unsupported."); return; }
       const item = JSON.parse(decodeURIComponent(text.slice(11)));
-      const receipt = await api.command("receive_from_live",{id:item.id,destination,operation_id:crypto.randomUUID().replaceAll("-","")});
+      const receipt = item.source_kind === "local_explorer" ? await (async () => {
+        const data = await chrome.runtime.sendMessage({type:"chutey-read-explorer-drag",id:item.id});
+        if (!data?.ok) throw Error(data?.error || "The original is unavailable.");
+        return api.receive(destination,new File([Uint8Array.from(atob(data.base64),value => value.charCodeAt(0))],data.name,{type:data.mime}));
+      })() : await api.command("receive_from_live",{id:item.id,destination,operation_id:crypto.randomUUID().replaceAll("-","")});
       if (receipt.state !== "COMMITTED") throw new Error("Copy did not commit. Check the destination before retrying.");
       say("Verified copy: " + receipt.name);
     }
@@ -339,7 +423,8 @@
     if (!host.hidden) list.scrollTop = rememberedScroll;
   }).observe(host, {attributes: true, attributeFilter: ["hidden"]});
   // Native protected consent remints handles after companion restart; no picker on resume.
-  if (chrome.runtime?.sendNativeMessage) void api.nativeSession(false).then(session => { writable = !session.read_only; return connect(); }).catch(error => say(error.message));
+  if (chrome.runtime?.sendNativeMessage) void api.nativeSession(false).then(session => { writable = !session.read_only; return connect(); }).catch(error => { say(error.code === "CANCELLED" ? previousStatus : error.message); });
   else $(".ex-connect").hidden = false; // Explicit developer/fixture fallback only.
+  new ResizeObserver(() => { if (!preview.hidden) { const row = rows.find(value => value.name === $(".ex-preview strong")?.textContent); if (row) positionPreview(row); } }).observe(list);
   window.addEventListener("pagehide", () => { closePreview(); releaseThumbnails(); api.connect(""); });
 })();

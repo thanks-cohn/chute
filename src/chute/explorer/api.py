@@ -153,8 +153,8 @@ class ExplorerAPI:
                     result = self.engine.execute(body["command"], **body.get("args", {}))
                 self.json(handler, result, 200 if result["state"] == "completed" else 400)
             elif path == "/api/explorer/v1/content":
-                if (set(body) - {"handle", "thumbnail", "identity"} or not isinstance(body.get("handle"), str)
-                        or not isinstance(body.get("identity"), str) or type(body.get("thumbnail", False)) is not bool):
+                if (set(body) - {"handle", "thumbnail", "identity", "original"} or not isinstance(body.get("handle"), str)
+                        or not isinstance(body.get("identity"), str) or type(body.get("thumbnail", False)) is not bool or type(body.get("original", False)) is not bool):
                     raise ExplorerError("INVALID_ARGUMENT", "Expected a file handle.")
                 self.content(handler, body)
             else:
@@ -181,7 +181,10 @@ class ExplorerAPI:
             row = self.engine._record(grant, grant.parts(body["handle"]), os.fstat(fd), fd=fd)
             if body.get("identity") != row["identity"]:
                 raise ExplorerError("FILE_CHANGED", "The file changed; refresh its preview.")
-            kind = preview_kind(row)
+            original = body.get("original", False)
+            if original and (body.get("thumbnail") or row["size"] > 64 * 1024 * 1024):
+                raise ExplorerError("TRANSFER_LIMIT", "Use the file picker for files larger than 64 MiB.")
+            kind = "original" if original else preview_kind(row)
             if kind == "unavailable":
                 raise ExplorerError("PREVIEW_UNAVAILABLE", "Preview unavailable for this file type.")
             if body.get("thumbnail"):
@@ -201,6 +204,8 @@ class ExplorerAPI:
             if partial:
                 extra.append(("Content-Range", f"bytes {start}-{end - 1}/{size}"))
             mime = "text/plain; charset=utf-8" if kind == "text" else row["mime"]
+            if original:
+                extra.append(("Content-Disposition", "attachment"))
             self.headers(handler, 206 if partial else 200, mime, end - start, extra)
             os.lseek(fd, start, os.SEEK_SET)
             remaining = end - start

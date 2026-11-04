@@ -167,6 +167,16 @@ class ExplorerTests(unittest.TestCase):
             with self.assertRaises(urllib.error.HTTPError) as error:
                 request({"handle": row["handle"], "identity": row["identity"]}, {"Range": "bytes=99-"}, "content")
             self.assertEqual(error.exception.code, 416)
+            binary = self.file("original.bin", bytes(range(256))*5)
+            with request({"handle":binary["handle"],"identity":binary["identity"],"original":True},route="content") as response:
+                self.assertEqual(response.read(),bytes(range(256))*5)
+                self.assertEqual(response.headers["Content-Disposition"],"attachment")
+            # Original export neither invents a preview nor relaxes identity/auth.
+            for body, headers in (({"handle":binary["handle"],"identity":binary["identity"]},{}),
+                                  ({"handle":binary["handle"],"identity":"stale","original":True},{}),
+                                  ({"handle":binary["handle"],"identity":binary["identity"],"original":True},{"Authorization":"Bearer wrong"})):
+                with self.assertRaises(urllib.error.HTTPError): request(body,headers,route="content")
+            self.assertEqual(server.store.list(),[],"Original export must not pre-copy into Live")
             (self.root / row["name"]).write_bytes(b"changed")
             with self.assertRaises(urllib.error.HTTPError):
                 request({"handle": row["handle"], "identity": row["identity"]}, route="content")

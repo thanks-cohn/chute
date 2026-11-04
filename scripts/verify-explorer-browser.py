@@ -1,4 +1,4 @@
-"""Real installed Chromium extension, production API and overlay geometry oracle."""
+"""Real installed Chromium extension, production API and inline interaction checks."""
 from __future__ import annotations
 
 import io
@@ -72,22 +72,26 @@ def main():
                 else:
                     context = playwright.chromium.launch_persistent_context(str(root / "profile"),
                         executable_path=os.environ.get("CHUTE_TEST_CHROME") or playwright.chromium.executable_path,
-                        headless=True, ignore_default_args=["--disable-extensions"], args=["--no-sandbox", "--disable-background-networking",
+                        headless=True, ignore_default_args=["--disable-extensions"], args=["--no-sandbox", "--disable-background-networking", "--enable-unsafe-extension-debugging",
                         f"--disable-extensions-except={ROOT / 'extension'}", f"--load-extension={ROOT / 'extension'}"])
+                    if not context.service_workers:
+                        # Recent Chromium can disable command-line sideloading;
+                        # its explicit test-only CDP API reports actual load errors.
+                        context.browser.new_browser_cdp_session().send("Extensions.loadUnpacked", {"path":str(ROOT / "extension")})
                     worker = context.service_workers[0] if context.service_workers else context.wait_for_event("serviceworker")
                     origin = worker.url.split("/background-entry.js")[0]
                 session = Session(origin)
                 server.explorer_api = ExplorerAPI(engine, session)
                 context.add_init_script("window.__nativeSessionToken = " + json.dumps(session.token) + ";")
                 if not fixture_mode:
-                    # Browser proof only: real native picker is covered separately on Windows.
+                    # Native selection is simulated here; Windows picker acceptance remains outstanding.
                     context.add_init_script("chrome.runtime.sendNativeMessage = async () => ({ok:true, explorer_protocol:'1.1',protocol:'1.1',read_only:true, token:window.__nativeSessionToken});")
                 page = context.new_page()
                 errors = []
                 page.on("pageerror", lambda error: errors.append(str(error)))
                 page.goto(("http://127.0.0.1:17891" if fixture_mode else origin) + "/shelf.html")
                 page.locator("#chutey-tab-explorer").click()
-                page.get_by_role("button", name="Select folder", exact=True).click()
+                # Initial resume is intentionally silent. No native picker gesture here.
                 try:
                     page.locator(".ex-row").first.wait_for(timeout=8000)
                 except Exception:
@@ -108,20 +112,52 @@ def main():
                         label = page.locator(".ex-row .ex-name").first.bounding_box()
                         assert label and label["height"] >= 16, "Grid filename must remain visible"
                     before = page.evaluate(metrics)
-                    page.locator(".ex-row", has_text="00-picture.png").click()
+                    picture = page.locator(".ex-row", has_text="00-picture.png")
+                    picture.click()
+                    expect(page.locator(".ex-preview")).to_be_hidden()
+                    expect(picture).to_have_attribute("aria-selected","true")
+                    page.keyboard.press("ArrowDown")
+                    expect(page.locator(".ex-preview")).to_be_hidden()
+                    expect(page.locator('.ex-row[aria-selected="true"]')).to_have_count(1)
+                    picture.dblclick()
                     expect(page.locator(".ex-preview-body img")).to_have_js_property("naturalWidth", 400)
                     after = page.evaluate(metrics)
-                    assert before == after, (before, after)
+                    assert before["width"] == after["width"] and before["height"] == after["height"], (before,after)
                     assert after["scroll"] > after["client"]
-                    overlap = page.evaluate("""() => {const p=document.querySelector('.ex-preview').getBoundingClientRect(),l=document.querySelector('.ex-list').getBoundingClientRect(); return p.top>l.top && p.top<l.bottom && p.bottom>=l.bottom;}""")
-                    assert overlap
+                    inline = page.evaluate("""() => { const p=document.querySelector('.ex-preview'); const prior=p.previousElementSibling; return p.parentElement.classList.contains('ex-list') && p.getBoundingClientRect().top >= prior.getBoundingClientRect().bottom; }""")
+                    assert inline, "Preview must follow its row in document flow"
+                    # Open preview follows arrows; closed preview remains closed.
+                    if width == 390:
+                        picture.focus()
+                        page.keyboard.press("ArrowDown")
+                        expect(page.locator(".ex-preview-body pre")).to_be_visible()
+                        picture.dblclick()
+                        expect(page.locator(".ex-preview-body img")).to_be_visible()
                     thumb = page.locator(".ex-row .ex-icon img").first
                     assert thumb.evaluate("node => node.complete && node.naturalWidth > 0")
                     thumb_box = thumb.bounding_box()
                     assert thumb_box and thumb_box["height"] >= 32 and thumb_box["width"] >= 32
+                    if width == 390:
+                        picture.click()
+                        page.locator(".ex-row", has_text="01-document.txt").click(modifiers=["Shift"])
+                        expect(page.locator('.ex-row[aria-selected="true"]')).to_have_count(2)
+                        picture.click(button="right")
+                        expect(page.locator('.ex-row[aria-selected="true"]')).to_have_count(2)
+                        page.keyboard.press("Escape")
+                        picture.click()
+                        # Native dragstart carries an opaque reference on attempt 1,
+                        # never an export-to-Live command. Actual website acceptance
+                        # and Windows OS drag remain separate interactive gates.
+                        drag = picture.evaluate("""node => { const dt=new DataTransfer(); const e=new DragEvent('dragstart',{bubbles:true,cancelable:true,dataTransfer:dt}); node.dispatchEvent(e); return {cancelled:e.defaultPrevented,token:dt.getData('application/x-chute-item')}; }""")
+                        assert not drag['cancelled'] and 'explorer-' in drag['token'], drag
+                        # Keyboard splitter updates a path-free ratio.
+                        grip=page.get_by_role("separator",name="Resize folders and files columns")
+                        grip.focus(); page.keyboard.press("ArrowRight")
+                        expect(grip).to_have_attribute("aria-valuenow","41")
+                        page.locator(".ex-row",has_text="00-picture.png").dblclick()
                     page.screenshot(path=str(out / f"explorer-{width}.png"), full_page=True)
                     page.get_by_role("button", name="Close preview", exact=True).click()
-                    page.locator(".ex-row", has_text="01-document.txt").click()
+                    page.locator(".ex-row", has_text="01-document.txt").dblclick()
                     page.locator(".ex-preview-body pre").wait_for()
                     assert page.locator(".ex-preview-body pre").text_content().startswith("safe <script>")
                     scroll = page.evaluate("""() => {const b=document.querySelector('.ex-preview-body'), l=document.querySelector('.ex-list'); const prior=l.scrollTop; b.scrollTop=120; return {document:b.scrollTop, list:l.scrollTop,prior,overflow:b.scrollHeight>b.clientHeight};}""")
@@ -131,7 +167,7 @@ def main():
                     row.click(button="right")
                     page.get_by_role("menuitem", name="Properties", exact=True).wait_for()
                     page.keyboard.press("End")
-                    assert page.get_by_role("menuitem", name="Properties", exact=True).evaluate("node => node === document.activeElement")
+                    assert page.get_by_role("menuitem", name="Copy", exact=True).evaluate("node => node === document.activeElement")
                     page.keyboard.press("Escape")
                     page.locator(".ex-list").evaluate("node => node.scrollTop=100")
                     page.get_by_role("tab", name="History", exact=True).click()
@@ -139,11 +175,16 @@ def main():
                     assert "history.txt" in page.locator("#files").inner_text()
                     expect(page.locator("#files .file-icon.has-thumbnail .file-thumb").first).to_be_visible()
                     expect(page.locator("#files .file-icon.has-thumbnail .file-thumb").first).to_have_js_property("complete", True)
+                    history_row=page.locator("#files .file-row",has_text="history-real.png")
+                    history_row.click()
+                    expect(page.locator(".chutey-shelf-viewer")).to_be_visible()
+                    expect(page.locator(".chutey-shelf-viewer img")).to_have_js_property("naturalWidth",400)
+                    assert page.locator(".chutey-shelf-viewer").evaluate("node => node.parentElement.id === 'files' && node.getBoundingClientRect().top >= node.previousElementSibling.getBoundingClientRect().bottom")
                     page.get_by_role("tab", name="File Explorer", exact=True).click()
                     assert page.locator(".ex-list").evaluate("node => node.scrollTop") == 100
                     assert page.locator("#chutey-workspace-tabs button").first.inner_text() == "File Explorer"
                     page.locator(".ex-list").evaluate("node => node.scrollTop=0")
-                    results.append({"transport": "fixture; not installed extension" if fixture_mode else "installed extension; native selection simulated", "width": width, "overlay_geometry": "PASS", "thumbnail_original_pixels": "PASS", "document_scroll": "PASS", "history": "PASS including real saved PNG thumbnail", "menu_keyboard": "PASS", "metrics": after})
+                    results.append({"transport": "fixture; not installed extension" if fixture_mode else "installed extension; native selection simulated", "width": width, "inline_geometry": "PASS", "thumbnail_original_pixels": "PASS", "document_scroll": "PASS", "history": "PASS including real saved PNG thumbnail", "menu_keyboard": "PASS", "metrics": after})
                 assert not errors, errors
                 (out / "results.json").write_text(json.dumps(results, indent=2))
                 print(json.dumps(results, indent=2))

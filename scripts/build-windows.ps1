@@ -20,14 +20,13 @@ $Py = Join-Path $Venv "Scripts\python.exe"
 
 Push-Location $Repo
 try {
-    # Native Messaging requires real stdin/stdout pipes, so this helper uses the
-    # console subsystem. Chrome launches it with redirected stdio; no console
-    # window is shown during normal native-messaging use.
+    # GUI subsystem prevents a console/taskbar window. native_host restores
+    # Chrome's inherited message pipes explicitly; never allocate a console.
     & $Py -m PyInstaller `
         --noconfirm `
         --clean `
         --onefile `
-        --console `
+        --windowed `
         --name Chute-NativeHost `
         --distpath $Dist `
         --workpath (Join-Path $BuildRoot "native-work") `

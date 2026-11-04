@@ -294,3 +294,40 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
 });
 
+
+// Explorer drags hold a short-lived reference, never a pre-copy in Live or a
+// webpage-visible session token. Only our extension pages may register sources.
+const explorerDragRegistrations = new Map();
+chrome.runtime.onMessage.addListener((message, sender, respond) => {
+  const own = sender.url?.startsWith(chrome.runtime.getURL(""));
+  if (message?.type === "chutey-register-explorer-drag" && own) {
+    const task = (async () => {
+      const [tab] = await chrome.tabs.query({active:true,currentWindow:true});
+      const stored = await chrome.storage.session.get(null);
+      const expired = Object.keys(stored).filter(key => key.startsWith("explorer-") && stored[key]?.expires < Date.now());
+      if (expired.length) await chrome.storage.session.remove(expired);
+      const record = {row:message.row, tabId:tab?.id, expires:Date.now()+60000};
+      await chrome.storage.session.set({[message.id]:record});
+      await relayDragOutStart({id:message.id,name:message.row.name,mime:message.row.mime,source_kind:"local_explorer"});
+    })();
+    explorerDragRegistrations.set(message.id,task);
+    task.then(() => respond({ok:true}), () => respond({ok:false})).finally(() => explorerDragRegistrations.delete(message.id));
+    return true;
+  }
+  if (message?.type !== "chutey-read-explorer-drag") return;
+  (async () => {
+    if (!/^explorer-[a-f0-9-]{36}$/.test(message.id || "")) throw Error("Invalid drag reference.");
+    await explorerDragRegistrations.get(message.id);
+    const record = (await chrome.storage.session.get(message.id))[message.id];
+    if (!record || record.expires < Date.now() || (!own && !sender.tab?.active)) throw Error("This drag expired. Start a new drag.");
+    const session = await chrome.runtime.sendNativeMessage("com.thankscohn.chute",{action:"explorer_resume"});
+    if (!session?.ok) throw Error("The companion could not resume this drag.");
+    const response = await fetch(BASE_URL+"/api/explorer/v1/content",{method:"POST",headers:{"Content-Type":"application/json",Authorization:"Bearer "+session.token},body:JSON.stringify({handle:record.row.handle,identity:record.row.identity,original:true})});
+    if (!response.ok) throw Error("The source changed or is unavailable. Refresh the folder.");
+    const bytes = new Uint8Array(await response.arrayBuffer());
+    let binary = "";
+    for (let offset=0;offset<bytes.length;offset+=32768) binary += String.fromCharCode(...bytes.subarray(offset,offset+32768));
+    return {ok:true,base64:btoa(binary),name:record.row.name,mime:record.row.mime};
+  })().then(respond,error => respond({ok:false,error:error.message}));
+  return true;
+});

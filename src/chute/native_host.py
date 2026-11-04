@@ -361,6 +361,26 @@ def _set_binary_stdio() -> None:
         return
     import msvcrt
 
+    # Windowed PyInstaller intentionally clears sys.std*. Native Messaging
+    # still supplies inherited Win32 pipes: wrap duplicates, never allocate a console.
+    if sys.stdin is None or sys.stdout is None:
+        import ctypes
+        from ctypes import wintypes
+        kernel = ctypes.WinDLL("kernel32", use_last_error=True)
+        kernel.GetStdHandle.argtypes = [wintypes.DWORD]
+        kernel.GetStdHandle.restype = wintypes.HANDLE
+        kernel.GetCurrentProcess.restype = wintypes.HANDLE
+        kernel.DuplicateHandle.argtypes = [wintypes.HANDLE, wintypes.HANDLE, wintypes.HANDLE,
+                                          ctypes.POINTER(wintypes.HANDLE), wintypes.DWORD, wintypes.BOOL, wintypes.DWORD]
+        process = kernel.GetCurrentProcess()
+        for name, identifier, flags, mode in (("stdin", -10, os.O_RDONLY, "r"), ("stdout", -11, os.O_WRONLY, "w")):
+            if getattr(sys, name) is not None: continue
+            handle = kernel.GetStdHandle(identifier & 0xffffffff)
+            duplicate = wintypes.HANDLE()
+            if not kernel.DuplicateHandle(process, handle, process, ctypes.byref(duplicate), 0, False, 2):
+                raise OSError("Native Messaging pipe unavailable")
+            fd = msvcrt.open_osfhandle(duplicate.value, flags | os.O_BINARY)
+            setattr(sys, name, os.fdopen(fd, mode, encoding="utf-8"))
     msvcrt.setmode(sys.stdin.fileno(), os.O_BINARY)
     msvcrt.setmode(sys.stdout.fileno(), os.O_BINARY)
 
@@ -408,7 +428,7 @@ def native_main() -> int:
                 origin = sys.argv[1].rstrip("/") if len(sys.argv) > 1 else ""
                 if not origin.startswith("chrome-extension://") or origin.removeprefix("chrome-extension://") not in _allowed_extension_ids():
                     raise ValueError("Unenrolled native caller")
-                if not ensure_bridge(): raise ValueError("Companion unavailable")
+                if not ensure_bridge(): raise OSError("Companion unavailable")
                 from .explorer.native import control_path
                 config = json.loads(control_path().read_text(encoding="utf-8"))
                 request = urllib.request.Request(
@@ -424,8 +444,10 @@ def native_main() -> int:
                     _write_message({"ok":False,"error":receipt.get("error","Folder access unavailable."),"code":receipt.get("code","UNAVAILABLE")})
                 except (ValueError, OSError):
                     _write_message({"ok":False,"error":"Folder access unavailable."})
+            except ValueError:
+                _write_message({"ok": False, "code": "UNAUTHORIZED", "error": "This Chutey installation is not enrolled."})
             except Exception:
-                _write_message({"ok": False, "error": "Select a folder using the matching Chutey companion. Selection may have been cancelled."})
+                _write_message({"ok": False, "code": "BRIDGE_UNAVAILABLE", "error": "The local companion could not reconnect. Retry in Folder Access settings."})
             continue
         if action == "ensure_bridge":
             ok = ensure_bridge()

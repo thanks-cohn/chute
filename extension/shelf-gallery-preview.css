@@ -1,9 +1,9 @@
-/* Shelf picture preview from the popup gallery; anchored under the History calendar. */
+/* Shelf picture preview from the popup gallery; anchored after the selected History row. */
 #chutey-history-view .chutey-shelf-viewer {
   position:relative; left:auto; right:auto; bottom:auto; width:100%; box-sizing:border-box; flex-shrink:0; z-index:12;
   min-height:140px; display:flex; flex-direction:column; overflow:hidden;
-  background:#171c16f5; border:1px solid #455238; border-radius:12px 12px 0 0;
-  box-shadow:0 -12px 30px #000b; backdrop-filter:blur(10px);
+  background:#171c16f5; border:1px solid #455238; border-radius:8px;
+  margin:8px 0;
 }
 #chutey-history-view .chutey-shelf-viewer[hidden] { display:none!important; }
 #chutey-history-view .chutey-shelf-viewer header {
@@ -31,7 +31,7 @@
   #chutey-history-view .chutey-shelf-viewer { backdrop-filter:none; }
 }
 
-/* History cards stay below the viewer, never underneath it. */
+/* The viewer spans a grid row; subsequent cards remain in flow. */
 #chutey-history-view #files .chutey-shelf-selectable {
   min-width:0; box-sizing:border-box; position:relative; cursor:pointer;
 }

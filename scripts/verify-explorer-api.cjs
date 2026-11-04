@@ -16,3 +16,21 @@ function api(host,bridge){
   assert.equal((await api({ok:true,explorer_protocol:'1.1'},receipt).nativeSession()).protocol,'1.1');
   console.log('PASS: stale helper and stale running bridge are independently rejected; matched Explorer protocol connects');
 })().catch(error=>{console.error(error);process.exitCode=1;});
+// Renewal is single-flight, retries the rejected operation once, and can never
+// turn a background resume into a consent dialog.
+(async()=>{
+  const actions=[]; let fetches=0;
+  const window={};
+  vm.runInNewContext(source,{window,fetch:async()=> ++fetches===1 ? {status:403,ok:false,json:async()=>({error:{code:'UNAUTHORIZED'}})} : {status:200,ok:true,json:async()=>({state:'completed',result:{ready:true}})},chrome:{runtime:{sendNativeMessage:async(_name,message)=>{
+    actions.push(message.action);
+    await Promise.resolve();
+    return message.action==='get_native_capabilities' ? {ok:true,explorer_protocol:'1.1'} : {ok:true,protocol:'1.1',token:'renewed'};
+  }}}});
+  await Promise.all([window.ChuteyExplorerAPI.nativeSession(false),window.ChuteyExplorerAPI.nativeSession(false)]);
+  assert.deepEqual(actions,['get_native_capabilities','explorer_resume']);
+  assert.equal((await window.ChuteyExplorerAPI.command('roots')).ready,true);
+  assert.equal(fetches,2);
+  assert.equal(actions.filter(value=>value==='explorer_resume').length,2);
+  assert(!actions.some(value=>value.includes('select')));
+  console.log('PASS: concurrent resume coalesces; expired request retries once without picker');
+})().catch(error=>{console.error(error);process.exitCode=1;});

@@ -1,7 +1,7 @@
 name: Chutey P0 paired Windows Explorer TEST build
 on:
   push:
-    branches: [codex/chutey-explorer-windows-usable-asap-2026-11-04, codex/chute-persistent-explorer-dnd-redown-2026-11-04]
+    branches: [codex/chutey-intuitive-explorer-ux-2026-11-04, codex/chutey-explorer-windows-usable-asap-2026-11-04, codex/chute-persistent-explorer-dnd-redown-2026-11-04]
   workflow_dispatch:
 permissions:
   contents: read
@@ -26,6 +26,7 @@ jobs:
         run: python scripts/summarize-explorer-tests.py explorer-pytest.xml
       - name: Existing worker and Shelf regressions
         run: |
+          node scripts/verify-explorer-drag.cjs
           node scripts/verify-explorer-api.cjs
           node scripts/verify-worker-boot.cjs
           node scripts/verify-thumbnail-icons.cjs
@@ -72,7 +73,7 @@ jobs:
           New-Item -ItemType Directory -Force dist/pair | Out-Null
           Copy-Item dist/windows/Chute-Windows.exe dist/pair/Chute-Windows-Explorer-TEST.exe
           Copy-Item dist/chrome-store/chute-chrome-2.6.1.zip dist/pair/
-          Copy-Item docs/explorer/PERSISTENT_TRANSFERS_TEST.md dist/pair/INSTALL-AND-EVIDENCE.md
+          Copy-Item docs/explorer/INTUITIVE_INTERACTIONS_TEST.md dist/pair/INSTALL-AND-EVIDENCE.md
           git rev-parse HEAD | Out-File dist/pair/SOURCE-COMMIT.txt -Encoding ascii
           $pairPath = (Resolve-Path dist/pair).Path
           $files = @(Get-ChildItem -Path (Join-Path $pairPath '*') -File | Where-Object { $_.Name -ne 'SHA256SUMS.txt' } | Sort-Object Name)

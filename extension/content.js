@@ -205,6 +205,7 @@
       const payload = JSON.parse(decodeURIComponent(text.slice(CHUTE_DRAG_PREFIX.length)));
       if (!payload?.id || !payload?.name) return null;
       return {
+        source_kind: payload.source_kind,
         id: String(payload.id),
         name: String(payload.name),
         mime: String(payload.mime || "application/octet-stream")
@@ -222,6 +223,7 @@
   function rememberExternalChuteDrag(item) {
     if (!item?.id || !item?.name) return;
     externalChuteDragItem = {
+      source_kind: item.source_kind,
       id: String(item.id),
       name: String(item.name),
       mime: String(item.mime || "application/octet-stream")
@@ -245,11 +247,16 @@
     if (deliveringChuteFile || !(target instanceof Element)) return;
     deliveringChuteFile = true;
     try {
-      const response = await fetch(`${BASE_URL}/api/files/${encodeURIComponent(item.id)}`, {
-        cache: "no-store"
-      });
-      if (!response.ok) throw new Error(`Chute returned ${response.status}`);
-      const blob = await response.blob();
+      let blob;
+      if (item.source_kind === "local_explorer") {
+        const receipt = await chrome.runtime.sendMessage({type:"chutey-read-explorer-drag",id:item.id});
+        if (!receipt?.ok) throw Error(receipt?.error || "File transfer unavailable.");
+        blob = new Blob([Uint8Array.from(atob(receipt.base64), value => value.charCodeAt(0))], {type:receipt.mime});
+      } else {
+        const response = await fetch(`${BASE_URL}/api/files/${encodeURIComponent(item.id)}`, {cache:"no-store"});
+        if (!response.ok) throw new Error(`Chute returned ${response.status}`);
+        blob = await response.blob();
+      }
       const file = new File([blob], item.name, {
         type: item.mime || blob.type || "application/octet-stream",
         lastModified: Date.now()
@@ -274,6 +281,12 @@
       target.dispatchEvent(new DragEvent("drop", options));
     } catch (error) {
       console.error("Chute could not deliver dragged file:", error);
+      const notice=document.createElement("div");
+      notice.setAttribute("role","status");
+      notice.textContent="Chutey could not deliver this file. " + error.message;
+      Object.assign(notice.style,{position:"fixed",bottom:"16px",right:"16px",maxWidth:"360px",padding:"12px",background:"#20251c",color:"#fff",border:"1px solid #879775",borderRadius:"8px",zIndex:"2147483647",pointerEvents:"none"});
+      document.documentElement.append(notice);
+      setTimeout(()=>notice.remove(),7000);
     } finally {
       deliveringChuteFile = false;
       clearExternalChuteDrag();

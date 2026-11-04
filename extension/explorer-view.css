@@ -28,8 +28,8 @@
 #chutey-explorer-view .ex-grid .ex-row { display: flex; flex-direction: column; min-width: 0; }
 #chutey-explorer-view .ex-grid .ex-icon, #chutey-explorer-view .ex-grid img { width: 64px; height: 64px; }
 #chutey-explorer-view .ex-grid .ex-name { width: 100%; text-align: center; }
-/* Absolute bottom overlay: it never participates in workspace sizing or columns. */
-#chutey-explorer-view .ex-preview { position: absolute; bottom: 0; left: 0; right: 0; height: 48%; min-height: 130px; max-height: 70%; z-index: 12; display: flex; flex-direction: column; background: #171c16f5; border: 1px solid var(--chutey-explorer-border); border-radius: 12px 12px 0 0; box-shadow: 0 -10px 32px #0009; backdrop-filter: blur(12px); }
+/* Preview participates in list/grid flow beneath the selected row. */
+#chutey-explorer-view .ex-preview { position:relative; grid-column:1 / -1; height:280px; min-height:130px; max-height:60vh; display:flex; flex-direction:column; background:var(--chutey-explorer-panel); border:1px solid var(--chutey-explorer-border); border-radius:8px; margin:8px 0; }
 #chutey-explorer-view .ex-preview header { display: flex; align-items: center; gap: 8px; padding: 5px 10px; }
 #chutey-explorer-view .ex-preview strong { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 #chutey-explorer-view .ex-resize { height: 7px; flex-shrink: 0; cursor: ns-resize; touch-action: none; }
@@ -42,7 +42,7 @@
 #chutey-explorer-view .ex-menu { position: absolute; z-index: 20; max-width: 240px; max-height: 70%; overflow: auto; padding: 5px; background: var(--chutey-explorer-panel); border: 1px solid var(--chutey-explorer-border); box-shadow: 0 8px 26px #0009; border-radius: 9px; }
 #chutey-explorer-view .ex-menu button { display: block; width: 100%; text-align: left; border: 0; padding: 8px; }
 #chutey-explorer-view .ex-menu button:hover:enabled { background: #303b20; }
-#chutey-explorer-view .ex-grid { grid-auto-rows: 112px; }
+#chutey-explorer-view .ex-grid { grid-auto-rows: auto; }
 #chutey-explorer-view .ex-grid .ex-row { height: 112px; }
 #chutey-explorer-view .ex-grid .ex-icon { flex-shrink: 0; }
 #chutey-explorer-view .ex-grid .ex-name { min-height: 16px; }
@@ -102,3 +102,10 @@
   background:#334327; border-color:var(--chutey-explorer-accent);
 }
 #chutey-explorer-view .ex-row { min-width:0; }
+
+#chutey-explorer-view { --ex-space:8px; }
+#chutey-explorer-view button { min-height:30px; }
+#chutey-explorer-view .ex-grid { gap:4px; }
+#chutey-explorer-view .ex-row { user-select:none; }
+#chutey-explorer-view :focus-visible { outline-width:2px; }
+@media (prefers-reduced-motion:reduce) { #chutey-explorer-view * { transition:none!important; scroll-behavior:auto!important; } }

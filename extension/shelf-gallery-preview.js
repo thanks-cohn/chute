@@ -22,8 +22,18 @@
   const image = document.createElement("img"); image.alt = ""; image.hidden = true;
   body.append(image,message);
   viewer.append(bar,body);
-  // Keep the preview in document flow under the calendar, never over History cards.
-  gallery.querySelector("#files")?.before(viewer);
+  function positionViewer(row) {
+    if (!row?.isConnected) return;
+    viewer.remove();
+    const cards = [...gallery.querySelectorAll("#files .file-row")];
+    let after = row;
+    for (const card of cards.slice(cards.indexOf(row)+1)) {
+      if (Math.abs(card.offsetTop-row.offsetTop)>2) break;
+      after=card;
+    }
+    after.after(viewer);
+    viewer.style.gridColumn="1 / -1";
+  }
   let sizeMode = "half";
   let processing = false, lastRequest = "", pending = null;
   let selectedRow = null;
@@ -57,6 +67,7 @@
     selectedRow.classList.add("chutey-gallery-selected");
     title.textContent = file.name || "Saved item";
     image.alt = file.name || "Saved image";
+    positionViewer(row);
     viewer.hidden = false;
     resizeViewer();
     if (!isImage(file)) {
@@ -108,13 +119,16 @@
     target.focus({preventScroll:true});
     target.scrollIntoView({block:"nearest"});
   });
+  new MutationObserver(() => {
+    if (selectedRow && !selectedRow.isConnected) dismiss();
+  }).observe(gallery.querySelector("#files"),{childList:true});
   close.addEventListener("click",dismiss);
   size.addEventListener("click",() => {
     sizeMode = sizeMode === "full" ? "half" : "full";
     resizeViewer();
     void chrome.storage.sync.set({chuteShelfViewerSize:sizeMode}).catch(console.warn);
   });
-  window.addEventListener("resize",resizeViewer);
+  window.addEventListener("resize",() => { positionViewer(selectedRow); resizeViewer(); });
   document.querySelector("#chutey-tab-explorer")?.addEventListener("click",dismiss);
   chrome.storage.onChanged.addListener((changes, area) => {
     if (area === "sync" && changes.chuteShelfViewerSize) {
@@ -165,6 +179,8 @@
     resizeViewer();
     try {
       selectedRow = await findHistoryRow(intent);
+      positionViewer(selectedRow);
+      if (!selectedRow) { dismiss(); return; }
     } catch (error) {
       console.warn("Chutey gallery location could not be reached:",error);
     }

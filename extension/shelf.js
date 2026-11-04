@@ -244,7 +244,7 @@ function createRow(file, index) {
   row.className = `file-row${file.active ? "" : " archived"}`;
   row.dataset.chuteId = file.id;
   const state = file.active
-    ? dragOutMode === "source" ? "Drag address" : "Drag original"
+    ? dragOutMode === "source" ? "Drag address" : "DRAG ME!"
     : "In history";
 
   row.innerHTML = `

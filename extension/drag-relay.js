@@ -36,6 +36,7 @@ function escapeDragAttribute(value) {
 }
 
 function addImageDragFallback(transfer, item) {
+  if (item.source_kind === "local_explorer") return; // No fake Live URL for an Explorer reference.
   if (!String(item.mime || "").toLowerCase().startsWith("image/")) return;
 
   const url = chuteRelayFileUrl(item);

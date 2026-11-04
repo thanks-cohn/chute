@@ -47,40 +47,16 @@ def choose_folder(*, writable=False):
     """Windows Shell picker on the request thread, without importing/booting Tk."""
     if os.name != 'nt':
         raise ExplorerError('UNSUPPORTED_PLATFORM','The native folder picker requires Windows.')
-    title=('Allow Chutey to READ AND WRITE this folder (remembered; revocable)' if writable
-           else 'Remember approval for Chutey to browse this folder (read only; revocable)')
-    class BrowseInfo(ctypes.Structure):
-        _fields_=[('owner',W.HWND),('root',ctypes.c_void_p),('display',W.LPWSTR),
-                  ('title',W.LPCWSTR),('flags',W.UINT),('callback',ctypes.c_void_p),
-                  ('param',ctypes.c_ssize_t),('image',ctypes.c_int)]
-    ole=ctypes.WinDLL('ole32',use_last_error=True)
-    ole.OleInitialize.argtypes=[ctypes.c_void_p]; ole.OleInitialize.restype=ctypes.c_long
-    initialized=ole.OleInitialize(None)
-    if initialized not in (0,1):
-        raise ExplorerError('PICKER_UNAVAILABLE','The Windows picker could not initialize. Reconnect and retry.')
-    shell=ctypes.WinDLL('shell32',use_last_error=True)
-    shell.SHBrowseForFolderW.argtypes=[ctypes.POINTER(BrowseInfo)]; shell.SHBrowseForFolderW.restype=ctypes.c_void_p
-    shell.SHGetPathFromIDListEx.argtypes=[ctypes.c_void_p,W.LPWSTR,W.DWORD,W.DWORD]; shell.SHGetPathFromIDListEx.restype=W.BOOL
-    ole.CoTaskMemFree.argtypes=[ctypes.c_void_p]
-    display=ctypes.create_unicode_buffer(32768)
-    info=BrowseInfo(None,None,ctypes.cast(display,W.LPWSTR),title,0x51,None,0,0)
-    selected=None
-    try:
-        selected=shell.SHBrowseForFolderW(ctypes.byref(info))
-        if not selected: return ''
-        path=ctypes.create_unicode_buffer(32768)
-        if not shell.SHGetPathFromIDListEx(selected,path,len(path),0):
-            raise ExplorerError('UNSAFE_ROOT','Select a local filesystem folder.')
-        return path.value
-    finally:
-        if selected: ole.CoTaskMemFree(selected)
-        ole.OleUninitialize()
+    from .windows_picker import pick_folder
+    return pick_folder(writable=writable)
 
 
 class NativeExplorer:
     def __init__(self, *, store=None):
         from .grant_store import GrantStore
         self.store = store if store is not None else (GrantStore() if os.name == "nt" else None)
+        from collections import deque
+        self.events = deque(maxlen=64)
         self.descriptors = {}
         self.token=secrets.token_urlsafe(32)
         self.adapters={}
@@ -97,6 +73,7 @@ class NativeExplorer:
             raise ExplorerError('UNAUTHORIZED','This Chutey installation is not enrolled.')
         if not self.selection_lock.acquire(blocking=False):
             raise ExplorerError('BUSY','A folder selection is already open.')
+        outcome='completed'
         try:
             # Native consent UI must not hold the authorization/state lock.
             # Existing browsing and view persistence remain available while it is open.
@@ -125,10 +102,15 @@ class NativeExplorer:
                     # Reopening Shelf renews same root without broadening scope.
                     grant=next(iter(old.engine.grants.values()))
                     grant.stat(grant.id)  # Revalidate the original guarded root.
-                    adapter=ExplorerAPI(old.engine,session)
-                    adapter.resume_handle=getattr(old,'resume_handle',grant.id)
-                    old.session.expires=0
-                    self.adapters[origin]=adapter
+                    # Multiple Shelf/popup surfaces share the origin. Reopening one
+                    # must not revoke the other surface's still-valid session.
+                    if old.session.expires > time.monotonic():
+                        adapter=old
+                        session=old.session
+                    else:
+                        adapter=ExplorerAPI(old.engine,session)
+                        adapter.resume_handle=getattr(old,'resume_handle',grant.id)
+                        self.adapters[origin]=adapter
                 elif self.store:
                     from .grant_store import restore
                     descriptor=self.store.load(origin)
@@ -141,10 +123,25 @@ class NativeExplorer:
                 else:
                     raise ExplorerError('NEEDS_SELECTION','Select a folder to begin browsing.')
                 adapter.native_state=lambda command,args: self.state(origin,command,args)
-                return {'ok':True,'token':session.token,'expires_in':900,'read_only':not next(iter(adapter.engine.grants.values())).writable,
+                return {'ok':True,'token':session.token,'expires_in':max(0,int(session.expires-time.monotonic())),'read_only':not next(iter(adapter.engine.grants.values())).writable,
                         'native_roundtrip_ms':round((time.perf_counter()-started)*1000,2),
                         'protocol':'1.1','persistent':bool(self.store)}
-        finally: self.selection_lock.release()
+        except Exception as error:
+            outcome = error.code if isinstance(error, ExplorerError) else 'UNAVAILABLE'
+            raise
+        finally:
+            self.selection_lock.release()
+            # Bounded diagnostics contain action/outcome/timing only. Never roots,
+            # handles, tokens, filenames, or content. Trace failure cannot break consent.
+            with self.lock:
+                self.events.append({'at_unix_ms':round(time.time()*1000),'action':'select_write' if select and writable else 'select' if select else 'resume',
+                                    'picker_requested':bool(select), 'outcome':outcome,
+                                    'elapsed_ms':round((time.perf_counter()-started)*1000,2)})
+                if os.name == 'nt':
+                    try:
+                        directory = self.store.directory.parent if self.store else control_path().parent
+                        private_write(directory / 'explorer-events.json',json.dumps(list(self.events)).encode())
+                    except OSError: pass
 
     def state(self, origin, command, args):
         adapter=self.adapters[origin]
