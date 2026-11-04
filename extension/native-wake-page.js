@@ -4,6 +4,7 @@
   const HEALTH_URL = `${CHUTE_ORIGIN}/health`;
   const WORKER_WAKE_TIMEOUT_MS = 8000;
   const DIRECT_WAKE_TIMEOUT_MS = 8000;
+  const HEALTH_PROBE_TIMEOUT_MS = 1200;
   const nativeFetch = window.fetch.bind(window);
   let wakePromise = null;
 
@@ -66,11 +67,19 @@
   }
 
   async function healthCheck() {
+    // A hung loopback probe must not stall the popup while Windows is starting.
+    // This is a health hint, not a write or file-operation timeout.
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), HEALTH_PROBE_TIMEOUT_MS);
     try {
-      const response = await nativeFetch(HEALTH_URL, { cache: "no-store" });
+      const response = await nativeFetch(HEALTH_URL, {
+        cache: "no-store", signal: controller.signal
+      });
       return response.ok;
     } catch {
       return false;
+    } finally {
+      clearTimeout(timeout);
     }
   }
 
