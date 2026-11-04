@@ -159,3 +159,11 @@ body.chutey-gallery-popup { width:390px; max-height:600px; overflow-y:auto; over
 .chutey-gallery-popup #files .chutey-gallery-tile.chutey-gallery-expanded {
   aspect-ratio:auto; height:100%; width:100%; max-height:100%;
 }
+
+/* The caption is the card-selection surface; the picture remains previewable. */
+.chutey-gallery-popup #files .chutey-gallery-tile .file-info {
+  pointer-events:auto; cursor:pointer; min-height:24px;
+}
+.chutey-gallery-popup #files .chutey-gallery-tile .file-name {
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+}
