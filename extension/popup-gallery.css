@@ -1,5 +1,5 @@
 /* Popup-only gallery: no changes to Shelf History or File Explorer styles. */
-body.chutey-gallery-popup { width:390px; max-height:600px; overflow:hidden; }
+body.chutey-gallery-popup { width:390px; max-height:600px; overflow-y:auto; overflow-x:hidden; }
 .chutey-gallery-popup .gallery-density-control { display:flex; justify-content:flex-end; align-items:center; gap:8px; }
 .chutey-gallery-popup #gallery-density { width:116px; min-width:0; accent-color:#d7ff3f; cursor:ew-resize; }
 .chutey-gallery-popup #gallery-density-value { color:#e3f0d6; font-size:11px; min-width:40px; text-align:right; font-variant-numeric:tabular-nums; }
@@ -60,7 +60,7 @@ body.chutey-gallery-popup { width:390px; max-height:600px; overflow:hidden; }
 .chutey-gallery-popup #files .chutey-gallery-tile .file-tools button { padding:2px 3px; font-size:9px; min-height:20px; }
 .chutey-gallery-popup #files .chutey-gallery-tile.archived { opacity:1; }
 .chutey-gallery-popup #files .empty { grid-column:1 / -1; }
-.chutey-gallery-popup .history-pagination { margin:3px 10px 4px; padding:5px 6px; }
+.chutey-gallery-popup .history-pagination { margin:3px 10px 4px; padding:5px 6px; position:sticky; bottom:0; z-index:5; }
 .chutey-gallery-popup .popup-note { padding-bottom:6px; }
 @keyframes chute-gallery-turn { to { transform:rotate(390deg); } }
 @media (prefers-reduced-motion:reduce) {
