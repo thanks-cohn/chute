@@ -129,7 +129,16 @@
         refresh.click();
         return;
       }
-      setTimeout(() => location.reload(), 0);
+      // The popup has no Refresh button. Reloading it after waking the local
+      // companion blanks and rebuilds its entire UI, which feels like a delayed
+      // popup open. Refresh the data in place, preserving gallery and focus.
+      if (location.pathname.endsWith("/popup.html") && typeof resetHistory === "function") {
+        void resetHistory().catch(error => console.warn("Chute popup refresh failed:", error));
+        return;
+      }
+      if (typeof resetHistory === "function") {
+        void resetHistory().catch(error => console.warn("Chute Shelf refresh failed:", error));
+      }
     }
 
     function renderWaking() {
