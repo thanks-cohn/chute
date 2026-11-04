@@ -154,6 +154,37 @@ class Store:
         dates.sort(reverse=True)
         return dates
 
+    def history_month_counts(self, month: str) -> dict[str, int]:
+        """Count original saves per UTC history date, independent of live basket.
+
+        This reads preserved 'add' events, not queue.json: clearing and recalling
+        items never reduces or increases the number of original saves.
+        """
+        if (
+            len(month) != 7
+            or month[4] != "-"
+            or not (month[:4].isdigit() and month[5:].isdigit())
+            or not 1 <= int(month[5:]) <= 12
+        ):
+            raise ValueError("month must be YYYY-MM")
+
+        counts: dict[str, int] = {}
+        for day in self.history_dates():
+            if not day.startswith(month + "-"):
+                continue
+            seen: set[str] = set()
+            path = self.history_dir / f"{day}.tsv"
+            for line in path.read_text(encoding="utf-8").splitlines():
+                parsed = self._parse_history_line(line)
+                if parsed is None:
+                    continue
+                _timestamp, event, item = parsed
+                if event == "add":
+                    seen.add(item.id)
+            if seen:
+                counts[day] = len(seen)
+        return counts
+
     def history_day(self, day: str | None = None) -> list[QueueItem]:
         dates = self.history_dates()
         if day is None:
@@ -170,6 +201,39 @@ class Store:
                 items.append(parsed[2])
         items.reverse()
         return items
+
+    def history_page(
+        self, offset: int, limit: int, day: str | None = None
+    ) -> tuple[list[QueueItem], bool]:
+        """Read at most one page of saved metadata across dates, newest first.
+
+        The original 'add' events remain intact after clear/remove. Only
+        metadata for the requested page is returned to the browser; bytes and
+        thumbnails are retrieved on demand by separate endpoints.
+        """
+        if offset < 0 or not 1 <= limit <= 500:
+            raise ValueError("invalid history pagination")
+        dates = [day] if day is not None else self.history_dates()
+        remaining = offset
+        page: list[QueueItem] = []
+        for history_date in dates:
+            # Retain only one day's metadata in memory at a time.
+            entries = self.history_day(history_date)
+            if remaining >= len(entries):
+                remaining -= len(entries)
+                continue
+            for item in entries[remaining:]:
+                page.append(item)
+                if len(page) > limit:
+                    return page[:limit], True
+            remaining = 0
+        return page, False
+
+    def live_page(self, offset: int, limit: int) -> tuple[list[QueueItem], bool]:
+        if offset < 0 or not 1 <= limit <= 500:
+            raise ValueError("invalid live pagination")
+        active = self.list()
+        return active[offset:offset + limit], len(active) > offset + limit
 
     def previous_history_date(self, day: str) -> str | None:
         dates = self.history_dates()

@@ -291,41 +291,6 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     return true;
   }
 
-  if (message?.type === "attach-file") {
-    attachFile(message.file)
-      .then((result) => sendResponse(result))
-      .catch((error) => sendResponse({ ok: false, error: error.message }));
-    return true;
-  }
+
 });
 
-async function attachFile(file) {
-  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-  if (!tab?.id) throw new Error("No active browser tab found.");
-
-  const results = await chrome.scripting.executeScript({
-    target: { tabId: tab.id },
-    func: async (url, name, mime) => {
-      const visible = (element) => {
-        const style = getComputedStyle(element);
-        return style.display !== "none" && style.visibility !== "hidden";
-      };
-      const inputs = [...document.querySelectorAll('input[type="file"]')];
-      const input = inputs.find(visible) || inputs[0];
-      if (!input) return { ok: false, error: "This page has no file upload field." };
-
-      const response = await fetch(url, { cache: "no-store" });
-      if (!response.ok) return { ok: false, error: `Could not read file (${response.status}).` };
-      const blob = await response.blob();
-      const transfer = new DataTransfer();
-      transfer.items.add(new File([blob], name, { type: mime || blob.type, lastModified: Date.now() }));
-      input.files = transfer.files;
-      input.dispatchEvent(new Event("input", { bubbles: true }));
-      input.dispatchEvent(new Event("change", { bubbles: true }));
-      return { ok: true };
-    },
-    args: [`${BASE_URL}/api/files/${file.id}`, file.name, file.mime]
-  });
-
-  return results[0]?.result || { ok: false, error: "The page rejected the attachment." };
-}

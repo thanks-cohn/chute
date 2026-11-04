@@ -7,7 +7,6 @@ const saveCustomToggle = document.querySelector("#browser-image-save-custom");
 const customWidthInput = document.querySelector("#browser-image-width");
 const customHeightInput = document.querySelector("#browser-image-height");
 const displayLimitInput = document.querySelector("#display-limit");
-const unlimitedButton = document.querySelector("#display-unlimited");
 const thumbnailsToggle = document.querySelector("#show-thumbnails");
 const clearChuteButton = document.querySelector("#clear-chute");
 
@@ -28,7 +27,7 @@ openShelfButton?.addEventListener("click", async () => {
 
 async function loadPopupSettings() {
   const settings = await chrome.storage.sync.get({
-    chuteDisplayLimit: 50,
+    chutePageSize: 40,
     chuteAccessMode: null,
     chuteBinVisible: true,
     chuteThumbnails: true,
@@ -40,7 +39,7 @@ async function loadPopupSettings() {
     chuteBrowserImageHeight: 512
   });
 
-  const limit = Number(settings.chuteDisplayLimit);
+  const limit = Number(settings.chutePageSize);
   const mode = settings.chuteAccessMode || (settings.chuteBinVisible ? "floating" : "context");
   const migratedFull = settings.chuteBrowserImageSaveFull === null
     ? settings.chuteBrowserImageCapture !== "thumbnail"
@@ -49,8 +48,7 @@ async function loadPopupSettings() {
     ? settings.chuteBrowserImageCapture === "thumbnail"
     : settings.chuteBrowserImageSaveCustom === true;
 
-  displayLimitInput.value = String(limit > 0 ? limit : 50);
-  unlimitedButton.classList.toggle("active", limit === 0);
+  displayLimitInput.value = String(Number.isFinite(limit) && limit > 0 ? Math.min(500, Math.trunc(limit)) : 40);
   accessModeSelect.value = mode;
   dragOutModeSelect.value = settings.chuteDragOutMode === "source" ? "source" : "file";
   saveFullToggle.checked = migratedFull;
@@ -70,15 +68,9 @@ async function loadPopupSettings() {
 }
 
 displayLimitInput?.addEventListener("change", async () => {
-  const value = Math.max(1, Math.trunc(Number(displayLimitInput.value) || 50));
+  const value = Math.min(500, Math.max(1, Math.trunc(Number(displayLimitInput.value) || 40)));
   displayLimitInput.value = String(value);
-  unlimitedButton.classList.remove("active");
-  await chrome.storage.sync.set({ chuteDisplayLimit: value });
-});
-
-unlimitedButton?.addEventListener("click", async () => {
-  unlimitedButton.classList.add("active");
-  await chrome.storage.sync.set({ chuteDisplayLimit: 0 });
+  await chrome.storage.sync.set({ chutePageSize: value });
 });
 
 accessModeSelect?.addEventListener("change", async () => {

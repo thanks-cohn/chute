@@ -5,6 +5,16 @@
   const thumbnailInFlight = new WeakSet();
   const retryDelays = [250, 600, 1200, 2500, 5000, 9000];
 
+  function showThumbnail(img, blob) {
+    // Release local blob URLs after the image is decoded so page navigation
+    // does not retain previews from every previous page in memory.
+    const url = URL.createObjectURL(blob);
+    img.addEventListener("load", () => URL.revokeObjectURL(url), { once: true });
+    img.addEventListener("error", () => URL.revokeObjectURL(url), { once: true });
+    img.src = url;
+    img.hidden = false;
+  }
+
   function sleep(ms) {
     return new Promise((resolve) => setTimeout(resolve, ms));
   }
@@ -83,8 +93,7 @@
         if (cached.ok) {
           const blob = await cached.blob();
           if (blob.size) {
-            img.src = URL.createObjectURL(blob);
-            img.hidden = false;
+            showThumbnail(img, blob);
             generatedThumbs.add(file.id);
             thumbnailRetries.delete(img);
             return;
@@ -102,8 +111,7 @@
       }
 
       if (!showThumbnails || !img.isConnected) return;
-      img.src = URL.createObjectURL(thumbnail);
-      img.hidden = false;
+      showThumbnail(img, thumbnail);
       thumbnailRetries.delete(img);
 
       if (await persistThumbnail(file, thumbnail)) {
@@ -119,40 +127,29 @@
     }
   };
 
-  function kickThumbnail(img, delay = 80) {
-    if (!showThumbnails || !(img instanceof HTMLImageElement) || !img.hidden) return;
-    const file = img.__chuteFile;
-    if (!file?.mime?.startsWith("image/")) return;
-    setTimeout(() => ensureThumbnail(file, img), delay);
-  }
-
-  const thumbnailKickObserver = new MutationObserver((records) => {
-    if (!showThumbnails) return;
-    let delay = 60;
-    for (const record of records) {
-      for (const node of record.addedNodes) {
-        if (!(node instanceof Element)) continue;
-        if (node.matches?.("img.file-thumb")) {
-          kickThumbnail(node, delay);
-          delay += 45;
-        }
-        for (const img of node.querySelectorAll?.("img.file-thumb") || []) {
-          kickThumbnail(img, delay);
-          delay += 45;
-        }
-      }
-    }
-  });
-
-  if (listElement) {
-    thumbnailKickObserver.observe(listElement, { childList: true, subtree: true });
-    for (const img of listElement.querySelectorAll("img.file-thumb")) kickThumbnail(img);
-  }
+  // shelf.js already watches only on-screen thumbnail rows with an
+  // IntersectionObserver. Do not schedule every image via MutationObserver:
+  // a large 200-item page should not fetch 200 full originals at once.
 
   async function renderLivePopup() {
     if (dragOutActive) return;
+    const token = ++historyRequestToken;
     try {
-      loadedCount = 0;
+      const params = new URLSearchParams({
+        scope: "live", page: String(currentPage), limit: String(displayLimit)
+      });
+      const response = await api(`/api/browse?${params}`);
+      const payload = await response.json();
+      if (token !== historyRequestToken) return;
+      const files = Array.isArray(payload.files) ? payload.files : [];
+
+      if (currentPage > 0 && files.length === 0) {
+        currentPage -= 1;
+        await renderLivePopup();
+        return;
+      }
+
+      loadedCount = files.length;
       previousDate = null;
       nextDate = null;
       currentDate = null;
@@ -163,13 +160,10 @@
       if (historyDateInput) historyDateInput.value = "";
       if (historyPrevButton) historyPrevButton.disabled = true;
       if (historyNextButton) historyNextButton.disabled = true;
-
-      const response = await api("/api/files");
-      const payload = await response.json();
-      const files = Array.isArray(payload.files) ? payload.files : [];
+      updatePageControls(payload);
 
       if (!files.length) {
-        listElement.innerHTML = `<div class="empty"><strong>Chute is clear.</strong>Your dated history is preserved. Open the Shelf or choose a date whenever you need something back.</div>`;
+        listElement.innerHTML = `<div class="empty"><strong>Chute is clear.</strong>Your dated history is preserved. Open the Shelf or choose a day whenever you need something back.</div>`;
         setStatus("0 live items · history preserved");
         chrome.runtime.sendMessage({ type: "badge-refresh" });
         return;
@@ -177,13 +171,13 @@
 
       for (const file of files) {
         listElement.append(createRow(file, loadedCount));
-        loadedCount += 1;
       }
-      setStatus(`${loadedCount} live item${loadedCount === 1 ? "" : "s"} in Chute`);
+      const first = currentPage * displayLimit + 1;
+      setStatus(`Live Chute · ${first}–${first + files.length - 1} · page ${currentPage + 1}`);
       chrome.runtime.sendMessage({ type: "badge-refresh" });
     } catch (error) {
-      listElement.innerHTML = `<div class="empty"><strong>Chute is not running.</strong>Start the local Chute service and try again.</div>`;
-      setStatus("Cannot reach 127.0.0.1:17891", true);
+      if (token !== historyRequestToken) return;
+      setStatus(error.message || "Cannot reach 127.0.0.1:17891", true);
       console.error("Chute live basket refresh failed:", error);
     }
   }
@@ -196,11 +190,8 @@
   if (isPopupSurface) {
     document.querySelector("#clear-chute")?.addEventListener("click", () => {
       selectedDay = "";
+      currentPage = 0;
       if (historyDateInput) historyDateInput.value = "";
     }, true);
-
-    // shelf.js may already have queued its original history render before this
-    // compatibility layer loaded. Replace it with the live working basket.
-    setTimeout(() => resetHistory(null), 0);
   }
 })();
