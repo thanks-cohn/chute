@@ -53,13 +53,29 @@ function formatWhen(value) {
   return date.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
 }
 
+// Consistent vector fallbacks instead of OS-dependent emoji glyphs.
+function fileKind(file) {
+  const mime = String(file.mime || "").toLowerCase();
+  const name = String(file.name || "").toLowerCase();
+  if (mime.startsWith("image/") || /\.(png|jpe?g|gif|webp|bmp|svg|avif)$/.test(name)) return "image";
+  if (mime === "application/pdf" || name.endsWith(".pdf")) return "pdf";
+  if (/\.(zip|7z|rar|tar|gz)$/.test(name)) return "archive";
+  if (name.endsWith(".url") || name.endsWith(".webloc")) return "link";
+  if (mime.startsWith("text/") || /\.(txt|md|csv|json|log)$/.test(name)) return "text";
+  return "file";
+}
+
 function iconFor(file) {
-  if (file.mime?.startsWith("image/")) return "🖼️";
-  if (file.mime === "application/pdf") return "📕";
-  if (file.name?.endsWith(".zip")) return "📦";
-  if (file.name?.endsWith(".url")) return "🔗";
-  if (file.mime?.startsWith("text/")) return "📝";
-  return "📄";
+  const kind = fileKind(file);
+  const shapes = {
+    image: '<rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="8.5" cy="9" r="1.3"/><path d="m5 17 5-5 3 3 2-2 4 4"/>',
+    pdf: '<path d="M6 2h8l5 5v13a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2Z"/><path d="M14 2v5h5M8 15h8M8 18h5"/>',
+    archive: '<rect x="4" y="2" width="16" height="20" rx="2"/><path d="M12 4v2m0 2v2m0 2v2M9.5 16h5v3h-5z"/>',
+    link: '<path d="M10 13a5 5 0 0 0 7.2.4l2.6-2.6a5 5 0 0 0-7.1-7.1l-1.5 1.5"/><path d="M14 11a5 5 0 0 0-7.2-.4l-2.6 2.6a5 5 0 0 0 7.1 7.1l1.5-1.5"/>',
+    text: '<path d="M6 2h8l5 5v13a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2Z"/><path d="M14 2v5h5M8 11h8M8 14h8M8 17h5"/>',
+    file: '<path d="M6 2h8l5 5v13a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2Z"/><path d="M14 2v5h5"/>'
+  };
+  return `<svg class="file-type-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${shapes[kind]}</svg>`;
 }
 
 function fileUrl(file) {
@@ -159,10 +175,12 @@ async function ensureThumbnail(file, img) {
 const thumbObserver = new IntersectionObserver((entries) => {
   for (const entry of entries) {
     if (!entry.isIntersecting) continue;
-    const img = entry.target;
-    thumbObserver.unobserve(img);
-    const file = img.__chuteFile;
-    if (file) ensureThumbnail(file, img);
+    // Observe the visible icon box, not a hidden <img> (which cannot intersect).
+    const icon = entry.target;
+    thumbObserver.unobserve(icon);
+    const img = icon.querySelector(".file-thumb");
+    const file = img?.__chuteFile;
+    if (file && img.isConnected) ensureThumbnail(file, img);
   }
 }, { rootMargin: "180px" });
 
@@ -222,8 +240,8 @@ function createRow(file, index) {
     : "In history";
 
   row.innerHTML = `
-    <div class="file-icon">
-      <span class="file-fallback">${iconFor(file)}</span>
+    <div class="file-icon" data-kind="${fileKind(file)}">
+      <span class="file-fallback" aria-hidden="true">${iconFor(file)}</span>
     </div>
     <div class="file-info">
       <div class="file-name" title="${escapeHtml(file.name)}">${escapeHtml(file.name)}</div>
@@ -241,7 +259,7 @@ function createRow(file, index) {
     thumb.draggable = false;
     thumb.__chuteFile = file;
     icon.append(thumb);
-    thumbObserver.observe(thumb);
+    thumbObserver.observe(icon);
   }
 
   const tools = row.querySelector(".file-tools");
@@ -289,11 +307,9 @@ function createRow(file, index) {
     open.addEventListener("click", async () => {
       open.disabled = true;
       try {
-        const response = await api(`/api/reveal/${encodeURIComponent(file.id)}`, { method: "POST" });
-        const result = await response.json();
-        setStatus(result.selection === "selected"
-          ? `Showing ${file.name} in your file manager`
-          : `Opened folder containing ${file.name} (file selection unavailable)`);
+        // Successful Open is self-evident in the OS file manager.
+        // Preserve the current Shelf status instead of printing internal feedback.
+        await api(`/api/reveal/${encodeURIComponent(file.id)}`, { method: "POST" });
       } catch (error) {
         setStatus(error.message || "Could not open the file location.", true);
       } finally {

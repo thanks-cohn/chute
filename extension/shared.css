@@ -165,9 +165,21 @@ button, input, select { font: inherit; }
   overflow: hidden;
   border-radius: 8px;
   background: #24291f;
-  font-size: 23px;
   text-align: center;
 }
+.file-fallback {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  color: #c0cbb0;
+}
+.file-type-svg { display: block; width: 24px; height: 24px; }
+.file-icon[data-kind="image"] .file-fallback { color: #b7d89d; }
+.file-icon[data-kind="pdf"] .file-fallback { color: #e7b3a5; }
+.file-icon[data-kind="archive"] .file-fallback { color: #e5c982; }
+.file-icon[data-kind="link"] .file-fallback { color: #a7c8d8; }
+.file-icon[data-kind="text"] .file-fallback { color: #c9cebd; }
 .file-thumb {
   position: absolute;
   inset: 0;
