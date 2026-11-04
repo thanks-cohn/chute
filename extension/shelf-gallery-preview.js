@@ -26,6 +26,7 @@
   let sizeMode = "half";
   let processing = false, lastRequest = "", pending = null;
   let selectedRow = null;
+  let viewToken = 0;
 
   function resizeViewer() {
     if (viewer.hidden) return;
@@ -38,7 +39,9 @@
   }
 
   function dismiss() {
+    ++viewToken;
     viewer.hidden = true;
+    image.onload = null; image.onerror = null;
     image.hidden = true; image.removeAttribute("src");
     message.textContent = "";
     if (selectedRow) selectedRow.classList.remove("chutey-gallery-selected");
@@ -91,22 +94,35 @@
     return row;
   }
 
-  async function show(intent) {
+  async function show(intent, clickedRow = null) {
     dismiss();
-    document.querySelector("#chutey-tab-history")?.click();
+    const thisView = ++viewToken;
+    if (!clickedRow) document.querySelector("#chutey-tab-history")?.click();
     title.textContent = intent.name;
     image.alt = intent.name;
     viewer.hidden = false;
     message.textContent = "Finding this item in your Shelf…";
     resizeViewer();
-    try {
-      selectedRow = await findHistoryRow(intent);
-    } catch (error) {
-      console.warn("Chutey gallery location could not be reached:",error);
+    if (clickedRow) {
+      // Direct clicks on Shelf History MUST preview immediately; don't
+      // re-fetch or navigate away from the existing page/scroll position.
+      selectedRow = clickedRow;
+      selectedRow.classList.add("chutey-gallery-selected");
+    } else {
+      try {
+        selectedRow = await findHistoryRow(intent);
+      } catch (error) {
+        console.warn("Chutey gallery location could not be reached:", error);
+      }
     }
+    if (thisView !== viewToken) return;
     if (intent.mime.toLowerCase().startsWith("image/")) {
-      image.onload = () => { message.textContent = ""; image.hidden = false; };
+      image.onload = () => {
+        if (thisView !== viewToken) return;
+        message.textContent = ""; image.hidden = false;
+      };
       image.onerror = () => {
+        if (thisView !== viewToken) return;
         image.hidden = true;
         message.textContent = "Saved image unavailable. The original file may have been moved or removed.";
       };
@@ -116,6 +132,32 @@
       message.textContent = "This item is located in Chutey History. Only images show an in-Shelf picture preview.";
     }
   }
+
+  // The original implementation only listened for handoffs FROM the
+  // extension popup. It never handled a click ON a Shelf History card.
+  // Delegate from the stable list so pagination and lazy re-rendering work.
+  const historyList = gallery.querySelector("#files");
+  function openFromHistory(event) {
+    const origin = event.target;
+    if (!origin || !origin.closest || origin.closest("button,a,input,select,.file-tools"))
+      return;
+    const card = origin.closest(".file-row");
+    if (!card || !historyList?.contains(card)) return;
+    const file = card.__chuteyFile;
+    if (!file || !/^[0-9a-f]{32}$/i.test(String(file.id || ""))) return;
+    if (event.type === "keydown") {
+      if (event.key !== "Enter" && event.key !== " ") return;
+      event.preventDefault();
+    }
+    void show({
+      id: file.id,
+      name: String(file.name || "Saved item"),
+      mime: String(file.mime || ""),
+      day: selectedDay || String(file.created_at || "").slice(0, 10)
+    }, card);
+  }
+  historyList?.addEventListener("click", openFromHistory);
+  historyList?.addEventListener("keydown", openFromHistory);
 
   async function consume(value) {
     if (!value || processing) { if (processing) pending = value; return; }
