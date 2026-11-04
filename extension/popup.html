@@ -5,12 +5,13 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Chutey</title>
   <link rel="stylesheet" href="shared.css">
+  <link rel="stylesheet" href="popup-gallery.css">
   <style>
     body { width: 390px; max-height: 600px; overflow: auto; }
     .popup-note { padding: 0 13px 11px; color: #8f9882; font-size: 10px; }
   </style>
 </head>
-<body>
+<body class="chutey-gallery-popup">
   <header class="topbar">
     <div class="brand">
       <div class="logo">↓</div>
@@ -61,11 +62,18 @@
         <input id="browser-image-height" type="number" min="1" step="1" value="512" aria-label="Custom image maximum height">
       </div>
 
-      <div class="setting-label">Items per page</div>
-      <div class="limit-control">
-        <input id="display-limit" type="number" min="1" max="500" step="1" inputmode="numeric" value="40" aria-label="Number of entries on each page">
+      <div class="setting-label">Gallery density</div>
+      <div class="gallery-density-control">
+        <input id="gallery-density" type="range" min="0" max="3" step="1" value="0" aria-label="Gallery grid density, four by four through six by five">
+        <output id="gallery-density-value" for="gallery-density" aria-live="polite">4 × 4</output>
       </div>
-      <div class="settings-note">40 items per page by default. Previous and Next let you keep browsing without an archive limit; images load only when their rows appear on screen.</div>
+      <div class="settings-note">Move the dial to rearrange the grid instantly: 4×4, 5×4, 5×5 or 6×5. A page never loads more than 30 items; scrolling and Previous / Next remain available.</div>
+      <div class="setting-label">Shelf image preview</div>
+      <select id="shelf-viewer-size" aria-label="Image preview card size in Shelf">
+        <option value="half">Half-size (default)</option>
+        <option value="full">Full — up to calendar</option>
+      </select>
+      <div class="settings-note">Click a gallery image to find and open it in the Shelf. Full preview expands upward to the calendar; Half preserves more browsing room.</div>
 
       <label>
         <span>Generated menu thumbnails</span>
@@ -125,6 +133,7 @@
   <script src="workflow-fixes.js"></script>
   <script src="drag-relay.js"></script>
   <script src="popup.js"></script>
+  <script src="popup-gallery.js"></script>
   <script src="popup-auto-hide.js"></script>
   <script src="calendar.js"></script>
 </body>
