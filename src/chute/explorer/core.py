@@ -35,7 +35,7 @@ class Explorer:
         return {"handle": grant.handle(parts), "name": name, "kind": kind,
                 "size": info.st_size, "modified_ns": info.st_mtime_ns,
                 "mime": (mimetypes.guess_type(name)[0] or "application/octet-stream") if kind == "file" else None,
-                "identity": (None if defer_identity or kind == "blocked" else grant.windows.identity(parts,fd=fd)) if grant.windows else f"{info.st_dev}:{info.st_ino}:{info.st_mtime_ns}:{info.st_size}"}
+                "identity": (None if defer_identity or kind == "blocked" else grant.windows.file_identity(parts,fd=fd)) if grant.windows else f"{info.st_dev}:{info.st_ino}:{info.st_mtime_ns}:{info.st_size}"}
 
     def execute(self, command: str, **args) -> dict:
         operation_id = uuid.uuid4().hex
@@ -114,7 +114,7 @@ class Explorer:
             # No recursive scan and no handle-open for every unreturned entry.
             for row in page:
                 if row['kind'] != 'blocked':
-                    row['identity']=grant.windows.identity(grant.parts(row['handle']))
+                    row['identity']=grant.windows.file_identity(grant.parts(row['handle']))
         return {"entries": page, "total": len(rows),
                 "next_offset": offset + limit if offset + limit < len(rows) else None,
                 "parent": grant.handle(parts[:-1]) if parts else None,

@@ -127,7 +127,7 @@ class WindowsFS:
         if not get(handle,ctypes.byref(info)): raise ctypes.WinError(ctypes.get_last_error())
         return f'{info.volume}:{(info.index_high<<32)|info.index_low}:{(info.written.dwHighDateTime<<32)|info.written.dwLowDateTime}:{(info.size_high<<32)|info.size_low}'
 
-    def identity(self, parts, *, fd=None):
+    def file_identity(self, parts, *, fd=None):
         if fd is not None:
             import msvcrt
             return self.handle_identity(msvcrt.get_osfhandle(fd))

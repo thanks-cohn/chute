@@ -92,4 +92,4 @@ class WindowsBrowseTests(unittest.TestCase):
         file=next(value for value in listing['entries'] if value['kind']=='file')
         self.assertEqual(file['identity'],self.command('stat',handle=file['handle'])['identity'])
         with self.grant.open(file['handle']) as fd:
-            self.assertEqual(file['identity'],self.grant.windows.identity(self.grant.parts(file['handle']),fd=fd))
+            self.assertEqual(file['identity'],self.grant.windows.file_identity(self.grant.parts(file['handle']),fd=fd))
