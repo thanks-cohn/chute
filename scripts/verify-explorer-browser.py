@@ -17,7 +17,7 @@ from chute.explorer.api import ExplorerAPI
 from chute.server import ChuteServer, ChuteHandler
 from chute.store import Store
 from PIL import Image
-from playwright.sync_api import sync_playwright
+from playwright.sync_api import sync_playwright, expect
 
 
 class FixtureHandler(ChuteHandler):
@@ -65,7 +65,7 @@ def main():
                 if fixture_mode:
                     browser = playwright.chromium.launch(executable_path=os.environ.get("CHUTE_TEST_CHROME") or shutil.which("chromium"), headless=True, args=["--no-sandbox"])
                     context = browser.new_context()
-                    context.add_init_script("""window.chrome = {storage:{local:{get:async d=>Object.assign({},d,window.__local||{}),set:async x=>{window.__local=Object.assign(window.__local||{},x)}},sync:{get:async d=>d},onChanged:{addListener(){}}},runtime:{sendMessage:async()=>({}),onMessage:{addListener(){}},connectNative(){throw Error('fixture: no native host')}}};""")
+                    context.add_init_script("""window.chrome = {storage:{local:{get:async d=>Object.assign({},d,window.__local||{}),set:async x=>{window.__local=Object.assign(window.__local||{},x)}},sync:{get:async d=>d},onChanged:{addListener(){}}},runtime:{sendNativeMessage:async()=>({ok:true,token:window.__nativeSessionToken}),sendMessage:async()=>({}),onMessage:{addListener(){}},connectNative(){throw Error('fixture: no native host')}}};""")
                     origin = "chrome-extension://abcdefghijklmnopabcdefghijklmnop"
                     # Test-only transport: real browser/GUI/API, not extension enrollment proof.
                     context.route("http://127.0.0.1:17891/api/explorer/**", lambda route: route.fulfill(response=route.fetch(headers={**route.request.headers, "origin": origin})))
@@ -78,13 +78,16 @@ def main():
                     origin = worker.url.split("/background-entry.js")[0]
                 session = Session(origin)
                 server.explorer_api = ExplorerAPI(engine, session)
+                context.add_init_script("window.__nativeSessionToken = " + json.dumps(session.token) + ";")
+                if not fixture_mode:
+                    # Browser proof only: real native picker is covered separately on Windows.
+                    context.add_init_script("chrome.runtime.sendNativeMessage = async () => ({ok:true, token:window.__nativeSessionToken});")
                 page = context.new_page()
                 errors = []
                 page.on("pageerror", lambda error: errors.append(str(error)))
                 page.goto(("http://127.0.0.1:17891" if fixture_mode else origin) + "/shelf.html")
                 page.locator("#chutey-tab-explorer").click()
-                page.get_by_label("Local read session token").fill(session.token)
-                page.get_by_role("button", name="Connect", exact=True).click()
+                page.get_by_role("button", name="Select folder", exact=True).click()
                 try:
                     page.locator(".ex-row").first.wait_for(timeout=8000)
                 except Exception:
@@ -92,7 +95,8 @@ def main():
                     print("Explorer status:", page.locator(".ex-status").inner_text())
                     print("Page URL:", page.url)
                     raise
-                page.wait_for_function("document.querySelector('.ex-icon img')?.naturalWidth > 0")
+                expect(page.locator(".ex-icon img").first).to_have_js_property("complete", True)
+                expect(page.locator(".ex-icon img").first).to_have_js_property("naturalWidth", 256)
                 results = []
                 for width in (390, 900):
                     page.set_viewport_size({"width": width, "height": 800})
@@ -105,7 +109,7 @@ def main():
                         assert label and label["height"] >= 16, "Grid filename must remain visible"
                     before = page.evaluate(metrics)
                     page.locator(".ex-row", has_text="00-picture.png").click()
-                    page.wait_for_function("document.querySelector('.ex-preview-body img')?.naturalWidth === 400")
+                    expect(page.locator(".ex-preview-body img")).to_have_js_property("naturalWidth", 400)
                     after = page.evaluate(metrics)
                     assert before == after, (before, after)
                     assert after["scroll"] > after["client"]
@@ -133,12 +137,13 @@ def main():
                     page.get_by_role("tab", name="History", exact=True).click()
                     page.locator("#files .file-row").first.wait_for()
                     assert "history.txt" in page.locator("#files").inner_text()
-                    page.wait_for_function("""() => [...document.querySelectorAll('#files .file-thumb')].some(img => img.complete && img.naturalWidth > 0 && !img.hidden && img.closest('.file-icon')?.classList.contains('has-thumbnail'))""")
+                    expect(page.locator("#files .file-icon.has-thumbnail .file-thumb").first).to_be_visible()
+                    expect(page.locator("#files .file-icon.has-thumbnail .file-thumb").first).to_have_js_property("complete", True)
                     page.get_by_role("tab", name="File Explorer", exact=True).click()
                     assert page.locator(".ex-list").evaluate("node => node.scrollTop") == 100
                     assert page.locator("#chutey-workspace-tabs button").first.inner_text() == "File Explorer"
                     page.locator(".ex-list").evaluate("node => node.scrollTop=0")
-                    results.append({"transport": "fixture; not installed extension" if fixture_mode else "installed extension", "width": width, "overlay_geometry": "PASS", "thumbnail_original_pixels": "PASS", "document_scroll": "PASS", "history": "PASS including real saved PNG thumbnail", "menu_keyboard": "PASS", "metrics": after})
+                    results.append({"transport": "fixture; not installed extension" if fixture_mode else "installed extension; native selection simulated", "width": width, "overlay_geometry": "PASS", "thumbnail_original_pixels": "PASS", "document_scroll": "PASS", "history": "PASS including real saved PNG thumbnail", "menu_keyboard": "PASS", "metrics": after})
                 assert not errors, errors
                 (out / "results.json").write_text(json.dumps(results, indent=2))
                 print(json.dumps(results, indent=2))

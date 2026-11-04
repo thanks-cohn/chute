@@ -4,7 +4,7 @@
   const host = document.querySelector("#chutey-explorer-view");
   if (!host) return;
   const api = window.ChuteyExplorerAPI;
-  host.innerHTML = `<form class="ex-connect"><label>Local read session <input type="password" autocomplete="off" aria-label="Local read session token" required></label><button title="Connect" aria-label="Connect">↗</button></form>
+  host.innerHTML = `<div class="ex-native"><button type="button" data-action="select" aria-label="Select folder">▰ Select folder</button><button type="button" data-action="resume" aria-label="Reconnect folder">↻</button></div><form class="ex-connect" hidden><label>Local read session <input type="password" autocomplete="off" aria-label="Local read session token" required></label><button title="Connect" aria-label="Connect">↗</button></form>
     <div class="ex-toolbar"><button data-action="back" title="Back" aria-label="Back">‹</button><button data-action="forward" title="Forward" aria-label="Forward">›</button><button data-action="parent" title="Parent folder" aria-label="Parent folder">↑</button><button data-action="roots" title="Approved folders" aria-label="Approved folders">⌂</button><button data-action="refresh" title="Refresh" aria-label="Refresh">↻</button><span class="ex-breadcrumb">Local files</span><button data-action="grid" title="Toggle grid" aria-label="Toggle grid">▦</button></div>
     <div class="ex-filter"><input type="search" placeholder="Search this folder" aria-label="Search this folder"><select aria-label="Sort files"><option value="name">Name</option><option value="type">Type</option><option value="date">Date</option><option value="size">Size</option></select></div>
     <div class="ex-workspace"><aside class="ex-tree" aria-label="Folder navigator"></aside><div class="ex-list" role="listbox" aria-label="Local files" aria-multiselectable="true" tabindex="0"></div></div>
@@ -158,6 +158,8 @@
   $(".ex-filter input").oninput = () => { clearTimeout(timer); timer = setTimeout(safe(() => current && load(current, {remember: false})), 180); };
   $(".ex-filter select").onchange = safe(() => current && load(current, {remember: false}));
   const actions = {
+    select: async () => { say("Choose a folder in the Windows consent dialog…"); await api.nativeSession(true); await connect(); },
+    resume: async () => { await api.nativeSession(false); await connect(); },
     refresh: () => current && load(current, {remember: false}), parent: () => parent && load(parent), roots: () => roots[0] && load(roots[0].handle), close: closePreview,
     back: async () => { if (back.length) { const target = back.pop(); forward.push(current); await load(target, {remember: false}); } },
     forward: async () => { if (forward.length) { const target = forward.pop(); back.push(current); await load(target, {remember: false}); } },
@@ -181,5 +183,8 @@
   new MutationObserver(() => {
     if (!host.hidden) list.scrollTop = rememberedScroll;
   }).observe(host, {attributes: true, attributeFilter: ["hidden"]});
+  // Existing grants survive Shelf close, but never companion restart or user switch.
+  if (chrome.runtime?.sendNativeMessage) void api.nativeSession(false).then(connect).catch(error => say(error.message));
+  else $(".ex-connect").hidden = false; // Explicit developer/fixture fallback only.
   window.addEventListener("pagehide", () => { closePreview(); releaseThumbnails(); api.connect(""); });
 })();

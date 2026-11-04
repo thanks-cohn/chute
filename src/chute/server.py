@@ -48,7 +48,29 @@ class ChuteHandler(BaseHTTPRequestHandler):
     def _explorer_route(self) -> bool:
         if not urlparse(self.path).path.startswith("/api/explorer/"):
             return False
-        adapter = getattr(self.server, "explorer_api", None)
+        native = getattr(self.server, "native_explorer", None)
+        if urlparse(self.path).path == "/api/explorer/native/session":
+            import secrets
+            expected = f"127.0.0.1:{self.server.server_port}"
+            if (not native or self.command != "POST" or self.headers.get("Origin") is not None
+                    or self.headers.get("Host") != expected
+                    or not secrets.compare_digest(self.headers.get("Authorization", ""), "Bearer " + native.token)):
+                self._json({"error": "Native authorization required"}, HTTPStatus.FORBIDDEN)
+                return True
+            try:
+                length = int(self.headers.get("Content-Length", "0"))
+                if not 2 <= length <= 1024: raise ValueError()
+                self.connection.settimeout(120)
+                body = json.loads(self.rfile.read(length))
+                if not isinstance(body, dict) or set(body) != {"origin", "select"} or type(body["select"]) is not bool:
+                    raise ValueError()
+                result = native.action(body["origin"], select=body["select"])
+                self._json(result)
+            except Exception:
+                # Never expose a native path, session token or raw OS exception.
+                self._json({"ok": False, "error": "Folder selection was cancelled or unavailable. Select a local, non-system folder and retry."}, HTTPStatus.BAD_REQUEST)
+            return True
+        adapter = native.adapter(self.headers.get("Origin")) if native else getattr(self.server, "explorer_api", None)
         if adapter is None:
             self._json({"state": "failed", "error": {"code": "EXPLORER_DISABLED", "message": "Start a local read session to browse an approved folder."}}, HTTPStatus.FORBIDDEN)
             return True
@@ -447,6 +469,9 @@ def serve(host: str = DEFAULT_HOST, port: int = DEFAULT_PORT, root: Path | None 
     store = Store(root)
     server = ChuteServer((host, port), store)
     server.explorer_api = adapter
+    if os.name == "nt" and host == DEFAULT_HOST:
+        from .explorer.native import NativeExplorer
+        server.native_explorer = NativeExplorer()
     if adapter:
         print("Explorer READ ONLY session (15 minutes; paste in the enrolled Shelf): " + adapter.session.token, flush=True)
     print(f"Chute is listening at http://{host}:{port}")

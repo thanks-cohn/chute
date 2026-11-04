@@ -1,0 +1,20 @@
+{
+  "milestone": "A candidate",
+  "PYTHON_LOGICAL": {
+    "passed": 61,
+    "windows_skipped": 5,
+    "subtests_passed": 34
+  },
+  "CHROMIUM_FIXTURE": "PASS; simulated native reply; not installed Windows",
+  "WINDOWS_REAL_FS": "BLOCKED locally; Windows CI required",
+  "INSTALLED_CHROME_WINDOWS": "NOT_TESTED",
+  "B_operations": "GATED",
+  "C_write_queue": "GATED",
+  "D_small_native_goldens": "implemented",
+  "E_cloud_handoff": "deferred; no transfers",
+  "local_chrome_zip": {
+    "name": "chute-chrome-2.6.1.zip",
+    "sha256": "5986abda975c95a60367c65c07216646a729499bb5d5c4976baddd73c8690e54",
+    "bytes": 73912
+  }
+}

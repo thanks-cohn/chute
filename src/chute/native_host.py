@@ -396,6 +396,25 @@ def native_main() -> int:
         if message is None:
             return 0
         action = str(message.get("action") or "")
+        if action in {"explorer_select_folder", "explorer_resume"}:
+            try:
+                # Chrome supplies the caller origin as argv[1]; ignore message-supplied origins/paths.
+                origin = sys.argv[1].rstrip("/") if len(sys.argv) > 1 else ""
+                if not origin.startswith("chrome-extension://") or origin.removeprefix("chrome-extension://") not in _allowed_extension_ids():
+                    raise ValueError("Unenrolled native caller")
+                if not ensure_bridge(): raise ValueError("Companion unavailable")
+                from .explorer.native import control_path
+                config = json.loads(control_path().read_text(encoding="utf-8"))
+                request = urllib.request.Request(
+                    f"http://{DEFAULT_HOST}:{DEFAULT_PORT}/api/explorer/native/session",
+                    json.dumps({"origin": origin, "select": action == "explorer_select_folder"}).encode(),
+                    {"Content-Type": "application/json", "Authorization": "Bearer " + config["token"]})
+                opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+                with opener.open(request, timeout=120) as response:
+                    _write_message(json.load(response))
+            except Exception:
+                _write_message({"ok": False, "error": "Select a folder using the matching Chutey companion. Selection may have been cancelled."})
+            continue
         if action == "ensure_bridge":
             ok = ensure_bridge()
             _write_message({"ok": ok, "bridge": "ready" if ok else "unavailable"})

@@ -171,7 +171,7 @@ def main() -> int:
     if missing:
         raise SystemExit("Missing manifest resources: " + ", ".join(sorted(missing)))
 
-    zip_path = zip_base.with_suffix(".zip")
+    zip_path = Path(str(zip_base) + ".zip")
     if zip_path.exists():
         zip_path.unlink()
     shutil.make_archive(str(zip_base), "zip", package_dir)

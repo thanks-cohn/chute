@@ -47,3 +47,5 @@
 #chutey-explorer-view .ex-grid .ex-icon { flex-shrink: 0; }
 #chutey-explorer-view .ex-grid .ex-name { min-height: 16px; }
 #chutey-explorer-view .ex-grid small { min-height: 12px; }
+
+#chutey-explorer-view .ex-native { display:flex; gap:6px; padding:6px 8px; }

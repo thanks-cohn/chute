@@ -13,6 +13,12 @@
     return response;
   }
   window.ChuteyExplorerAPI = Object.freeze({
+    async nativeSession(select = false) {
+      const response = await chrome.runtime.sendNativeMessage("com.thankscohn.chute", {action: select ? "explorer_select_folder" : "explorer_resume"});
+      if (!response?.ok || !response.token) throw new Error(response?.error || "Select a folder using the matching Windows companion.");
+      token = response.token;
+      return response;
+    },
     connect(value) { token = value.trim(); },
     async command(command, args = {}) {
       const receipt = await (await request("command", {command, args})).json();

@@ -16,7 +16,7 @@ if (Test-Path $Venv) { Remove-Item -Recurse -Force $Venv }
 & $Python -m venv $Venv
 $Py = Join-Path $Venv "Scripts\python.exe"
 & $Py -m pip install --upgrade pip
-& $Py -m pip install pyinstaller $Repo
+& $Py -m pip install pyinstaller Pillow==13.0.0 $Repo
 
 Push-Location $Repo
 try {

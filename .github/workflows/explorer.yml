@@ -3,7 +3,7 @@ on:
   pull_request:
     branches: [main]
   push:
-    branches: [codex/chutey-api-first-local-explorer]
+    branches: [codex/chutey-api-first-local-explorer, codex/chutey-explorer-windows-usable-asap-2026-11-04]
   workflow_dispatch:
 permissions:
   contents: read

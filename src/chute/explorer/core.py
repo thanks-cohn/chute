@@ -30,7 +30,7 @@ class Explorer:
     def _record(self, grant, parts, info):
         name = parts[-1] if parts else grant.label
         kind = "directory" if stat.S_ISDIR(info.st_mode) else "file"
-        if not (stat.S_ISREG(info.st_mode) or stat.S_ISDIR(info.st_mode)):
+        if getattr(info, "st_file_attributes", 0) & 0x400 or not (stat.S_ISREG(info.st_mode) or stat.S_ISDIR(info.st_mode)):
             kind = "blocked"
         return {"handle": grant.handle(parts), "name": name, "kind": kind,
                 "size": info.st_size, "modified_ns": info.st_mtime_ns,
@@ -74,8 +74,7 @@ class Explorer:
         grant = self.grant_for(handle)
         parts = grant.parts(handle)
         if command in {"stat", "preview"}:
-            with grant.open(handle) as fd:
-                row = self._record(grant, parts, os.fstat(fd))
+            row = self._record(grant, parts, grant.stat(handle))
             row["parent"] = grant.handle(parts[:-1]) if parts else None
             if command == "preview":
                 from .preview import preview_kind
@@ -90,21 +89,20 @@ class Explorer:
                 or not isinstance(query, str) or len(query) > 256 or type(descending) is not bool):
             raise ExplorerError("INVALID_ARGUMENT", "Invalid directory page or sort.")
         rows = []
-        with grant.open(handle, directory=True) as fd:
-            with os.scandir(fd) as entries:
-                for index, entry in enumerate(entries):
-                    if index >= 20000:
-                        raise ExplorerError("DIRECTORY_LIMIT", "This directory exceeds the current 20,000-item limit.")
-                    if query.casefold() not in entry.name.casefold():
-                        continue
-                    try:
-                        component(entry.name)
-                        info = entry.stat(follow_symlinks=False)
-                        rows.append(self._record(grant, parts + (entry.name,), info))
-                    except ExplorerError:
-                        continue
-                    except FileNotFoundError:
-                        raise ExplorerError("DIRECTORY_CHANGED", "Folder changed; refresh before continuing.")
+        with grant.entries(handle) as entries:
+            for index, entry in enumerate(entries):
+                if index >= 20000:
+                    raise ExplorerError("DIRECTORY_LIMIT", "This directory exceeds the current 20,000-item limit.")
+                if query.casefold() not in entry.name.casefold():
+                    continue
+                try:
+                    component(entry.name)
+                    info = entry.stat(follow_symlinks=False)
+                    rows.append(self._record(grant, parts + (entry.name,), info))
+                except ExplorerError:
+                    continue
+                except FileNotFoundError:
+                    raise ExplorerError("DIRECTORY_CHANGED", "Folder changed; refresh before continuing.")
         key = {"name": lambda r: (r["name"].casefold(), r["name"]),
                "size": lambda r: (r["size"], r["name"]),
                "date": lambda r: (r["modified_ns"], r["name"]),

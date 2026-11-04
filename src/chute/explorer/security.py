@@ -1,8 +1,4 @@
-"""Explicit process-local grants and descriptor-relative, no-follow POSIX access.
-
-Windows needs a native handle/reparse-point implementation before the HTTP adapter
-can be enabled. Deliberately fail closed rather than substitute resolve()+open().
-"""
+"""Explicit process-local grants, guarded Windows HANDLEs and POSIX no-follow access."""
 from __future__ import annotations
 
 import contextlib
@@ -28,18 +24,27 @@ def component(name: str) -> str:
 class RootGrant:
     """Grant only from trusted Python/native code, never from an HTTP path."""
     def __init__(self, root: Path, *, label: str | None = None):
-        if os.name != "posix" or not hasattr(os, "O_NOFOLLOW"):
+        self.windows = None
+        if os.name == "nt":
+            from .windows_fs import WindowsFS
+            self.windows = WindowsFS(root)
+            raw = self.windows.root
+            self.fd = None
+        elif os.name != "posix" or not hasattr(os, "O_NOFOLLOW"):
             raise ExplorerError("UNSUPPORTED_PLATFORM", "Native Windows handle guards are not yet verified.")
-        raw = Path(root).absolute()
-        if raw != raw.resolve(strict=True) or not raw.is_dir():
-            raise ExplorerError("UNSAFE_ROOT", "Select a real directory without symbolic links.")
-        self.fd = os.open(raw, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
+        else:
+            raw = Path(root).absolute()
+            if raw != raw.resolve(strict=True) or not raw.is_dir():
+                raise ExplorerError("UNSAFE_ROOT", "Select a real directory without symbolic links.")
+            self.fd = os.open(raw, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
         self.id = secrets.token_urlsafe(24)
         self.label = label or raw.name or "Local files"
         self.handles = {self.id: ()}
         self._reverse = {(): self.id}
 
     def close(self):
+        if self.windows:
+            self.windows.close()
         if self.fd is not None:
             os.close(self.fd)
             self.fd = None
@@ -61,6 +66,10 @@ class RootGrant:
     @contextlib.contextmanager
     def open(self, handle: str, *, directory: bool = False):
         parts = self.parts(handle)
+        if self.windows:
+            with self.windows.open(parts) as fd:
+                yield fd
+            return
         if self.fd is None:
             raise ExplorerError("EXPIRED", "Reconnect to the local companion.")
         fd = os.dup(self.fd)
@@ -81,6 +90,24 @@ class RootGrant:
             yield fd
         finally:
             os.close(fd)
+
+    def stat(self, handle):
+        if self.windows:
+            with self.windows.guard(self.parts(handle), directory=False) as (_, info):
+                return info
+        with self.open(handle) as fd:
+            return os.fstat(fd)
+
+    @contextlib.contextmanager
+    def entries(self, handle):
+        if self.windows:
+            with self.windows.guard(self.parts(handle), directory=True):
+                with os.scandir(self.windows.root.joinpath(*self.parts(handle))) as entries:
+                    yield entries
+        else:
+            with self.open(handle, directory=True) as fd:
+                with os.scandir(fd) as entries:
+                    yield entries
 
 
 class Session:
