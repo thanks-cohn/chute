@@ -1,0 +1,16 @@
+{
+  "schema": "1.0",
+  "source_commit": "a6214d494e4db89f765717b85ac03f69391b454a",
+  "pair_run": "https://github.com/thanks-cohn/chute/actions/runs/41795692460",
+  "api_browser_run": "https://github.com/thanks-cohn/chute/actions/runs/41795692239",
+  "artifact_id": 13304873647,
+  "artifact_name": "Chutey-Windows-Chrome-Explorer-TEST-a6214d494e4db89f765717b85ac03f69391b454a",
+  "artifact_sha256": "718dc58c14cda3d1a1daffeb8050f742d3defdc8691c2dded608a61e8ebcb8c9",
+  "WINDOWS_REAL_FS": "PASS; tiny filesystem and native source tests, observed successful CI step; exact counts unavailable from public logs",
+  "WINDOWS_COMPILED_STARTUP": "PASS; isolated home, companion health, protected control file, bundled native host",
+  "INSTALLED_CHROMIUM": "PASS; selection reply simulated; real production extension/CSP/API/geometry",
+  "WINDOWS_NATIVE_DIALOG": "NOT_TESTED; owner interaction required",
+  "B_DIRECTORY_CLIPBOARD": "GATED",
+  "C_DURABLE_WRITE_QUEUE": "GATED",
+  "E_EXTERNAL_HANDOFF": "deferred; no uploads"
+}
