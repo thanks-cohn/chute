@@ -174,7 +174,9 @@ button, input, select { font: inherit; }
   height: 30px;
   color: #c0cbb0;
 }
-.file-type-svg { display: block; width: 24px; height: 24px; }
+.file-type-svg { display: block; width: 24px; height: 24px; flex: none; }
+.file-icon.has-thumbnail .file-fallback { opacity: 0; }
+.file-thumb[hidden] { display: none !important; }
 .file-icon[data-kind="image"] .file-fallback { color: #b7d89d; }
 .file-icon[data-kind="pdf"] .file-fallback { color: #e7b3a5; }
 .file-icon[data-kind="archive"] .file-fallback { color: #e5c982; }
