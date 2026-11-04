@@ -52,14 +52,22 @@ class WindowsBrowseTests(unittest.TestCase):
         origin='chrome-extension://abcdefghijklmnopabcdefghijklmnop'
         with patch('chute.explorer.native.private_write'):
             controller=NativeExplorer(store=False)
-        with patch('chute.native_host._allowed_extension_ids',return_value=[origin.split('//')[1]]):
+        with patch('chute.explorer.native.private_write'), patch('chute.native_host._allowed_extension_ids',return_value=[origin.split('//')[1]]):
             with self.assertRaises(ExplorerError): controller.action(origin,select=False)
             with patch('chute.explorer.native.choose_folder',return_value=str(self.root)):
                 first=controller.action(origin,select=True)
             with patch('chute.explorer.native.choose_folder',return_value=''):
                 with self.assertRaises(ExplorerError): controller.action(origin,select=True)
             second=controller.action(origin,select=False)
-            self.assertNotEqual(first['token'],second['token'])
+            self.assertEqual(first['token'],second['token'])
+            with patch('chute.explorer.native.choose_folder',side_effect=AssertionError('spontaneous picker')):
+                for _ in range(20):
+                    self.assertEqual(controller.action(origin,select=False)['token'],first['token'])
+                controller.adapters[origin].session.authorize(origin,'Bearer '+first['token'])
+                controller.adapters[origin].session.expires=0
+                renewed=controller.action(origin,select=False)
+                self.assertNotEqual(renewed['token'],first['token'])
+                controller.adapters[origin].session.authorize(origin,'Bearer '+renewed['token'])
             controller.adapters[origin].engine.close()
     def test_acl_file_and_real_thumbnail(self):
         from chute.explorer.native import private_write

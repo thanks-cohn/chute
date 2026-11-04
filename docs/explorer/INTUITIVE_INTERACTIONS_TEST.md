@@ -65,7 +65,8 @@ Branding uses Your Everything, DRAG ME!, and the existing Feed Chutey! action.
 
 ## Executed checks and evidence
 
-- Python unittest suite: 75 run, 67 passed, 8 Windows-only skips (Linux).
+- Complete pinned pytest 9.2.0 suite: 77 passed, 8 Windows-only skips, 37 subtests passed (Linux).
+- Python unittest discovery: 75 run, 67 passed, 8 Windows-only skips (Linux).
 - New regressions: 20 resumes without picker; expiry rotation; cancel preserves session
   and location; bridge failure category; authenticated exact binary export without Live
   mutation, stale identity and unauthorized reads rejected.
@@ -91,6 +92,10 @@ policy was not modified. Consequently no installed-extension or real website int
 result is claimed here. Fixture mode does not establish extension permissions/enrollment.
 
 ## Matched artifacts, installation and rollback
+
+The first remote Windows run (41838330949) failed its old assertion that warm resume
+must rotate the token. That assertion now checks shared-token validity across 20 reopens
+and rotation only after expiry; no tests were disabled. The updated run is required.
 
 The branch triggers `.github/workflows/explorer-windows-pair.yml` (or dispatch on this
 exact branch). It tests Windows filesystem behavior, builds both halves from the same
