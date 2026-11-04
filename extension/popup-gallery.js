@@ -56,6 +56,7 @@
       const tabs = await chrome.tabs.query({active:true,currentWindow:true});
       const tab = tabs[0];
       if (!chrome.sidePanel?.open || !tab?.windowId) throw new Error("Shelf not available");
+      intent.windowId = tab.windowId;
       await chrome.storage.session.set({chuteyPopupOpenItem:intent});
       await chrome.sidePanel.open({windowId:tab.windowId});
       window.close();
