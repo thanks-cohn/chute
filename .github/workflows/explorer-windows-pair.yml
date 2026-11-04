@@ -32,6 +32,7 @@ jobs:
           powershell -ExecutionPolicy Bypass -File scripts/build-windows.ps1
           python scripts/build-chrome-store.py
       - name: Installed test EXE startup in isolated CI home
+        timeout-minutes: 2
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
@@ -39,7 +40,9 @@ jobs:
           $env:LOCALAPPDATA = Join-Path $env:RUNNER_TEMP 'chutey-pair-local'
           New-Item -ItemType Directory -Force $env:USERPROFILE, $env:LOCALAPPDATA | Out-Null
           try {
-            Start-Process -FilePath (Resolve-Path dist/windows/Chute-Windows.exe).Path -Wait
+            $setup = Start-Process -FilePath (Resolve-Path dist/windows/Chute-Windows.exe).Path -PassThru
+            if (-not $setup.WaitForExit(15000)) { throw 'Setup parent did not exit within 15 seconds' }
+            if ($setup.ExitCode -ne 0) { throw 'Setup parent returned a failure' }
             $ready = $false
             for ($i=0; $i -lt 40; $i++) {
               try {
