@@ -202,6 +202,39 @@ class Store:
         items.reverse()
         return items
 
+    def history_page(
+        self, offset: int, limit: int, day: str | None = None
+    ) -> tuple[list[QueueItem], bool]:
+        """Read at most one page of saved metadata across dates, newest first.
+
+        The original 'add' events remain intact after clear/remove. Only
+        metadata for the requested page is returned to the browser; bytes and
+        thumbnails are retrieved on demand by separate endpoints.
+        """
+        if offset < 0 or not 1 <= limit <= 500:
+            raise ValueError("invalid history pagination")
+        dates = [day] if day is not None else self.history_dates()
+        remaining = offset
+        page: list[QueueItem] = []
+        for history_date in dates:
+            # Retain only one day's metadata in memory at a time.
+            entries = self.history_day(history_date)
+            if remaining >= len(entries):
+                remaining -= len(entries)
+                continue
+            for item in entries[remaining:]:
+                page.append(item)
+                if len(page) > limit:
+                    return page[:limit], True
+            remaining = 0
+        return page, False
+
+    def live_page(self, offset: int, limit: int) -> tuple[list[QueueItem], bool]:
+        if offset < 0 or not 1 <= limit <= 500:
+            raise ValueError("invalid live pagination")
+        active = self.list()
+        return active[offset:offset + limit], len(active) > offset + limit
+
     def previous_history_date(self, day: str) -> str | None:
         dates = self.history_dates()
         try:
