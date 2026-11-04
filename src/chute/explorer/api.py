@@ -182,8 +182,8 @@ class ExplorerAPI:
             if body.get("identity") != row["identity"]:
                 raise ExplorerError("FILE_CHANGED", "The file changed; refresh its preview.")
             original = body.get("original", False)
-            if original and (body.get("thumbnail") or row["size"] > 64 * 1024 * 1024):
-                raise ExplorerError("TRANSFER_LIMIT", "Use the file picker for files larger than 64 MiB.")
+            if original and (body.get("thumbnail") or row["size"] > 32 * 1024 * 1024):
+                raise ExplorerError("TRANSFER_LIMIT", "Use the file picker for files larger than 32 MiB.")
             kind = "original" if original else preview_kind(row)
             if kind == "unavailable":
                 raise ExplorerError("PREVIEW_UNAVAILABLE", "Preview unavailable for this file type.")

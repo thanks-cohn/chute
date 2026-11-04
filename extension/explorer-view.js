@@ -182,7 +182,7 @@
           try {
             if (!selected.has(row.handle)) select(row);
             const source = transferSelection();
-            if (source.size > 64 * 1024 * 1024) throw Error("Use the file picker for files larger than 64 MiB.");
+            if (source.size > 32 * 1024 * 1024) throw Error("Use the file picker for files larger than 32 MiB.");
             const id = "explorer-" + crypto.randomUUID();
             event.dataTransfer.effectAllowed = "copy";
             const token = "CHUTE_ITEM:" + encodeURIComponent(JSON.stringify({id,name:source.name,mime:source.mime,source_kind:"local_explorer"}));

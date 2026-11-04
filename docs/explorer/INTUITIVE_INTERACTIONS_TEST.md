@@ -48,7 +48,7 @@ into Live. Binary files retain their bytes/MIME; exports have attachment/nosniff
 This is the existing browser-adapter pipeline, NOT a native Windows OS file drag.
 Receivers may reject synthetic file events. No upload success is asserted from event
 dispatch. Receiver errors display a brief inline notice. This bounded browser path
-supports one file up to 64 MiB; larger files require the destination's file picker.
+supports one file up to 32 MiB (leaving room for base64 within Chrome message limits); larger files require the destination's file picker.
 Premium entitlement is not invented: bulk selection works, but bulk transfers remain
 unavailable pending an authoritative entitlement adapter. REDOWN is not implemented.
 

@@ -177,6 +177,11 @@ class ExplorerTests(unittest.TestCase):
                                   ({"handle":binary["handle"],"identity":binary["identity"],"original":True},{"Authorization":"Bearer wrong"})):
                 with self.assertRaises(urllib.error.HTTPError): request(body,headers,route="content")
             self.assertEqual(server.store.list(),[],"Original export must not pre-copy into Live")
+            with (self.root / "large.bin").open("wb") as large: large.truncate(32*1024*1024+1)
+            large=next(value for value in self.run_command("list",handle=self.handle)["entries"] if value["name"]=="large.bin")
+            with self.assertRaises(urllib.error.HTTPError) as error:
+                request({"handle":large["handle"],"identity":large["identity"],"original":True},route="content")
+            self.assertEqual(json.load(error.exception)["error"]["code"],"TRANSFER_LIMIT")
             (self.root / row["name"]).write_bytes(b"changed")
             with self.assertRaises(urllib.error.HTTPError):
                 request({"handle": row["handle"], "identity": row["identity"]}, route="content")
