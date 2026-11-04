@@ -20,7 +20,25 @@
 
   <div class="history-nav">
     <button id="history-prev" class="icon-button" type="button" title="Older day">‹</button>
-    <input id="history-date" type="date" aria-label="Browse Chute history by day">
+    <input id="history-date" type="date" aria-label="Selected history date" hidden>
+    <button id="history-calendar-toggle" class="secondary-button history-calendar-toggle" type="button" aria-haspopup="dialog" aria-expanded="false" aria-controls="history-calendar-popover">
+      <span aria-hidden="true">▦</span><span id="history-calendar-label">Calendar</span>
+    </button>
+    <div id="history-calendar-popover" class="history-calendar-popover" role="dialog" aria-label="Choose a Chute history date" hidden>
+      <div class="history-calendar-heading">
+        <button id="history-calendar-month-prev" class="icon-button" type="button" aria-label="Previous month">‹</button>
+        <strong id="history-calendar-month-label"></strong>
+        <button id="history-calendar-month-next" class="icon-button" type="button" aria-label="Next month">›</button>
+      </div>
+      <div id="history-calendar-grid" class="history-calendar-grid" aria-label="History days colored by saves"></div>
+      <div class="history-calendar-legend" aria-label="Daily save color scale">
+        <span><i class="calendar-maroon"></i>0–9</span>
+        <span><i class="calendar-orange"></i>10–19</span>
+        <span><i class="calendar-light-green"></i>20–49</span>
+        <span><i class="calendar-money"></i>50+</span>
+      </div>
+      <p class="history-calendar-hint">Select any day to browse its preserved history. Clearing Live Chute never changes these totals.</p>
+    </div>
     <button id="history-latest" class="secondary-button" type="button">Latest</button>
     <button id="history-next" class="icon-button" type="button" title="Newer day">›</button>
   </div>
@@ -33,5 +51,6 @@
   <script src="companion-help.js"></script>
   <script src="workflow-fixes.js"></script>
   <script src="drag-relay.js"></script>
+  <script src="calendar.js"></script>
 </body>
 </html>
