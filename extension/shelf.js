@@ -15,6 +15,8 @@ let currentDate = null;
 let loadingHistory = false;
 let dragOutActive = false;
 let dragGeometrySnapshot = null;
+let lastLatestHistorySignature = null;
+let latestHistoryCheckInFlight = false;
 
 const listElement = document.querySelector("#files");
 const statusElement = document.querySelector("#status");
@@ -241,16 +243,16 @@ function createRow(file, index) {
     row.draggable = true;
     row.classList.add("ready");
 
-    const attach = document.createElement("button");
-    attach.className = "secondary-button attach";
-    attach.title = "Attach the original file to the active tab";
-    attach.textContent = "Attach";
+    const open = document.createElement("button");
+    open.className = "secondary-button open";
+    open.title = "Show this saved file in your computer's file manager";
+    open.textContent = "Open";
 
     const remove = document.createElement("button");
     remove.className = "icon-button remove";
     remove.title = "Remove from the live chute";
     remove.textContent = "×";
-    tools.append(attach, remove);
+    tools.append(open, remove);
 
     row.addEventListener("dragstart", (event) => {
       const transfer = event.dataTransfer;
@@ -277,9 +279,19 @@ function createRow(file, index) {
 
     row.addEventListener("dragend", endDragOut);
 
-    attach.addEventListener("click", async () => {
-      const result = await chrome.runtime.sendMessage({ type: "attach-file", file });
-      setStatus(result?.ok ? `Attached ${file.name}` : result?.error || "Could not attach.", !result?.ok);
+    open.addEventListener("click", async () => {
+      open.disabled = true;
+      try {
+        const response = await api(`/api/reveal/${encodeURIComponent(file.id)}`, { method: "POST" });
+        const result = await response.json();
+        setStatus(result.selection === "selected"
+          ? `Showing ${file.name} in your file manager`
+          : `Opened folder containing ${file.name} (file selection unavailable)`);
+      } catch (error) {
+        setStatus(error.message || "Could not open the file location.", true);
+      } finally {
+        open.disabled = false;
+      }
     });
 
     remove.addEventListener("click", async () => {
@@ -336,6 +348,15 @@ async function fetchHistoryDay(day = null) {
   return response.json();
 }
 
+// Stable IDs and active/archive status are sufficient to detect meaningful
+// changes without tearing down the Shelf every time the polling timer fires.
+function latestHistorySignature(payload) {
+  return JSON.stringify([
+    payload.date || null,
+    (payload.files || []).map((file) => [file.id, Boolean(file.active)])
+  ]);
+}
+
 function updateHistoryNavigation(payload) {
   currentDate = payload.date;
   previousDate = payload.previous_date;
@@ -385,6 +406,7 @@ async function resetHistory(day = selectedDay || null) {
 
     const payload = await fetchHistoryDay(day);
     updateHistoryNavigation(payload);
+    if (!selectedDay) lastLatestHistorySignature = latestHistorySignature(payload);
 
     if (!payload.date || !payload.files.length) {
       if (day) {
@@ -477,6 +499,20 @@ chrome.storage.onChanged.addListener(async (changes, area) => {
 
 loadSettings().then(() => resetHistory());
 
-setInterval(() => {
-  if (!dragOutActive && !selectedDay && window.scrollY < 8) resetHistory();
-}, 5000);
+async function refreshLatestIfChanged() {
+  if (latestHistoryCheckInFlight || loadingHistory || dragOutActive || selectedDay || window.scrollY >= 8) return;
+  latestHistoryCheckInFlight = true;
+  try {
+    const payload = await fetchHistoryDay();
+    if (latestHistorySignature(payload) !== lastLatestHistorySignature) {
+      await resetHistory();
+    }
+  } catch (error) {
+    // A transient bridge failure must not repeatedly erase visible history.
+    console.warn("Chute background history check failed:", error);
+  } finally {
+    latestHistoryCheckInFlight = false;
+  }
+}
+
+setInterval(refreshLatestIfChanged, 5000);
