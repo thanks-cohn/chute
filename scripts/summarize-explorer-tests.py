@@ -17,6 +17,9 @@ else:
             detail=(failure.text or failure.attrib.get('message',''))[:10000]
             detail=detail.replace(str(Path.home()),'<user>').replace(str(Path.cwd()),'<checkout>')
             detail=re.sub(r'[A-Za-z0-9_-]{40,}','<opaque>',detail)
+            annotation=detail[:3000].replace('%','%25').replace('\r','%0D').replace('\n','%0A')
+            title=(case.get('classname','')+'.'+case.get('name','')).replace(',','_').replace(':','_')
+            print(f'::error title={title}::{annotation}')
             failures.append(f"### {case.get('classname','')}.{case.get('name','')}\n\n```text\n{detail}\n```\n")
     text=f'## Explorer tests\n\nCurrent-run cases: {len(cases)}; failing cases: {len(failures)}. Platform skips remain skips.\n\n'+''.join(failures)
 summary=os.environ.get('GITHUB_STEP_SUMMARY')

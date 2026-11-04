@@ -27,7 +27,7 @@ class Explorer:
                 return grant
         raise ExplorerError("INVALID_HANDLE", "This file reference has expired.")
 
-    def _record(self, grant, parts, info):
+    def _record(self, grant, parts, info, *, fd=None, defer_identity=False):
         name = parts[-1] if parts else grant.label
         kind = "directory" if stat.S_ISDIR(info.st_mode) else "file"
         if getattr(info, "st_file_attributes", 0) & 0x400 or not (stat.S_ISREG(info.st_mode) or stat.S_ISDIR(info.st_mode)):
@@ -35,7 +35,7 @@ class Explorer:
         return {"handle": grant.handle(parts), "name": name, "kind": kind,
                 "size": info.st_size, "modified_ns": info.st_mtime_ns,
                 "mime": (mimetypes.guess_type(name)[0] or "application/octet-stream") if kind == "file" else None,
-                "identity": f"{info.st_dev}:{info.st_ino}:{info.st_mtime_ns}:{info.st_size}"}
+                "identity": (None if defer_identity or kind == "blocked" else grant.windows.identity(parts,fd=fd)) if grant.windows else f"{info.st_dev}:{info.st_ino}:{info.st_mtime_ns}:{info.st_size}"}
 
     def execute(self, command: str, **args) -> dict:
         operation_id = uuid.uuid4().hex
@@ -98,7 +98,7 @@ class Explorer:
                 try:
                     component(entry.name)
                     info = entry.stat(follow_symlinks=False)
-                    rows.append(self._record(grant, parts + (entry.name,), info))
+                    rows.append(self._record(grant, parts + (entry.name,), info, defer_identity=bool(grant.windows)))
                 except ExplorerError:
                     continue
                 except FileNotFoundError:
@@ -108,7 +108,14 @@ class Explorer:
                "date": lambda r: (r["modified_ns"], r["name"]),
                "type": lambda r: (r["mime"] or "", r["name"])}[sort]
         rows.sort(key=key, reverse=descending)
-        return {"entries": rows[offset:offset + limit], "total": len(rows),
+        page=rows[offset:offset+limit]
+        if grant.windows:
+            # Only materialize stable HANDLE identities for the bounded page.
+            # No recursive scan and no handle-open for every unreturned entry.
+            for row in page:
+                if row['kind'] != 'blocked':
+                    row['identity']=grant.windows.identity(grant.parts(row['handle']))
+        return {"entries": page, "total": len(rows),
                 "next_offset": offset + limit if offset + limit < len(rows) else None,
                 "parent": grant.handle(parts[:-1]) if parts else None,
                 "name": parts[-1] if parts else grant.label,

@@ -178,7 +178,7 @@ class ExplorerAPI:
     def content(self, handler, body):
         grant = self.engine.grant_for(body["handle"])
         with grant.open(body["handle"]) as fd:
-            row = self.engine._record(grant, grant.parts(body["handle"]), grant.stat(body["handle"]))
+            row = self.engine._record(grant, grant.parts(body["handle"]), os.fstat(fd), fd=fd)
             if body.get("identity") != row["identity"]:
                 raise ExplorerError("FILE_CHANGED", "The file changed; refresh its preview.")
             kind = preview_kind(row)

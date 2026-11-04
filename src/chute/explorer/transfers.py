@@ -54,7 +54,7 @@ class Transfers:
         grant = self.engine.grant_for(source['handle'])
         with grant.open(source['handle']) as fd:
             info = os.fstat(fd)
-            row = self.engine._record(grant, grant.parts(source['handle']), info)
+            row = self.engine._record(grant, grant.parts(source['handle']), info, fd=fd)
             if row['identity'] != source['identity'] or not stat.S_ISREG(info.st_mode):
                 raise ExplorerError('FILE_CHANGED', 'The source changed. Start a new copy.')
             with os.fdopen(os.dup(fd), 'rb') as stream:

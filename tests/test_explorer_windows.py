@@ -84,3 +84,12 @@ class WindowsBrowseTests(unittest.TestCase):
             self.assertEqual(receipt['error']['code'],'DIRECTORY_CHANGED')
         finally:
             self.root.rmdir(); moved.rename(self.root)
+
+    def test_enumerated_path_and_open_handle_identities_match(self):
+        row=self.command('list',handle=self.grant.id)['entries'][0]
+        self.assertEqual(row['identity'],self.command('stat',handle=row['handle'])['identity'])
+        listing=self.command('list',handle=row['handle'])
+        file=next(value for value in listing['entries'] if value['kind']=='file')
+        self.assertEqual(file['identity'],self.command('stat',handle=file['handle'])['identity'])
+        with self.grant.open(file['handle']) as fd:
+            self.assertEqual(file['identity'],self.grant.windows.identity(self.grant.parts(file['handle']),fd=fd))
