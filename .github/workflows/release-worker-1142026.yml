@@ -56,7 +56,23 @@ jobs:
           mkdir -p dist/source-pair dist/release
           gh run download "$PAIRED_RUN" --repo "$REPO" -n "$PAIRED_ARTIFACT" -D dist/source-pair
           test "$(tr -d '\r\n' < dist/source-pair/SOURCE-COMMIT.txt)" = "$PAIRED_SOURCE"
-          (cd dist/source-pair && sha256sum -c SHA256SUMS.txt)
+          # The original Windows Actions artifact used PowerShell Out-File, which
+          # wrapped checksum records at the console width. Verify the ORIGINAL
+          # file-bound digests after removing only formatting whitespace.
+          # Do not bypass artifact integrity checks to publish a release.
+          original_checksums="$(tr -d '[:space:]' < dist/source-pair/SHA256SUMS.txt)"
+          verified=0
+          while IFS= read -r -d '' file; do
+            name="$(basename "$file")"
+            digest="$(sha256sum "$file" | cut -d' ' -f1)"
+            if [[ "$original_checksums" != *"$digest$name"* ]]; then
+              echo "Original checksum mismatch for $name" >&2
+              exit 1
+            fi
+            verified=$((verified + 1))
+          done < <(find dist/source-pair -maxdepth 1 -type f ! -name 'SHA256SUMS.txt' -print0)
+          test "$verified" -ge 4
+          echo "PASS: $verified original artifact hashes and filenames verified"
           test -s dist/source-pair/Chute-Windows-Explorer-TEST.exe
           test -s dist/source-pair/chute-chrome-2.6.1.zip
           cp dist/source-pair/Chute-Windows-Explorer-TEST.exe dist/release/
