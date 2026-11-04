@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 from dataclasses import asdict
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -9,6 +10,7 @@ from pathlib import Path
 from urllib.parse import parse_qs, unquote, urlparse
 
 from .provenance import append_image_capture
+from .reveal import reveal_file
 from .store import Store
 
 DEFAULT_HOST = "127.0.0.1"
@@ -171,6 +173,29 @@ class ChuteHandler(BaseHTTPRequestHandler):
 
     def do_POST(self) -> None:  # noqa: N802
         path = urlparse(self.path).path
+
+        if path.startswith("/api/reveal/"):
+            # A desktop action must come from the installed browser extension;
+            # never accept a path or command provided by a web page.
+            origin = self.headers.get("Origin", "")
+            if not origin.startswith("chrome-extension://") or not allowed_origin(origin):
+                self._json({"error": "extension origin required"}, HTTPStatus.FORBIDDEN)
+                return
+            item_id = unquote(path.removeprefix("/api/reveal/"))
+            if re.fullmatch(r"[0-9a-f]{32}", item_id) is None:
+                self._json({"error": "invalid item id"}, HTTPStatus.BAD_REQUEST)
+                return
+            found = self.store.get(item_id)
+            if found is None:
+                self._json({"error": "saved file not found"}, HTTPStatus.NOT_FOUND)
+                return
+            try:
+                selection = reveal_file(found[1])
+            except (OSError, ValueError) as exc:
+                self._json({"error": str(exc)}, HTTPStatus.SERVICE_UNAVAILABLE)
+                return
+            self._json({"ok": True, "selection": selection})
+            return
 
         if path == "/api/clear":
             self._json({"removed": self.store.clear()})
