@@ -1,0 +1,65 @@
+name: Publish timestamped CHUTE matched TEST release
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'release-requests/chute-*.txt'
+permissions:
+  contents: write
+  actions: read
+jobs:
+  publish:
+    if: github.repository == 'thanks-cohn/chute'
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - name: Publish pinned matched pair from previously successful Windows test run
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          TAG: chute-test-20261104-0529-CST
+          PINNED_SHA: b0727d56f89484d110fe7b1d24e12ba9bf476611
+          BUILD_RUN: '41818438528'
+          ARTIFACT: Chutey-Windows-Chrome-Explorer-TEST-b0727d56f89484d110fe7b1d24e12ba9bf476611
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f release-requests/chute-20261104-0529-CST.txt
+          grep -Fxq "$PINNED_SHA" release-requests/chute-20261104-0529-CST.txt
+          ACTUAL=$(gh api "repos/$REPO/actions/runs/$BUILD_RUN" --jq '.head_sha')
+          STATUS=$(gh api "repos/$REPO/actions/runs/$BUILD_RUN" --jq '.conclusion')
+          test "$ACTUAL" = "$PINNED_SHA"
+          test "$STATUS" = "success"
+          mkdir -p release-assets
+          gh run download "$BUILD_RUN" --repo "$REPO" --name "$ARTIFACT" --dir release-assets
+          test -s release-assets/Chute-Windows-Explorer-TEST.exe
+          test -s release-assets/chute-chrome-2.6.1.zip
+          test -s release-assets/SHA256SUMS.txt
+          test -s release-assets/SOURCE-COMMIT.txt
+          test "$(tr -d '\r\n' < release-assets/SOURCE-COMMIT.txt)" = "$PINNED_SHA"
+          (cd release-assets && sha256sum -c SHA256SUMS.txt)
+          if gh release view "$TAG" --repo "$REPO" >/dev/null 2>&1; then
+            echo "::error::Release tag already exists; refusing to overwrite"
+            exit 1
+          fi
+          cat > release-notes.md <<'NOTES'
+          # CHUTE Windows + Chrome matched TEST build — 2026-11-04 05:29 CST
+
+          Pinned source commit: `b0727d56f89484d110fe7b1d24e12ba9bf476611`
+
+          Includes the paired Windows Explorer test EXE and Chrome package from [successful paired build #41818438528](https://github.com/thanks-cohn/chute/actions/runs/41818438528). Check `SHA256SUMS.txt` and `INSTALL-AND-EVIDENCE.md` before installation. This is a **TEST** build, not a claim that the live Windows desktop or cross-cloud integration has been fully validated.
+
+          This release is pinned to the existing tested commit rather than the later release-workflow bookkeeping commits. Keep the native companion and extension versions matched.
+          NOTES
+          gh release create "$TAG" \
+            --repo "$REPO" \
+            --target "$PINNED_SHA" \
+            --title "CHUTE matched Windows + Chrome TEST | 2026-11-04 05:29 CST" \
+            --notes-file release-notes.md \
+            --prerelease \
+            release-assets/Chute-Windows-Explorer-TEST.exe \
+            release-assets/chute-chrome-2.6.1.zip \
+            release-assets/SHA256SUMS.txt \
+            release-assets/SOURCE-COMMIT.txt \
+            release-assets/INSTALL-AND-EVIDENCE.md
