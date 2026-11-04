@@ -123,6 +123,10 @@
         !/^\d{4}-\d{2}-\d{2}$/.test(String(value.day || "")) ||
         !Number.isFinite(value.issuedAt) || Math.abs(Date.now()-value.issuedAt)>120000 ||
         !value.requestId || value.requestId===lastRequest) return;
+    if (Number.isInteger(value.windowId)) {
+      const ownWindow = await chrome.windows.getCurrent();
+      if (ownWindow.id !== value.windowId) return;
+    }
     const intent = {
       id:value.id,
       name:String(value.name||"Saved item").slice(0,256),
