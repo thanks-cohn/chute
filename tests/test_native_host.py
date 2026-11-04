@@ -53,3 +53,15 @@ def test_allowed_extension_ids_keep_store_and_discovered_ids(tmp_path, monkeypat
 
     assert ids[0] == native_host.STORE_EXTENSION_ID
     assert DEV_EXTENSION_ID in ids
+
+
+def test_native_host_accepts_chutey_and_legacy_chute_manifests():
+    for label in ("Chute", "Chutey"):
+        assert native_host._is_chute_manifest({
+            "name": label,
+            "homepage_url": "https://github.com/thanks-cohn/chute",
+        })
+        assert not native_host._is_chute_manifest({
+            "name": label,
+            "homepage_url": "https://example.com",
+        })

@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
-  "name": "Chute",
-  "short_name": "Chute",
+  "name": "Chutey",
+  "short_name": "Chutey",
   "version": "2.6.1",
   "description": "Drag files, images, links, and text through one local Chute basket with recallable history.",
   "minimum_chrome_version": "116",
@@ -20,7 +20,7 @@
     "service_worker": "background-entry.js"
   },
   "action": {
-    "default_title": "Chute",
+    "default_title": "Chutey",
     "default_popup": "popup.html",
     "default_icon": {
       "16": "icons/icon16.png",

@@ -12,6 +12,12 @@ ROOT = Path(__file__).resolve().parents[1]
 EXT = ROOT / "extension"
 manifest = json.loads((EXT / "manifest.json").read_text(encoding="utf-8"))
 assert manifest["version"] == "2.6.1"
+assert manifest["name"] == "Chutey", "Chrome side-panel header must be Chutey"
+assert manifest["short_name"] == "Chutey"
+assert manifest["action"]["default_title"] == "Chutey"
+assert "<title>Chutey</title>" in (EXT / "shelf.html").read_text(encoding="utf-8")
+assert '<div class="title">Chutey</div>' in (EXT / "shelf.html").read_text(encoding="utf-8")
+
 assert manifest["background"]["service_worker"] == "background-entry.js"
 assert "nativeMessaging" in manifest["permissions"]
 assert "sidePanel" in manifest["permissions"]

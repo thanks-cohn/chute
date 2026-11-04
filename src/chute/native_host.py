@@ -150,7 +150,7 @@ def _is_chute_manifest(value: object) -> bool:
         return False
     name = str(value.get("name") or "").strip().lower()
     homepage = str(value.get("homepage_url") or "").strip().lower()
-    return name == "chute" and "github.com/thanks-cohn/chute" in homepage
+    return name in {"chute", "chutey"} and "github.com/thanks-cohn/chute" in homepage
 
 
 def _extension_path_is_chute(raw_path: object) -> bool:
