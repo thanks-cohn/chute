@@ -167,3 +167,21 @@ body.chutey-gallery-popup { width:390px; max-height:600px; overflow-y:auto; over
 .chutey-gallery-popup #files .chutey-gallery-tile .file-name {
   overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
 }
+
+/* Chutey mascot, not a fake thumbnail: actual image bytes cover it only after decode.
+   Web shortcuts retain their explicit LINK type, and all card click handlers remain. */
+.chutey-gallery-popup #files .chutey-gallery-tile .file-icon.chutey-mascot-fallback .file-fallback {
+  width:42%; height:42%; max-width:48px; max-height:48px;
+  filter:drop-shadow(0 3px 8px #0008); opacity:.88;
+}
+.chutey-gallery-popup #files .chutey-gallery-tile .chutey-tile-mascot {
+  display:block; width:100%; height:100%; object-fit:contain;
+  image-rendering:auto; pointer-events:none; user-select:none;
+}
+.chutey-gallery-popup #files .chutey-gallery-tile .chutey-shortcut-kind {
+  position:absolute; left:5px; top:5px; z-index:2;
+  padding:2px 4px; border:1px solid #bde97066; border-radius:4px;
+  color:#e2f8ba; background:#111a12c9; font-size:8px;
+  font-weight:750; letter-spacing:.035em; pointer-events:none;
+}
+.chutey-gallery-popup #files .chutey-gallery-tile .file-icon.has-thumbnail .chutey-shortcut-kind { display:none; }
