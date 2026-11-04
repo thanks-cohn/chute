@@ -66,8 +66,10 @@ function fileKind(file) {
 }
 
 function isPreviewableImage(file) {
-  // Source sites sometimes label images as application/octet-stream; extension is
-  // still enough to attempt a lazy preview, without changing file MIME/storage.
+  // A local image preview needs actual image bytes. .url Internet shortcuts
+  // do not contain the original picture and must never be misidentified.
+  // Some saved images have application/octet-stream MIME despite a valid
+  // image extension; attempt to decode those rather than defaulting to icons.
   return fileKind(file) === "image";
 }
 
