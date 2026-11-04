@@ -27,6 +27,10 @@ assert(explorerCSS.includes("--chutey-explorer-background"));
 assert(before.includes("showThumbnail(img, source)"), "Real saved image preview must remain");
 assert(shell.includes("statusElement.hidden = !error"), "Routine 1-40 history count must not be displayed");
 assert(!html.includes('class="secondary-button">Clear live chute</button>'));
+assert(css.includes(".file-list { padding: 8px 20px 9px 9px;"), "Keep 20px gutter beside native scrollbar");
+assert(css.includes("min-height: 59px;"), "Cards should be compact without clipping thumbnails");
+assert(css.includes(".file-tools button { padding: 5px 7px;"), "Keep action buttons compact in side panel");
+
 
 function node(name) {
   const handlers = {};
