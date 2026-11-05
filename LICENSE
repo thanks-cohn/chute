@@ -1,83 +1,109 @@
-CHUTE SOURCE-AVAILABLE NON-COMMERCIAL LICENSE v1.0
+CHUTE PROPRIETARY SOURCE LICENSE 2.0
+ALL RIGHTS RESERVED
+Effective date: November 5, 2026
 
-Copyright (c) 2026 Chute contributors and applicable rights holders.
-All rights reserved except for the limited permissions expressly granted below.
+Copyright (c) 2026 the respective Chute copyright holders.
+All rights reserved.
 
-THIS SOFTWARE IS NOT LICENSED UNDER THE MIT LICENSE.
-THIS IS A SOURCE-AVAILABLE NON-COMMERCIAL LICENSE, NOT AN OPEN-SOURCE LICENSE.
+IMPORTANT — NO PUBLIC USE LICENSE
 
-1. NON-COMMERCIAL PERMISSION
+Chute (also referred to as "Chutey") is proprietary software. The public
+availability of this repository does not grant the public permission to
+install, run, execute, copy, modify, distribute, publish, adapt, repackage,
+host, incorporate into another product, or otherwise use its original
+software, source code, documentation, designs, graphics, or other
+copyrightable materials for any purpose, whether personal, educational,
+research, charitable, noncommercial, or commercial.
 
-Subject to the terms of this license, you may access, view, download, run, copy,
-and modify the covered Chute software and source code solely for personal,
-educational, evaluation, research, hobby, or other genuinely non-commercial
-purposes.
+Except where an act is independently authorized by applicable law, an
+existing valid license grant, GitHub's applicable terms, or a separately
+licensed third-party component, PRIOR EXPRESS WRITTEN AUTHORIZATION from
+the applicable Chute copyright holder(s) is required.
 
-2. COMMERCIAL USE IS PROHIBITED
+1. OWNERSHIP AND SCOPE
 
-Without prior written permission from the applicable Chute rights holder, you
-may not, directly or indirectly:
+All rights in original Chute materials remain with their respective
+copyright holders. This notice applies only to materials for which those
+holders have authority to determine licensing terms. It does not transfer
+copyright ownership or assert ownership of third-party materials, tools,
+libraries, separately licensed contributions, or independent works.
 
-(a) use the covered software, source code, or a substantial portion of either
-    for commercial advantage, monetary compensation, or financial gain;
+2. NO GENERAL LICENSE OR PERMISSION
 
-(b) sell, rent, lease, sublicense, monetize, or commercially redistribute the
-    covered software or source code;
+No permission or license is granted to the public to use, install, run,
+execute, reproduce, copy, download for use, modify, translate, adapt,
+create derivative works from, redistribute, publish, sublicense, sell,
+rent, host, deploy, monetize, train or operate a product using, or
+otherwise exploit the covered original Chute materials, whether in whole
+or in part, for commercial or noncommercial purposes.
 
-(c) include the covered software or source code in a paid product, paid
-    service, subscription, hosted service, commercial bundle, consulting
-    deliverable, or other revenue-generating offering;
+Possessing a copy, seeing source code in a public repository, receiving
+a link, or accessing a released build does not by itself create a new
+copyright license. No permission arises merely from silence or an
+unanswered request, to the extent permitted by law.
 
-(d) create, publish, distribute, market, sell, or operate a commercial fork,
-    clone, derivative work, competing product, or competing service based in
-    whole or substantial part on this repository or its source code;
+3. REQUESTING WRITTEN AUTHORIZATION
 
-(e) use this repository, its source code, or derivatives to provide a product
-    or service for financial purposes, including advertising-supported or
-    otherwise monetized commercial operation; or
+To seek permission, contact the maintainer through the canonical
+repository: https://github.com/thanks-cohn/chute
 
-(f) remove, obscure, or misrepresent copyright, attribution, or license notices.
+Any authorization must come from the applicable rights holder(s) and
+identify the covered material and permitted activities, including
+relevant duration, distribution rights, and conditions. A separate
+written agreement may set commercial licensing terms. No license is
+created by a unilateral payment, an unsolicited proposal, or a request
+that has not been accepted.
 
-3. NON-COMMERCIAL SHARING
+4. PRIOR GRANTS AND DISTRIBUTED VERSIONS
 
-You may share non-commercial copies or modifications only if you do so without
-charging a fee or receiving compensation, preserve this license and all
-copyright notices, clearly identify your modifications, and license the shared
-covered material under these same non-commercial terms.
+This license applies prospectively to covered versions and materials
+distributed with this notice.
 
-4. NO TRADEMARK OR BRAND LICENSE
+It does not retroactively terminate, withdraw, or narrow permissions
+that were already validly and irrevocably granted for earlier copies or
+versions under another license, including the Chute Source-Available
+Non-Commercial License v1.0 or other applicable terms. Existing
+separately licensed releases and agreements remain subject to their
+respective valid terms. Any future release or distribution must be
+evaluated under its own applicable terms.
 
-This license does not grant permission to use the Chute name, logos, branding,
-or other trademarks to imply endorsement, affiliation, or an official product.
+5. THIRD-PARTY RIGHTS AND LEGAL EXCEPTIONS
 
-5. TERMINATION
+Third-party libraries, dependencies, contributed code, fonts, imagery,
+and other materials remain under the terms imposed by their respective
+rights holders. This notice does not supersede those terms or authorize
+Chute to relicense material it does not control.
 
-Any permission granted by this license terminates automatically if you violate
-its terms. Upon termination you must cease the violating use and distribution.
+Nothing here restricts acts permitted independently of this license
+under applicable law, including mandatory statutory exceptions and
+limitations, or rights supplied by GitHub's applicable terms for
+viewing or platform forking. This notice does not claim copyright in
+abstract ideas, concepts, methods, facts, or other unprotectable subject
+matter.
 
-6. THIRD-PARTY MATERIAL
+6. NO TRADEMARK OR ENDORSEMENT LICENSE
 
-This license applies only to material for which the Chute rights holders have
-the authority to set these terms. Third-party components, if any, remain
-subject to their own licenses.
+No permission to use the Chute or Chutey names, branding, logos, or
+other marks in a manner requiring trademark authorization is granted.
+No affiliation or endorsement may be implied without separate
+authorization, subject to applicable law.
 
-7. PRIOR LICENSE GRANTS
+7. RESERVATION OF REMEDIES
 
-This license applies to versions and branch states distributed with this
-license. It does not retroactively revoke license rights that were already and
-validly granted for earlier snapshots under a different license.
+All remedies available under applicable law are reserved for
+unauthorized infringement or other actionable conduct. No automatic
+royalty, ownership interest in third-party revenue, or predetermined
+monetary penalty is created by this notice.
 
-8. NO WARRANTY
+8. DISCLAIMER
 
-THE COVERED SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE, TITLE, AND NON-INFRINGEMENT. TO THE MAXIMUM
-EXTENT PERMITTED BY LAW, THE AUTHORS AND RIGHTS HOLDERS SHALL NOT BE LIABLE FOR
-ANY CLAIM, DAMAGES, OR OTHER LIABILITY ARISING FROM OR RELATED TO THE SOFTWARE
-OR ITS USE.
+TO THE MAXIMUM EXTENT PERMITTED BY APPLICABLE LAW, THE COVERED MATERIALS
+ARE PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED,
+INCLUDING MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE,
+NONINFRINGEMENT, AND TITLE. TO THE SAME EXTENT, THE COPYRIGHT HOLDERS
+DISCLAIM LIABILITY ARISING FROM THE MATERIALS OR THEIR USE. NOTHING
+EXCLUDES LIABILITY THAT MAY NOT LAWFULLY BE EXCLUDED.
 
-9. COMMERCIAL LICENSING
-
-Commercial use requires a separate written license from the applicable Chute
-rights holder. No commercial rights are granted merely because the source code
-is publicly viewable or technically cloneable.
+This is a proprietary, all-rights-reserved, source-visible notice. It
+is not an open-source license, not freeware, and not an invitation for
+public use.
