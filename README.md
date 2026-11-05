@@ -1,5 +1,8 @@
 # How to install this fixed version of Chute!
 
+> **PROPRIETARY — ALL RIGHTS RESERVED.** The original Chute/Chutey source and current repository materials are **not licensed for public use, including personal, educational, or noncommercial use**. Installation, execution, copying, modification, redistribution, or other use requires prior express written authorization from the applicable rights holder, except where a valid earlier grant, applicable law, GitHub's applicable terms, or a third-party license provides independent rights. **The installation instructions below are for rights holders and previously or expressly authorized users only; they do not grant permission.** See [LICENSE](LICENSE).
+
+
 > **Important Windows fix:** use **Chute for Windows v2.6.1 RC1** with the current Chute extension. This is the Windows companion build that fixes the previous sleep/disconnect problem and has been tested to wake Chute again after `Chute.exe` is killed.
 
 ## If you installed Chute from the Chrome Web Store
@@ -224,4 +227,6 @@ See [`PRIVACY.md`](PRIVACY.md) for the full policy.
 
 ## License
 
-Chute is **not MIT licensed**. It uses the Chute Source-Available Non-Commercial License v1.0. See [`LICENSE`](LICENSE).
+Chute/Chutey is **proprietary and All Rights Reserved** under the [Chute Proprietary Source License 2.0](LICENSE). No general permission is granted to install, run, copy, modify, share, or otherwise use the covered original source or current builds for **any purpose**, including noncommercial or educational purposes, without prior express written authorization from the applicable rights holder(s), except where independently permitted by law, earlier valid grants, applicable GitHub terms, or third-party licenses.
+
+**Previous grants are not retroactively revoked.** Earlier snapshots distributed under the Chute Source-Available Non-Commercial License v1.0 or any other valid terms retain their lawful existing rights. Public source visibility is not a new license.
