@@ -190,7 +190,7 @@ body.chutey-gallery-popup { width:390px; max-height:600px; overflow-y:auto; over
 html:has(body.chutey-gallery-popup) { width:390px; min-width:390px; max-width:390px; height:590px; min-height:590px; max-height:590px; overflow:hidden; }
 body.chutey-gallery-popup { width:390px; min-width:390px; max-width:390px; height:590px; min-height:590px; max-height:590px; overflow:hidden; background:#111610; }
 .chutey-gallery-popup .topbar { min-height:56px; padding:11px 14px; background:linear-gradient(180deg,#1c2419,#141a13); }
-.chutey-gallery-popup .topbar .subtitle { display:none; }
+.chutey-gallery-popup .topbar .subtitle { display:block; color:#a8b59d; font-size:11px; line-height:1.35; letter-spacing:.025em; }
 .chutey-gallery-popup .topbar .title { letter-spacing:.04em; font-size:14px; }
 .chutey-gallery-popup .topbar .logo { transform:none; border-radius:9px; }
 .chutey-gallery-popup #open-shelf { width:35px; height:33px; padding:0; font-size:18px; border-radius:9px; }
