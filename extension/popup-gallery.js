@@ -73,7 +73,7 @@
       <button type="button" class="chutey-lightbox-next" aria-label="Next image">›</button>
       <p class="chutey-lightbox-error" hidden>Image unavailable. The History entry is preserved.</p>
     </div>
-    <footer><span class="chutey-lightbox-count"></span><button type="button" class="secondary-button chutey-lightbox-shelf">Open in Shelf</button></footer>`;
+    <footer><span class="chutey-lightbox-count"></span><button type="button" class="secondary-button chutey-lightbox-shelf" aria-label="Open in Shelf" title="Open in Shelf">↗</button></footer>`;
   document.body.append(lightbox);
   const preview = lightbox.querySelector(".chutey-lightbox-image");
   const errorText = lightbox.querySelector(".chutey-lightbox-error");
@@ -213,29 +213,24 @@
         }
       }
     }
-    if (isPreviewableImage(file) && icon) {
-      icon.setAttribute("role","button");
-      icon.tabIndex = 0;
-      icon.setAttribute("aria-label","Preview " + file.name);
-      icon.addEventListener("click",event => { event.stopPropagation(); openPreview(file,icon); });
-      icon.addEventListener("keydown",event => {
-        if (!["Enter"," "].includes(event.key)) return;
-        event.preventDefault(); event.stopPropagation(); openPreview(file,icon);
+    // Image clicks have ONE deterministic action: open the popup preview.
+    // Grid expansion was the competing, visually inconsistent second action.
+    if (isPreviewableImage(file)) {
+      row.setAttribute("role", "button");
+      row.setAttribute("aria-label", "Preview " + file.name);
+      row.removeAttribute("aria-expanded");
+      row.querySelector(".file-tools .open")?.remove();
+      row.addEventListener("click", event => {
+        if (event.defaultPrevented || event.target.closest("button,input,a,select")) return;
+        openPreview(file, row);
       });
+      row.addEventListener("keydown", event => {
+        if (event.target !== row || !["Enter", " "].includes(event.key)) return;
+        event.preventDefault(); openPreview(file, row);
+      });
+    } else {
+      row.removeAttribute("aria-expanded");
     }
-    function toggle() {
-      const expanded = !row.classList.contains("chutey-gallery-expanded");
-      row.classList.toggle("chutey-gallery-expanded",expanded);
-      row.setAttribute("aria-expanded",String(expanded));
-    }
-    row.addEventListener("click",event => {
-      if (event.defaultPrevented || event.target.closest("button,input,a,select") || (isPreviewableImage(file) && event.target.closest(".file-icon"))) return;
-      toggle();
-    });
-    row.addEventListener("keydown",event => {
-      if (!["Enter"," "].includes(event.key) || event.target !== row) return;
-      event.preventDefault(); toggle();
-    });
     return row;
   };
 })();
