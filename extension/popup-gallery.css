@@ -206,8 +206,13 @@ body.chutey-gallery-popup { width:390px; min-width:390px; max-width:390px; heigh
 .chutey-gallery-popup #files .chutey-gallery-tile:hover { border-color:#8bac68; box-shadow:0 3px 11px #0009; }
 .chutey-gallery-popup #files .chutey-gallery-tile:focus-visible { outline:2px solid #d7ff3f; outline-offset:-2px; }
 .chutey-gallery-popup #files .chutey-gallery-tile .file-icon { background:linear-gradient(145deg,#293728,#19231b); cursor:pointer; }
-.chutey-gallery-popup #files .chutey-gallery-tile .file-icon::before,
-.chutey-gallery-popup #files .chutey-gallery-tile .file-icon::after { content:none!important; display:none!important; animation:none!important; }
+/* Keep the original living mathematical animation behind Chutey's mascot.
+   Real image thumbnails never show it; the source CSS already handles .has-thumbnail.
+   The fallback animation stops once the actual image has loaded. */
+.chutey-gallery-popup #files .chutey-gallery-tile .file-icon.has-thumbnail::before,
+.chutey-gallery-popup #files .chutey-gallery-tile .file-icon.has-thumbnail::after {
+  opacity:0; animation:none;
+}
 .chutey-gallery-popup #files .chutey-gallery-tile .file-meta { display:none!important; }
 .chutey-gallery-popup #files .chutey-gallery-tile .file-info { pointer-events:none; min-height:0; padding:12px 4px 4px; opacity:0; transition:opacity .12s ease; }
 .chutey-gallery-popup #files .chutey-gallery-tile:hover .file-info,
