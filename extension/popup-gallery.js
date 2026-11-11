@@ -8,6 +8,77 @@
   const viewerSize = document.querySelector("#shelf-viewer-size");
   const popupStatus = document.querySelector("#status");
   let opening = false;
+  // Assets are packaged inside the extension. A build helper copies files from
+  // repository /alternate-chuteys into extension/alternate-chuteys and generates
+  // the manifest before Chrome is reloaded. No network access is required.
+  const faces = [];
+  let facesReady = false;
+  function stableHash(value) {
+    let hash = 2166136261;
+    for (const char of String(value || "")) {
+      hash ^= char.codePointAt(0);
+      hash = Math.imul(hash, 16777619);
+    }
+    return hash >>> 0;
+  }
+  function allocateFaces() {
+    if (!facesReady) return;
+    const tiles = Array.from(document.querySelectorAll("#files .chutey-gallery-tile"));
+    const columns = Number(document.body.style.getPropertyValue("--chutey-gallery-columns")) || 4;
+    // Row-major coloring: never use the same expression immediately left or
+    // above. The layout is recomputed when density or page contents change.
+    const assigned = [];
+    for (let position = 0; position < tiles.length; position++) {
+      const tile = tiles[position];
+      const image = tile.querySelector(".chutey-tile-mascot");
+      if (!image) { assigned.push(null); continue; }
+      const file = tile.__galleryFile;
+      // Only actual shortcut/link items use the alternate expressions. Real
+      // images retain the familiar Chutey fallback while their bytes load.
+      if (fileKind(file) !== "link" || !faces.length) {
+        image.src = "icons/icon32.png"; assigned.push(null); continue;
+      }
+      const forbidden = new Set();
+      if (position % columns !== 0 && assigned[position - 1] != null) forbidden.add(assigned[position - 1]);
+      if (position >= columns && assigned[position - columns] != null) forbidden.add(assigned[position - columns]);
+      const candidates = faces.map((_, i) => i).filter(i => !forbidden.has(i));
+      // With only one face, avoiding adjacency is mathematically impossible;
+      // show the default mascot for the conflicting cell instead of duplicating.
+      const choice = candidates.length
+        ? candidates[stableHash(file.id) % candidates.length] : null;
+      if (choice === null) {
+        image.src = "icons/icon32.png"; assigned.push(-1);
+      } else {
+        image.src = faces[choice]; assigned.push(choice);
+      }
+      image.onerror = () => { image.onerror = null; image.src = "icons/icon32.png"; };
+    }
+  }
+  async function loadFacePack() {
+    try {
+      const response = await fetch(chrome.runtime.getURL("alternate-chuteys/manifest.json"));
+      if (!response.ok) throw new Error("No face pack");
+      const names = await response.json();
+      if (Array.isArray(names)) {
+        for (const name of names) {
+          if (typeof name === "string" && /^[a-zA-Z0-9][a-zA-Z0-9_.-]*\\.(png|webp|gif|jpg|jpeg)$/i.test(name)) {
+            faces.push(chrome.runtime.getURL("alternate-chuteys/" + name));
+          }
+        }
+      }
+    } catch (error) { console.debug("Optional Chutey faces unavailable:", error); }
+    facesReady = true;
+    allocateFaces();
+  }
+  void loadFacePack();
+  let layoutRefreshScheduled = false;
+  function scheduleFaceLayout() {
+    if (layoutRefreshScheduled) return;
+    layoutRefreshScheduled = true;
+    requestAnimationFrame(() => {
+      layoutRefreshScheduled = false; allocateFaces();
+    });
+  }
 
   function applyLayout(value) {
     const n = Number(value);
@@ -19,6 +90,7 @@
     if (dial) dial.value = String(step);
     if (readout) readout.textContent = choice.columns + " × " + choice.rows;
     queueMicrotask(sizeGridCells);
+    scheduleFaceLayout();
     return step;
   }
   applyLayout(0);
@@ -231,6 +303,7 @@
     } else {
       row.removeAttribute("aria-expanded");
     }
+    scheduleFaceLayout();
     return row;
   };
 })();
