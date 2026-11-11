@@ -2,7 +2,45 @@ const BASE_URL = "http://127.0.0.1:17891";
 const THUMB_SIZE = 48;
 const CHUTE_DRAG_TYPE = "application/x-chute-item";
 const CHUTE_DRAG_PREFIX = "CHUTE_ITEM:";
+// Deduplicate thumbnail requests and retain a bounded object-URL cache across
+// history refreshes. The gallery should not download originals repeatedly.
 const generatedThumbs = new Set();
+const thumbnailJobs = new Map();
+const thumbnailCache = new Map();
+const THUMB_CACHE_LIMIT = 80;
+const THUMB_CONCURRENCY = 3;
+let activeThumbnailJobs = 0;
+const thumbnailWaiting = [];
+let renderedHistorySignature = null;
+function rememberThumbnail(id, blob) {
+  const previous = thumbnailCache.get(id);
+  if (previous) URL.revokeObjectURL(previous);
+  const url = URL.createObjectURL(blob);
+  thumbnailCache.delete(id);
+  thumbnailCache.set(id, url);
+  while (thumbnailCache.size > THUMB_CACHE_LIMIT) {
+    const oldest = thumbnailCache.keys().next().value;
+    URL.revokeObjectURL(thumbnailCache.get(oldest));
+    thumbnailCache.delete(oldest);
+  }
+  return url;
+}
+function runThumbnailTask(task) {
+  return new Promise((resolve, reject) => {
+    thumbnailWaiting.push({task, resolve, reject});
+    pumpThumbnailTasks();
+  });
+}
+function pumpThumbnailTasks() {
+  while (activeThumbnailJobs < THUMB_CONCURRENCY && thumbnailWaiting.length) {
+    const {task, resolve, reject} = thumbnailWaiting.shift();
+    activeThumbnailJobs++;
+    Promise.resolve().then(task).then(resolve, reject).finally(() => {
+      activeThumbnailJobs--;
+      pumpThumbnailTasks();
+    });
+  }
+}
 
 let displayLimit = 40;
 let currentPage = 0;
@@ -148,34 +186,46 @@ function canvasThumbnail(blob) {
 }
 
 async function ensureThumbnail(file, img) {
-  if (!showThumbnails || !isPreviewableImage(file) || generatedThumbs.has(file.id)) return;
-
-  try {
-    const cached = await fetch(thumbnailUrl(file), { cache: "force-cache" });
-    if (cached.ok) {
-      const blob = await cached.blob();
-      if (blob.size) {
-        img.src = URL.createObjectURL(blob);
-        img.hidden = false;
-        generatedThumbs.add(file.id);
-        return;
+  if (!showThumbnails || !isPreviewableImage(file) || !img.isConnected) return;
+  const id = file.id;
+  const cachedUrl = thumbnailCache.get(id);
+  if (cachedUrl) {
+    img.src = cachedUrl; img.hidden = false;
+    return;
+  }
+  if (!thumbnailJobs.has(id)) {
+    const job = runThumbnailTask(async () => {
+      const cached = await fetch(thumbnailUrl(file), {cache:"force-cache"});
+      let blob;
+      if (cached.ok) {
+        blob = await cached.blob();
       }
+      if (!blob?.size) {
+        const response = await api(`/api/files/${encodeURIComponent(id)}`);
+        // Do not attempt to decode arbitrarily large originals just to paint a tiny tile.
+        const length = Number(response.headers.get("Content-Length") || file.size || 0);
+        if (length > 16 * 1024 * 1024) {
+          await response.body?.cancel();
+          return null;
+        }
+        const source = await response.blob();
+        blob = await canvasThumbnail(source);
+        // Thumbnail upload failure must not hide the successfully generated preview.
+        void fetch(thumbnailUrl(file), {
+          method:"POST", headers:{"Content-Type":"image/webp"}, body:blob
+        }).catch(error => console.warn("Chute thumbnail cache write failed:",error));
+      }
+      return blob?.size ? rememberThumbnail(id, blob) : null;
+    }).finally(() => thumbnailJobs.delete(id));
+    thumbnailJobs.set(id, job);
+  }
+  try {
+    const url = await thumbnailJobs.get(id);
+    if (url && img.isConnected && img.__chuteFile?.id === id) {
+      img.src = url; img.hidden = false; generatedThumbs.add(id);
     }
-
-    const response = await api(`/api/files/${encodeURIComponent(file.id)}`);
-    const source = await response.blob();
-    const thumbnail = await canvasThumbnail(source);
-    img.src = URL.createObjectURL(thumbnail);
-    img.hidden = false;
-
-    await fetch(thumbnailUrl(file), {
-      method: "POST",
-      headers: { "Content-Type": "image/webp" },
-      body: thumbnail
-    });
-    generatedThumbs.add(file.id);
   } catch (error) {
-    img.hidden = true;
+    if (img.isConnected) img.hidden = true;
     console.warn("Chute thumbnail generation failed:", error);
   }
 }
@@ -437,6 +487,19 @@ async function resetHistory(day = selectedDay || null) {
       return;
     }
     loadedCount = payload.files.length;
+    const signature = JSON.stringify([day || "", currentPage,
+      payload.files.map(file => [file.id,file.name,file.size,file.mime,file.active,file.created_at])]);
+    if (signature === renderedHistorySignature) {
+      updateHistoryNavigation(payload);
+      updatePageControls(payload);
+      // A connection may have recovered after thumbnails previously failed.
+      // Retry only missing visible thumbnails instead of destroying all cards.
+      for (const img of listElement.querySelectorAll(".file-thumb[hidden]")) {
+        if (img.__chuteFile && img.isConnected) void ensureThumbnail(img.__chuteFile, img);
+      }
+      return;
+    }
+    renderedHistorySignature = signature;
     generatedThumbs.clear();
     thumbObserver.disconnect();
     listElement.replaceChildren();
@@ -532,6 +595,7 @@ chrome.storage.onChanged.addListener(async (changes, area) => {
   if (area !== "sync") return;
   if (changes.chutePageSize || changes.chuteThumbnails || changes.chuteDragOutMode) {
     await loadSettings();
+    renderedHistorySignature = null;
     currentPage = 0;
     await resetHistory();
   }

@@ -144,9 +144,8 @@
     function renderWaking() {
       status.classList.remove("error");
       status.textContent = "Chute went to sleep too — waking up…";
-      if (files && RAW_TRANSPORT_PATTERN.test(files.textContent || "")) {
-        files.innerHTML = '<div class="empty"><strong>Chute is waking up.</strong>The extension is asking the Windows helper to restart the local Chute worker.</div>';
-      }
+      // Keep existing tiles and Explorer DOM mounted during transient transport loss.
+      // Connectivity status belongs to #status; never replace a gallery with prose.
     }
 
     function renderOffline() {
@@ -175,9 +174,8 @@
       });
       status.append(reconnectButton);
 
-      if (files) {
-        files.innerHTML = '<div class="empty"><strong>Chute is asleep.</strong>Automatic reconnect failed. Hit Reconnect above to ask the Windows helper again.</div>';
-      }
+      // Preserve cached files and the visible gallery while offline.
+      // A manual reconnect action remains available in #status.
     }
 
     function scheduleAutomaticReconnect() {

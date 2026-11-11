@@ -14,6 +14,7 @@
   const list = $(".ex-list"), tree = $(".ex-tree"), preview = $(".ex-preview"), status = $(".ex-status"), menu = $(".ex-menu");
   let current = null, parent = null, rows = [], roots = [], selected = new Set(), back = [], forward = [];
   let offset = 0, requestId = 0, previewId = 0, abort = null, urls = [], grid = false;
+  let lastExplorerSignature = null;
   // Folder navigation can be resized by mouse or keyboard. Persist only a
   // non-sensitive ratio; never store a private root path or access token.
   const workspace = $(".ex-workspace");
@@ -161,7 +162,17 @@
       throw error;
     }
     if (id !== requestId) return;
+    // A refresh of an unchanged folder must not destroy rows, previews,
+    // selections, thumbnail URLs or scroll position just to repaint the same data.
+    const freshSignature = JSON.stringify([handle, $(".ex-filter select").value,
+      $(".ex-filter input").value, result.next_offset,
+      result.entries.map(row => [row.handle,row.identity,row.name,row.size,row.mime,row.kind])]);
+    if (!append && handle === current && freshSignature === lastExplorerSignature) {
+      say(result.total ? `${rows.length} of ${result.total} items` : "This folder is empty");
+      return;
+    }
     if (!append) {
+      lastExplorerSignature = freshSignature;
       if (remember && current && current !== handle) { back.push(current); forward = []; }
       observer.disconnect(); queue.length = 0;
       current = handle; parent = result.parent; selected.clear(); anchor = null; closePreview(); releaseThumbnails(); rows = []; list.replaceChildren();
