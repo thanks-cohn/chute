@@ -226,3 +226,16 @@ body.chutey-gallery-popup { width:390px; min-width:390px; max-width:390px; heigh
 .chutey-gallery-popup .chutey-lightbox-count { margin-right:auto; opacity:.55; font-size:11px; }
 .chutey-gallery-popup .chutey-lightbox:not([hidden]) { animation:none!important; }
 .chutey-gallery-popup .history-pagination { position:relative; border-color:#293728; }
+
+/* Polished progressive gallery: stable tile geometry with a quiet image reveal.
+   Loading is still bounded to avoid freezing Chrome on large images. */
+.chutey-gallery-popup #files .chutey-gallery-tile .file-thumb:not([hidden]) {
+  animation: chutey-thumb-arrive .22s ease-out both;
+}
+@keyframes chutey-thumb-arrive {
+  from { opacity:0; }
+  to { opacity:1; }
+}
+@media (prefers-reduced-motion:reduce) {
+  .chutey-gallery-popup #files .chutey-gallery-tile .file-thumb:not([hidden]) { animation:none; }
+}
