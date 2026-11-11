@@ -8,6 +8,75 @@
   const viewerSize = document.querySelector("#shelf-viewer-size");
   const popupStatus = document.querySelector("#status");
   let opening = false;
+  // Assets are packaged inside the extension. A build helper copies files from
+  // repository /alternate-chuteys into extension/alternate-chuteys and generates
+  // the manifest before Chrome is reloaded. No network access is required.
+  const faces = [];
+  let facesReady = false;
+  function stableHash(value) {
+    let hash = 2166136261;
+    for (const char of String(value || "")) {
+      hash ^= char.codePointAt(0);
+      hash = Math.imul(hash, 16777619);
+    }
+    return hash >>> 0;
+  }
+  function allocateFaces() {
+    if (!facesReady) return;
+    const tiles = Array.from(document.querySelectorAll("#files .chutey-gallery-tile"));
+    const columns = Number(document.body.style.getPropertyValue("--chutey-gallery-columns")) || 4;
+    // The original mascot is always one face in the palette. With even one
+    // alternate face, a checkerboard is possible without duplicate neighbors.
+    const palette = ["icons/icon32.png", ...faces];
+    const assigned = [];
+    for (let position = 0; position < tiles.length; position++) {
+      const tile = tiles[position];
+      const image = tile.querySelector(".chutey-tile-mascot");
+      if (!image) { assigned.push(null); continue; }
+      const file = tile.__galleryFile;
+      if (fileKind(file) !== "link") {
+        if (image.getAttribute("src") !== palette[0]) image.src = palette[0];
+        // Image fallback is not one of the decorated link tiles.
+        assigned.push(null); continue;
+      }
+      const forbidden = new Set();
+      if (position % columns !== 0 && assigned[position - 1] != null) forbidden.add(assigned[position - 1]);
+      if (position >= columns && assigned[position - columns] != null) forbidden.add(assigned[position - columns]);
+      const candidates = palette.map((_, i) => i).filter(i => !forbidden.has(i));
+      // If there are no alternates, retain the old mascot rather than hiding
+      // link tiles; the no-adjacent-duplicate constraint requires >= 2 faces.
+      const choice = candidates.length ? candidates[stableHash(file.id) % candidates.length] : 0;
+      const chosenSrc = palette[choice];
+      if (image.src !== new URL(chosenSrc, location.href).href) image.src = chosenSrc;
+      assigned.push(choice);
+      image.onerror = () => { image.onerror = null; image.src = "icons/icon32.png"; };
+    }
+  }
+  async function loadFacePack() {
+    try {
+      const response = await fetch(chrome.runtime.getURL("alternate-chuteys/manifest.json"));
+      if (!response.ok) throw new Error("No face pack");
+      const names = await response.json();
+      if (Array.isArray(names)) {
+        for (const name of names) {
+          if (typeof name === "string" && /^[a-zA-Z0-9][a-zA-Z0-9_.-]*\.(png|webp|gif|jpg|jpeg)$/i.test(name)) {
+            faces.push(chrome.runtime.getURL("alternate-chuteys/" + name));
+          }
+        }
+      }
+    } catch (error) { console.debug("Optional Chutey faces unavailable:", error); }
+    facesReady = true;
+    allocateFaces();
+  }
+  void loadFacePack();
+  let layoutRefreshScheduled = false;
+  function scheduleFaceLayout() {
+    if (layoutRefreshScheduled) return;
+    layoutRefreshScheduled = true;
+    requestAnimationFrame(() => {
+      layoutRefreshScheduled = false; allocateFaces();
+    });
+  }
 
   function applyLayout(value) {
     const n = Number(value);
@@ -19,6 +88,7 @@
     if (dial) dial.value = String(step);
     if (readout) readout.textContent = choice.columns + " × " + choice.rows;
     queueMicrotask(sizeGridCells);
+    scheduleFaceLayout();
     return step;
   }
   applyLayout(0);
@@ -231,6 +301,7 @@
     } else {
       row.removeAttribute("aria-expanded");
     }
+    scheduleFaceLayout();
     return row;
   };
 })();
