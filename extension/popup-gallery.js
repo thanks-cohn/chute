@@ -25,32 +25,30 @@
     if (!facesReady) return;
     const tiles = Array.from(document.querySelectorAll("#files .chutey-gallery-tile"));
     const columns = Number(document.body.style.getPropertyValue("--chutey-gallery-columns")) || 4;
-    // Row-major coloring: never use the same expression immediately left or
-    // above. The layout is recomputed when density or page contents change.
+    // The original mascot is always one face in the palette. With even one
+    // alternate face, a checkerboard is possible without duplicate neighbors.
+    const palette = ["icons/icon32.png", ...faces];
     const assigned = [];
     for (let position = 0; position < tiles.length; position++) {
       const tile = tiles[position];
       const image = tile.querySelector(".chutey-tile-mascot");
       if (!image) { assigned.push(null); continue; }
       const file = tile.__galleryFile;
-      // Only actual shortcut/link items use the alternate expressions. Real
-      // images retain the familiar Chutey fallback while their bytes load.
-      if (fileKind(file) !== "link" || !faces.length) {
-        image.src = "icons/icon32.png"; assigned.push(null); continue;
+      if (fileKind(file) !== "link") {
+        if (image.getAttribute("src") !== palette[0]) image.src = palette[0];
+        // Image fallback is not one of the decorated link tiles.
+        assigned.push(null); continue;
       }
       const forbidden = new Set();
       if (position % columns !== 0 && assigned[position - 1] != null) forbidden.add(assigned[position - 1]);
       if (position >= columns && assigned[position - columns] != null) forbidden.add(assigned[position - columns]);
-      const candidates = faces.map((_, i) => i).filter(i => !forbidden.has(i));
-      // With only one face, avoiding adjacency is mathematically impossible;
-      // show the default mascot for the conflicting cell instead of duplicating.
-      const choice = candidates.length
-        ? candidates[stableHash(file.id) % candidates.length] : null;
-      if (choice === null) {
-        image.src = "icons/icon32.png"; assigned.push(-1);
-      } else {
-        image.src = faces[choice]; assigned.push(choice);
-      }
+      const candidates = palette.map((_, i) => i).filter(i => !forbidden.has(i));
+      // If there are no alternates, retain the old mascot rather than hiding
+      // link tiles; the no-adjacent-duplicate constraint requires >= 2 faces.
+      const choice = candidates.length ? candidates[stableHash(file.id) % candidates.length] : 0;
+      const chosenSrc = palette[choice];
+      if (image.src !== new URL(chosenSrc, location.href).href) image.src = chosenSrc;
+      assigned.push(choice);
       image.onerror = () => { image.onerror = null; image.src = "icons/icon32.png"; };
     }
   }
