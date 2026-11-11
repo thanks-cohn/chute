@@ -492,6 +492,11 @@ async function resetHistory(day = selectedDay || null) {
     if (signature === renderedHistorySignature) {
       updateHistoryNavigation(payload);
       updatePageControls(payload);
+      // A connection may have recovered after thumbnails previously failed.
+      // Retry only missing visible thumbnails instead of destroying all cards.
+      for (const img of listElement.querySelectorAll(".file-thumb[hidden]")) {
+        if (img.__chuteFile && img.isConnected) void ensureThumbnail(img.__chuteFile, img);
+      }
       return;
     }
     renderedHistorySignature = signature;
