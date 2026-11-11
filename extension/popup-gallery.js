@@ -59,7 +59,7 @@
       const names = await response.json();
       if (Array.isArray(names)) {
         for (const name of names) {
-          if (typeof name === "string" && /^[a-zA-Z0-9][a-zA-Z0-9_.-]*\\.(png|webp|gif|jpg|jpeg)$/i.test(name)) {
+          if (typeof name === "string" && /^[a-zA-Z0-9][a-zA-Z0-9_.-]*\.(png|webp|gif|jpg|jpeg)$/i.test(name)) {
             faces.push(chrome.runtime.getURL("alternate-chuteys/" + name));
           }
         }
