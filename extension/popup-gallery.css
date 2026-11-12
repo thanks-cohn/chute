@@ -185,3 +185,44 @@ body.chutey-gallery-popup { width:390px; max-height:600px; overflow-y:auto; over
   font-weight:750; letter-spacing:.035em; pointer-events:none;
 }
 .chutey-gallery-popup #files .chutey-gallery-tile .file-icon.has-thumbnail .chutey-shortcut-kind { display:none; }
+
+/* November 10: deliberately minimal popup ONLY (not the Shelf). */
+html:has(body.chutey-gallery-popup) { width:390px; min-width:390px; max-width:390px; height:590px; min-height:590px; max-height:590px; overflow:hidden; }
+body.chutey-gallery-popup { width:390px; min-width:390px; max-width:390px; height:590px; min-height:590px; max-height:590px; overflow:hidden; background:#111610; }
+.chutey-gallery-popup .topbar { min-height:56px; padding:11px 14px; background:linear-gradient(180deg,#1c2419,#141a13); }
+.chutey-gallery-popup .topbar .subtitle { display:block; color:#a8b59d; font-size:11px; line-height:1.35; letter-spacing:.025em; }
+.chutey-gallery-popup .topbar .title { letter-spacing:.04em; font-size:14px; }
+.chutey-gallery-popup .topbar .logo { transform:none; border-radius:9px; }
+.chutey-gallery-popup #open-shelf { width:35px; height:33px; padding:0; font-size:18px; border-radius:9px; }
+.chutey-gallery-popup .settings-panel summary { font-size:0; padding:8px 13px; line-height:14px; }
+.chutey-gallery-popup .settings-panel summary::first-letter { font-size:14px; }
+.chutey-gallery-popup .settings-note,
+.chutey-gallery-popup .popup-note,
+.chutey-gallery-popup .history-calendar-hint { display:none; }
+/* Keep status readable to assistive technology, never display debug prose on the popup. */
+.chutey-gallery-popup #status { position:absolute!important; width:1px!important; height:1px!important; padding:0!important; margin:-1px!important; overflow:hidden!important; clip:rect(0,0,0,0)!important; clip-path:inset(50%)!important; white-space:nowrap!important; border:0!important; }
+.chutey-gallery-popup #files { grid-auto-flow:row; grid-auto-rows:var(--chutey-gallery-cell,80px); height:400px; min-height:400px; max-height:400px; padding:10px; gap:7px; background:#111610; }
+.chutey-gallery-popup #files .chutey-gallery-tile { grid-column:auto!important; grid-row:auto!important; aspect-ratio:1!important; border:1px solid #394a34; border-radius:11px; background:#1e281d; box-shadow:0 1px 4px #0005; transition:border-color .12s ease,box-shadow .12s ease; }
+.chutey-gallery-popup #files .chutey-gallery-tile:hover { border-color:#8bac68; box-shadow:0 3px 11px #0009; }
+.chutey-gallery-popup #files .chutey-gallery-tile:focus-visible { outline:2px solid #d7ff3f; outline-offset:-2px; }
+.chutey-gallery-popup #files .chutey-gallery-tile .file-icon { background:linear-gradient(145deg,#293728,#19231b); cursor:pointer; }
+/* Keep the original living mathematical animation behind Chutey's mascot.
+   Real image thumbnails never show it; the source CSS already handles .has-thumbnail.
+   The fallback animation stops once the actual image has loaded. */
+.chutey-gallery-popup #files .chutey-gallery-tile .file-icon.has-thumbnail::before,
+.chutey-gallery-popup #files .chutey-gallery-tile .file-icon.has-thumbnail::after {
+  opacity:0; animation:none;
+}
+.chutey-gallery-popup #files .chutey-gallery-tile .file-meta { display:none!important; }
+.chutey-gallery-popup #files .chutey-gallery-tile .file-info { pointer-events:none; min-height:0; padding:12px 4px 4px; opacity:0; transition:opacity .12s ease; }
+.chutey-gallery-popup #files .chutey-gallery-tile:hover .file-info,
+.chutey-gallery-popup #files .chutey-gallery-tile:focus-visible .file-info,
+.chutey-gallery-popup #files .chutey-gallery-tile:focus-within .file-info { opacity:1; }
+.chutey-gallery-popup #files .chutey-gallery-tile .file-tools .open { display:none!important; }
+.chutey-gallery-popup #files .chutey-gallery-tile .file-tools { background:#151e16cc; border-radius:7px; }
+.chutey-gallery-popup .chutey-lightbox { height:590px; max-height:590px; padding:12px; background:#101710fc; gap:7px; }
+.chutey-gallery-popup .chutey-lightbox header strong { display:none; }
+.chutey-gallery-popup .chutey-lightbox footer { justify-content:flex-end; }
+.chutey-gallery-popup .chutey-lightbox-count { margin-right:auto; opacity:.55; font-size:11px; }
+.chutey-gallery-popup .chutey-lightbox:not([hidden]) { animation:none!important; }
+.chutey-gallery-popup .history-pagination { position:relative; border-color:#293728; }
