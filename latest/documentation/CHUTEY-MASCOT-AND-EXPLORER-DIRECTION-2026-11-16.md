@@ -164,15 +164,52 @@ Record the current binary's results **before** optimization, then compare the en
 - Verify actual Chutey functionality, Chrome integration and local history integrity on the test pairing, then repeat stress/soak tests.
 - Do not replace the currently installed worker or alter preserved GitHub Releases/tags as a side effect of Codex development. Promote only after explicit owner approval and evidence-backed comparison.
 
+## J. Product performance goal: sustained full-length high-bitrate media
+
+The owner wants Chutey reliable enough to stream and watch a **whole 4K-class movie** from local disk to the browser, not merely test a short video clip. This is a stress/performance target, not a specific film. Long-term, Chutey should be a credible everyday local media player.
+
+- The **exact CURRENT installed Windows worker** (SHA-256 `C193FE77CC3E7DB9FA1B661F98FC3416AD42067B9B86BD496E2F00ED0CC4944B`, matching the archived November 4 TEST release) is the engineering foundation. Trace its source lineage; preserve the installed binary and improve its implementation incrementally in isolated, separately packaged builds.
+- Provide authenticated loopback local-file streaming with byte-range requests, correct content types/lengths, seek and pause/resume behavior, bounded buffering/read-ahead, and cancellation. Never load an entire movie into RAM or duplicate it on disk just to play it.
+- Keep sustained playback smooth under concurrent file browsing, thumbnail jobs, UI interactions and bulk transfers, using fairness, priorities and resource caps.
+- Browser codec/hardware decoding is separate from the native worker's byte throughput; report unsupported formats honestly.
+- Test full-duration high-bitrate playback, repeated seeks and simultaneous workloads. Measure stalls, seek/startup latency, buffering, sustained MiB/s, CPU, memory, handles and responsiveness. The target is no Chutey-induced stalls on capable hardware, not an unconditional guarantee of universal 4K decoding.
+
+## K. Product performance goal: high-speed robust large-batch file engine
+
+Chutey is intended to become a **serious alternative to Windows File Explorer**, with powerful reliable local transfers and moves—not merely a preview UI.
+
+- Handle large individual files, many thousands of files, complete folder trees, multi-select, drag/drop, authorized copy/move/rename/folder operations, and long/deep paths.
+- Use efficient same-volume rename/move when possible. For cross-volume move, copy and verify the destination **before** deleting the source; never delete originals after uncertain or failed copies.
+- Offer an observable durable batch queue with per-item and whole-job progress, bytes/sec, pause/resume/cancel/retry, conflicts and clear final receipts. Provide crash-safe checkpoints and resumable/idempotent workflows where possible.
+- Respect locks, permissions, disk-full, file collisions, symlinks/junctions, network drives and interrupted operations. Avoid path traversal, unbounded buffering, copy loops and accidental destructive operations.
+- Employ bounded concurrent I/O and fair scheduling: lengthy copies must not block the popup, Explorer selection, image thumbnails, the worker health endpoint or active video playback.
+- Benchmark throughput (MiB/s and files/s), integrity, resource use and recovery against the archived native worker and Windows Explorer on matched workloads; never claim superiority without real evidence.
+- This is a long-term product ambition. Implement and validate foundation functions in phases rather than pretending a complete Explorer replacement is already available.
+
+## L. Movie Mode — dedicated third workspace tab, built LAST
+
+The Shelf's persistent tabs should ultimately be **History | File Explorer | Movie Mode**. Movie Mode is a dedicated full-content-area local video/media player, separate from File Explorer's smaller bottom overlay preview.
+
+- Select an authorized local movie/video/media file from File Explorer or use a Movie Mode file chooser. Preserve a safe handoff of the file handle/identity to the Movie Mode player.
+- Use the worker's efficient range-based local streaming APIs, designed and stress-tested **before Movie Mode UI implementation**; do not duplicate media-byte transfer logic in the UI.
+- Provide a properly sized player with play/pause, seeking, timeline, elapsed/total time, mute/volume, fullscreen where supported, file information and understandable buffering/errors. Start paused unless user explicitly requests autoplay.
+- Prefer browser hardware-supported codecs and report unsupported formats accurately; do not promise every format or implement unrequested automatic transcoding. Support full-length playback with stable controls and media cleanup when switching files/tabs.
+- Preserve tabs and coherent navigation; offer an explicit "Watch in Movie Mode" entry from Explorer media selection. When leaving Movie Mode, specify and test whether playback pauses or continues rather than accidentally leaking playback.
+- Do not let Movie Mode or an active stream starve file transfers, directory listings or the popup. Media playback must coexist with the file engine.
+
+## Mandatory Codex execution sequence (strict)
+
+**PHASE 1 — Appearance / Explorer behavior FIRST.** Finish stable first-paint popup (placeholders first, no entrance animation); mascot/default image and background module/settings; Grid View real image thumbnails; correct image/video previews and native `Expected a file handle.` issue; bottom-anchored **overlay** preview at one-third Shelf height with draggable top edge, Expand/restore/X, no file-grid reflow, unchanged Up/Down directory navigation; correct trash-button scope. Validate these independently on the current working pairing. Avoid unnecessary native binary changes while tracing any API defects.
+
+**PHASE 2 — Current-worker hardening SECOND.** Only after Phase 1, benchmark and strengthen the exact established current-worker architecture in isolated test builds for resilient streaming, local files, high-throughput large batches, bounded memory, stability and crash recovery. **Design the worker's API/architecture in anticipation of Phase 3 Movie Mode from the outset.** Implement byte ranges, seeking, sustained playback fairness, priority scheduling, compatible media interfaces, authenticated file handles, cancellation and diagnostics now; do not wait for the Movie Mode tab to discover those requirements. Stress/soak tests and regression gates must pass before proceeding.
+
+**PHASE 3 — Movie Mode LAST.** Once the strengthened worker is demonstrably capable and passes tests, build the third `Movie Mode` tab and wire it to the already-designed media APIs. Test whole-film playback, seek, switching tabs, concurrent bulk transfer and recovery. Keep the original worker and archived extension safe; owner approval is required before any installed worker replacement.
+
+**No future popup opening/corner animation in any of these phases.** Fix only the unwanted janky opening.
+
 ## Implementation order and safety gates
 
-1. Reproduce and instrument the native `Expected a file handle.` failure in the current pairing without changing the installed worker.
-2. Repair real image thumbnails in Grid View and verify actual local image/video byte access; replace inline Explorer previews with the bottom-anchored overlay, without reflow or resizing any other UI; stabilize media preview and keyboard selection synchronization.
-3. Implement overlay-only drag-to-expand / Expand / restore / X behavior, stopping at the workspace tabs and preserving all persistent navigation controls.
-4. Extract the reusable default-images + background-animation presentation module; introduce Options background color, migration, and unit tests.
-5. Run focused Chrome and real Windows Explorer tests on a separate test extension/worker pairing, with existing current working pair left as a rollback.
-6. After UI/media work and initial regressions, run the dedicated native-worker streaming/throughput hardening phase described in section I. Benchmark the exact archived worker first, then optimize isolated test builds and run stress/soak/fault-injection tests.
-7. Preserve verified working binary, Git refs, and local history/Chute data; do not conflate logged success, visible preview and successful native Open. Do not replace the installed worker without an explicit user-approved promotion.
+Use the **strict three phases above**: appearance/Explorer first, native worker second (explicitly Movie Mode-ready by design), Movie Mode UI last. Do not parallelize risky native rewrites with the appearance debugging. Preserve the immutable installed worker, documented release checksums, existing source baseline and user data throughout. All replacement binaries require reproducible Windows build artifacts, tests, documented rollback and owner-approved promotion.
 
 ## Out of scope for this Codex run: ALL popup entrance animation
 
