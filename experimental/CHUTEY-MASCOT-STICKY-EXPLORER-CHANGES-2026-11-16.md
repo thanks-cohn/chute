@@ -3,7 +3,7 @@
 
 ## Existing mascot: modular right-click menu and sticky Explorer
 - Fix immediate defect: right-click currently hides the mascot. The mascot must remain visible while the menu is open and during drag/drop.
-- Create a **separate reusable mascot context-menu module**, not tangled with current gallery/worker logic. Style: **little brown background with gold menu cards**. Initial options: **Expand**, **Assign**, **Pick Me Up** / **Drop Off** (state-dependent). Further choices only after owner approval.
+- Create a **separate reusable mascot context-menu module**, not tangled with current gallery/worker logic. Style: **yellow-and-brown notepad / sticky-note appearance** (warm yellow paper and brown accents, rather than generic gold cards). Keep the menu legible and distinct; this is the user's actual desired visual reference. Initial options: **Expand**, **Assign**, **Pick Me Up** / **Drop Off** (state-dependent). Further choices only after owner approval.
 - **Expand:** turn/open this same mascot into a movable, **permanent native always-on-top File Explorer / gallery / lightbox window** that stays above ordinary applications and websites. User can move window, collapse to the mascot and expand it again. Don't duplicate windows or replace the mascot.
 - **Assign:** open compact Chutey File Explorer/folder chooser and select the location where files dropped onto THIS mascot are saved. Default prior to assignment remains the mascot's **existing working destination**.
 - **Make Chutey Location!:** add this exact action to folders' right-click menu inside Chutey File Explorer, assigning the chosen folder to the current mascot (with appropriate authorization). It must not be an arbitrary global path grant.
@@ -19,7 +19,7 @@
 ## Mascot location, hide/reveal and interactions
 - Mascot currently at bottom left; requested initial activation hotspot is **bottom right**.
 - Let user deliberately relocate the existing mascot using **Pick Me Up** and **Drop Off**, save chosen resting/dock position, and maintain a clear distinction from a file drop.
-- Collapsed mascot hides after **10 seconds of inactivity**, and is intentionally revealed by hover over **bottom-right hotspot**; random hovering elsewhere on a webpage must not trigger it.
+- Collapsed mascot hides after **10 seconds of inactivity**, including after minimizing the sticky Explorer back to the mascot's last saved Drop Off position. **Only hovering the bottom-right activation hotspot summons it again**, even if the mascot's saved on-screen position is elsewhere; hovering casually anywhere else must not summon it. An active mascot menu/drop interaction pauses the countdown.
 - Auto-hide is suspended during right-click menu, active drag/drop, ongoing interaction; expanded sticky Explorer does not disappear due to mascot timer.
 
 ## Multiple destination-linked mascots (later stage)
@@ -37,7 +37,7 @@
 
 ## Codex boundaries / execution order
 1. Fix the current right-click hiding regression in Phase 1.
-2. Prototype modular brown/gold right-click menu for the EXISTING mascot, then Expand -> single movable sticky Explorer -> Collapse, as separately approved work.
+2. Prototype modular yellow-and-brown notepad-style right-click menu for the EXISTING mascot, then Expand -> single movable sticky Explorer -> Collapse, as separately approved work.
 3. Implement Assign picker, folder menu **Make Chutey Location!**, safe destination drops including sibling-image drop, and last-directory/last-selected file behavior with optional restart persistence.
 4. Implement **Pick Me Up / Drop Off** relocation, configurable activation/hotspot and 10s idle hide without interrupting interaction.
 5. Add multiple destination-linked Chuteys only after single instance is stable and resource-bounded.
