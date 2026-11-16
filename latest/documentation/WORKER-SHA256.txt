@@ -1,0 +1,9 @@
+CURRENT INSTALLED WINDOWS CHUTE EXECUTABLE — OBSERVED 2026-11-16
+SHA256 C193FE77CC3E7DB9FA1B661F98FC3416AD42067B9B86BD496E2F00ED0CC4944B
+Installed path: C:\Users\jg202\AppData\Local\Programs\Chute\Chute.exe
+Matching released asset: Chute-Windows-Explorer-TEST.exe
+Release tag: chute-test-20261104-0529-CST
+https://github.com/thanks-cohn/chute/releases/download/chute-test-20261104-0529-CST/Chute-Windows-Explorer-TEST.exe
+Source extension commit: 45dc8f034045c8807f5b712f7e8915c7ba76313a
+Native /health build string: main-2.6.1-upgrades-2026-11-03
+CAUTION: This is a confirmed hash match, not proof of three-month uptime.
