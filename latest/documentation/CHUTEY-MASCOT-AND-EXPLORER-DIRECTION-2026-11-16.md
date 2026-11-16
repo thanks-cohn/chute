@@ -109,10 +109,28 @@ At full height the preview overlays nearly the whole Shelf content region **with
 
 **Status:** Design correction documented; existing code not modified by this document.
 
+## H. CRITICAL: Grid View must show actual image thumbnails
+
+**User clarification:** File Explorer's **Grid View** must display real, smaller versions of local images **inside their own file tiles**, independently of whether the bottom overlay preview is open. Generic icons are only acceptable as loading, unsupported-format, or failure fallbacks.
+
+**Existing code:** `extension/explorer-view.js` already tries to queue visible-image thumbnail requests through an `IntersectionObserver` with three concurrent jobs, calling `api.content(row, {thumbnail:true})`. It replaces `.ex-icon` with an `<img>` after receiving bytes. The observer only registers rows whose `row.mime` matches a narrow image MIME regex; errors are swallowed. `extension/explorer-view.css` sizes grid thumbnails to roughly 64×64 pixels. Thus there is **partial thumbnail code, but the reported user-visible behavior is not acceptable**. Do not assume the preview overlay alone will repair the grid.
+
+**Required behavior:**
+- Image files in Grid View show actual miniatures cropped/contained consistently within stable tile geometry; preserve filenames and selection styling. List View may also use small thumbnails without changing row height.
+- Show placeholder/type icon immediately while image bytes load, then replace it upon successful decode. Never hold up the grid's first paint waiting for images.
+- Fix the full thumbnail path: native file handles, MIME determination when absent or generic, authorized bytes/thumbnail API, decoding errors, and URL lifetime. Classify supported image extensions as fallback when MIME is missing.
+- Prefer true small decoded thumbnails, not loading entire large originals merely to shrink them visually. Request only visible tiles with bounded concurrency, resource limits and cancellation on folder change.
+- An unsupported format or failure leaves a truthful file icon and displays a diagnostic, not a silently indefinite empty tile. Do not confuse preview/Open/Revealing actions with thumbnail retrieval.
+- Video entries may show a poster-frame thumbnail where supported; videos still play only in the separate bottom overlay and do not autoplay in the grid.
+- Grid thumbnails **must not invoke, insert, resize, or depend on** the preview overlay. Arrow navigation remains in the file list, independent of the overlay.
+- Validate populated folders with small/large PNG/JPEG/GIF/WebP images, absent or octet-stream MIME, broken files, videos, scrolled grid, rapid navigation, and native-worker disconnected/reconnected.
+
+**Status:** Required investigation and implementation; not yet fixed. Preserve the current known working installation.
+
 ## Implementation order and safety gates
 
 1. Reproduce and instrument the native `Expected a file handle.` failure in the current pairing without changing the installed worker.
-2. Replace inline Explorer previews with the bottom-anchored overlay, without reflow or resizing any other UI; stabilize image/video preview and keyboard selection synchronization.
+2. Repair real image thumbnails in Grid View and verify actual local image/video byte access; replace inline Explorer previews with the bottom-anchored overlay, without reflow or resizing any other UI; stabilize media preview and keyboard selection synchronization.
 3. Implement overlay-only drag-to-expand / Expand / restore / X behavior, stopping at the workspace tabs and preserving all persistent navigation controls.
 4. Extract the reusable default-images + background-animation presentation module; introduce Options background color, migration, and unit tests.
 5. Run focused Chrome and real Windows Explorer tests on a separate test extension/worker pairing, with existing current working pair left as a rollback.
