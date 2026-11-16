@@ -22,19 +22,22 @@
   const image = document.createElement("img"); image.alt = ""; image.hidden = true;
   body.append(image,message);
   viewer.append(bar,body);
-  function positionViewer(row) {
-    if (!row?.isConnected) return;
-    viewer.remove();
-    const cards = [...gallery.querySelectorAll("#files .file-row")];
-    let after = row;
-    for (const card of cards.slice(cards.indexOf(row)+1)) {
-      if (Math.abs(card.offsetTop-row.offsetTop)>2) break;
-      after=card;
-    }
-    after.after(viewer);
-    viewer.style.gridColumn="1 / -1";
-  }
-  let sizeMode = "half";
+  gallery.append(viewer);
+  function positionViewer(row) { /* Overlay remains outside the History grid. */ }
+  const grip = document.createElement("div"); grip.className = "chutey-viewer-resize";
+  grip.setAttribute("role","separator"); grip.tabIndex = 0;
+  grip.setAttribute("aria-label","Resize saved preview"); grip.setAttribute("aria-orientation","horizontal");
+  viewer.prepend(grip);
+  grip.onpointerdown = event => { if (event.button === 0) { event.preventDefault(); grip.setPointerCapture(event.pointerId); } };
+  function setHeight(height) { sizeMode = "half"; heightRatio = Math.max(120,height) / Math.max(1,window.innerHeight); resizeViewer(); }
+  grip.onpointermove = event => { if (grip.hasPointerCapture(event.pointerId)) setHeight(window.innerHeight - event.clientY); };
+  grip.onkeydown = event => {
+    if (!["ArrowUp","ArrowDown","Home","End"].includes(event.key)) return;
+    event.preventDefault(); event.stopPropagation();
+    if (event.key === "End") { sizeMode = "full"; resizeViewer(); }
+    else setHeight(event.key === "Home" ? 120 : viewer.offsetHeight + (event.key === "ArrowUp" ? 16 : -16));
+  };
+  let sizeMode = "half", heightRatio = 1/3;
   let processing = false, lastRequest = "", pending = null;
   let selectedRow = null;
   let previewRequest = 0;
@@ -44,10 +47,10 @@
     if (viewer.hidden) return;
     const calendar = gallery.querySelector(".history-nav");
     const top = calendar ? Math.ceil(calendar.getBoundingClientRect().bottom) : 120;
-    const available = Math.max(140,window.innerHeight - Math.max(top,0) - 3);
-    viewer.style.height = Math.round(sizeMode === "full" ? available : available * .52) + "px";
-    size.textContent = sizeMode === "full" ? "Half" : "Expand";
-    size.setAttribute("aria-label",sizeMode === "full" ? "Use half-height preview" : "Expand preview up to calendar");
+    const available = Math.max(0,window.innerHeight - Math.max(top,0) - 3);
+    viewer.style.height = Math.round(sizeMode === "full" ? available : Math.min(available,Math.max(Math.min(120,available),window.innerHeight * heightRatio))) + "px";
+    size.textContent = sizeMode === "full" ? "Restore" : "Expand";
+    size.setAttribute("aria-label",sizeMode === "full" ? "Restore preview height" : "Expand preview up to calendar");
   }
 
   function dismiss() {

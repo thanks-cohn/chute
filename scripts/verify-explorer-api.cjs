@@ -34,3 +34,23 @@ function api(host,bridge){
   assert(!actions.some(value=>value.includes('select')));
   console.log('PASS: concurrent resume coalesces; expired request retries once without picker');
 })().catch(error=>{console.error(error);process.exitCode=1;});
+
+// The installed b0727d5 worker rejects every unknown content key. Reproduce
+// that real schema, rather than accepting modern payloads in a permissive mock.
+(async()=>{
+  const window={}, calls=[];
+  vm.runInNewContext(source,{window,fetch:async(_url,options)=>{
+    const body=JSON.parse(options.body); calls.push(body);
+    const valid=Object.keys(body).every(key=>['handle','identity','thumbnail'].includes(key));
+    return {ok:valid,status:valid?200:400,blob:async()=>({decoded:true}),
+      json:async()=>({error:{code:'INVALID_ARGUMENT',message:'Expected a file handle.'}})};
+  }});
+  const row={handle:'authorized-file',identity:'canonical-identity'};
+  await window.ChuteyExplorerAPI.content(row);
+  await window.ChuteyExplorerAPI.content(row,{thumbnail:true});
+  assert(!calls.some(body=>'original' in body));
+  await assert.rejects(window.ChuteyExplorerAPI.content({handle:'not-an-identity'}),/Refresh the folder/);
+  assert.equal(calls.length,2,'An incomplete identity never reaches the worker');
+  await assert.rejects(window.ChuteyExplorerAPI.content(row,{original:true}),/Expected a file handle/);
+  console.log('PASS: preserved November 4 content schema, preview/thumbnail compatibility, explicit newer-export incompatibility');
+})().catch(error=>{console.error(error);process.exitCode=1;});

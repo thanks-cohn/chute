@@ -39,3 +39,11 @@ See [HISTORICAL-CANDIDATES.md](HISTORICAL-CANDIDATES.md) and [THREE-MONTH-WORKER
 6. Do not treat a momentary `/health` OK or a passing CI run as proof of months of uninterrupted stability.
 
 This archive is read-only historical evidence for future REDOWN / Universal File API integration, not permission to silently switch current installs.
+
+## November 16 API-first and adapter addenda
+
+- [API-first architecture and implementation boundary](API-FIRST-ARCHITECTURE-2026-11-16.md)
+- [Implemented local API and compatibility](LOCAL-API.md)
+- [Machine-readable HTTP definitions](local-api.openapi.json)
+- [Versioned media adapter design requirement](MEDIA-ADAPTER-CONTRACT.md)
+- [Phase 1 evidence and isolated Windows handoff](PHASE1-WINDOWS-HANDOFF.md)

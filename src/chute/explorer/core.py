@@ -10,6 +10,7 @@ import uuid
 
 from .protocol import BLOCKED_COMMANDS, ExplorerError, VERSION, catalog
 from .security import RootGrant, component
+from .preview import media_mime
 
 
 class Explorer:
@@ -34,7 +35,7 @@ class Explorer:
             kind = "blocked"
         return {"handle": grant.handle(parts), "name": name, "kind": kind,
                 "size": info.st_size, "modified_ns": info.st_mtime_ns,
-                "mime": (mimetypes.guess_type(name)[0] or "application/octet-stream") if kind == "file" else None,
+                "mime": media_mime({"name":name,"mime":mimetypes.guess_type(name)[0]}) if kind == "file" else None,
                 "identity": (None if defer_identity or kind == "blocked" else grant.windows.file_identity(parts,fd=fd)) if grant.windows else f"{info.st_dev}:{info.st_ino}:{info.st_mtime_ns}:{info.st_size}"}
 
     def execute(self, command: str, **args) -> dict:

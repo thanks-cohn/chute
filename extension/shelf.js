@@ -308,6 +308,7 @@ function createRow(file, index) {
     <div class="file-tools"></div>`;
 
   const icon = row.querySelector(".file-icon");
+  if (fileKind(file) === "link" || isPreviewableImage(file)) window.ChuteyPresentation?.decorate(icon);
   let thumb = null;
   if (showThumbnails && isPreviewableImage(file)) {
     thumb = document.createElement("img");
@@ -340,7 +341,7 @@ function createRow(file, index) {
     const open = document.createElement("button");
     open.className = "secondary-button open";
     open.title = "Show this saved file in your computer's file manager";
-    open.textContent = "Open";
+    open.textContent = "Reveal";
 
     const remove = document.createElement("button");
     remove.className = "icon-button remove";
@@ -579,6 +580,9 @@ pageNextButton?.addEventListener("click", async () => {
 });
 
 clearButton?.addEventListener("click", async () => {
+  if (document.querySelector("#chutey-history-view")?.hidden || clearButton.disabled) return;
+  if (!window.confirm("Empty the live basket? Dated history and original local files are kept.")) return;
+  clearButton.disabled = true;
   try {
     const response = await api("/api/clear", { method: "POST" });
     const result = await response.json();
@@ -586,7 +590,7 @@ clearButton?.addEventListener("click", async () => {
     setStatus(`Cleared ${result.removed} item${result.removed === 1 ? "" : "s"} · preserved for Recall`);
   } catch (error) {
     setStatus(error.message, true);
-  }
+  } finally { clearButton.disabled = false; }
 });
 
 refreshButton?.addEventListener("click", () => resetHistory());

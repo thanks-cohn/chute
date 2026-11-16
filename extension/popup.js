@@ -120,6 +120,7 @@ thumbnailsToggle?.addEventListener("change", async () => {
 });
 
 clearChuteButton?.addEventListener("click", async () => {
+  if (!window.confirm("Empty the live basket? Dated history and original local files are kept.")) return;
   clearChuteButton.disabled = true;
   const originalText = clearChuteButton.textContent;
   clearChuteButton.textContent = "Clearing…";

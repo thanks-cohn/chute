@@ -1,9 +1,9 @@
 /* Shelf picture preview from the popup gallery; anchored after the selected History row. */
 #chutey-history-view .chutey-shelf-viewer {
-  position:relative; left:auto; right:auto; bottom:auto; width:100%; box-sizing:border-box; flex-shrink:0; z-index:12;
-  min-height:140px; display:flex; flex-direction:column; overflow:hidden;
+  position:fixed; left:0; right:0; bottom:0; width:100%; box-sizing:border-box; flex-shrink:0; z-index:12;
+  min-height:0; display:flex; flex-direction:column; overflow:hidden;
   background:#171c16f5; border:1px solid #455238; border-radius:8px;
-  margin:8px 0;
+  margin:0;
 }
 #chutey-history-view .chutey-shelf-viewer[hidden] { display:none!important; }
 #chutey-history-view .chutey-shelf-viewer header {
@@ -40,3 +40,6 @@
 }
 #chutey-history-view .chutey-shelf-viewer-body { max-width:100%; }
 #chutey-history-view .chutey-shelf-viewer-body img { max-width:100%; }
+
+.chutey-viewer-resize { height:8px; flex-shrink:0; cursor:ns-resize; touch-action:none; background:#455238; }
+.chutey-viewer-resize:focus-visible { outline:2px solid #d7ff3f; outline-offset:-2px; }

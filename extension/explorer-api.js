@@ -59,7 +59,10 @@
     connect(value) { token = value.trim(); },
     async command(command, args = {}) {
       const receipt = await (await request("command", {command, args})).json();
-      if (receipt.state !== "completed") throw new Error(receipt.error?.message || "Command failed.");
+      if (receipt.state !== "completed") {
+        const error = new Error(receipt.error?.message || "Command failed.");
+        error.code = receipt.error?.code; throw error;
+      }
       return receipt.result;
     },
     async receive(destination, file) {
@@ -72,8 +75,21 @@
       if (!response.ok || receipt.state !== "COMMITTED") throw new Error(receipt.error?.message || "Copy did not commit. Check the destination before retrying.");
       return receipt;
     },
+    async mediaSource(row) {
+      const source = await window.ChuteyExplorerAPI.command("media_source",{handle:row.handle,identity:row.identity});
+      if (!/^\/api\/explorer\/v1\/media\/[A-Za-z0-9_-]+$/.test(source.url)) throw new Error("Invalid local media response.");
+      return {...source,url:"http://127.0.0.1:17891" + source.url};
+    },
     async content(row, {thumbnail = false, original = false, signal} = {}) {
-      return (await request("content", {handle: row.handle, identity: row.identity, thumbnail, original}, signal)).blob();
+      if (typeof row?.handle !== "string" || typeof row?.identity !== "string") {
+        const error = new Error("This file reference is incomplete. Refresh the folder, then select the file again.");
+        error.code = "INVALID_HANDLE"; throw error;
+      }
+      // The preserved November 4 worker strictly rejects unknown keys, including
+      // original:false. Only an explicit export needs the newer original flag.
+      const body = {handle:row.handle, identity:row.identity, thumbnail};
+      if (original) body.original = true;
+      return (await request("content", body, signal)).blob();
     }
   });
 })();

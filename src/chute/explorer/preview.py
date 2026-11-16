@@ -11,8 +11,20 @@ SAFE_IMAGES = {"image/png", "image/jpeg", "image/gif", "image/webp", "image/bmp"
 SAFE_VIDEO = {"video/mp4", "video/webm", "video/ogg"}
 
 
+# Windows MIME registration may be missing/generic. Narrow extension fallback
+# is a format hint, never authority: guarded bytes/decoder checks still apply.
+def media_mime(row):
+    mime = row.get("mime")
+    if mime and mime != "application/octet-stream":
+        return mime
+    suffix = str(row.get("name", "")).rsplit(".", 1)[-1].lower()
+    return {"png":"image/png", "jpg":"image/jpeg", "jpeg":"image/jpeg", "gif":"image/gif",
+            "webp":"image/webp", "bmp":"image/bmp", "mp4":"video/mp4", "webm":"video/webm",
+            "ogv":"video/ogg"}.get(suffix, mime or "application/octet-stream")
+
+
 def preview_kind(row):
-    mime = row["mime"]
+    mime = media_mime(row)
     if row["kind"] != "file":
         return "unavailable"
     if mime in SAFE_IMAGES:

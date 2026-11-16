@@ -138,6 +138,16 @@ class ChuteHandler(BaseHTTPRequestHandler):
         self._cors()
         self.end_headers()
 
+    def log_request(self, code="-", size="-"):
+        if self.path.startswith("/api/explorer/v1/media/"):
+            self.log_message('"%s /api/explorer/v1/media/[redacted] %s" %s %s', self.command, self.request_version, str(code), str(size))
+        else:
+            super().log_request(code, size)
+
+    def do_HEAD(self) -> None:  # noqa: N802
+        if not self._explorer_route():
+            self.send_error(HTTPStatus.METHOD_NOT_ALLOWED)
+
     def do_GET(self) -> None:  # noqa: N802
         if self._explorer_route():
             return

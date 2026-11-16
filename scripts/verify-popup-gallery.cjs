@@ -42,7 +42,7 @@ class Element {
   querySelectorAll(){return [];}
   setAttribute(k,v){this.attributes[k]=v;}
   removeAttribute(k){delete this.attributes[k];}
-  append(){} focus(){} getBoundingClientRect(){return {bottom:150};}
+  remove(){} append(){} focus(){} getBoundingClientRect(){return {bottom:150};}
 }
 (async()=>{
   const dial=new Element(),label=new Element(),size=new Element(),status=new Element(),grid=new Element(),body=new Element();
@@ -60,6 +60,7 @@ class Element {
     getComputedStyle:()=>({paddingLeft:"0",paddingRight:"0",columnGap:"6"}),
     MutationObserver:class{observe(){}},selectedDay:"",currentPage:0,
     fileUrl:file=>"http://127.0.0.1:17891/api/files/"+file.id,
+    fileKind:file=>file.mime.startsWith("image/")?"image":"file",
     isPreviewableImage:file=>file.mime.startsWith("image/"),
     createRow:()=>{const row=new Element();rows.push(row);return row;},console};
   vm.runInNewContext(source,context,{filename:"extension/popup-gallery.js"});
@@ -75,9 +76,9 @@ class Element {
   const row=context.createRow(file,0);
   const event={target:{closest:()=>null},defaultPrevented:false,stopPropagation(){}};
   row.handlers.click(event);
-  assert(row.classList.contains("chutey-gallery-expanded"));
+  assert(!row.classList.contains("chutey-gallery-expanded"));
   assert.equal(opened,0,"Caption selects the card without opening Shelf");
-  row.querySelector(".file-icon").handlers.click(event);
+
   const lightbox=created[0];assert.equal(lightbox.hidden,false);
   assert.equal(opened,0,"Picture opens the local preview only");
   assert.equal(lightbox.querySelector(".chutey-lightbox-image").src,context.fileUrl(file));
@@ -90,5 +91,5 @@ class Element {
   const expanded=row.classList.contains("chutey-gallery-expanded");
   row.handlers.click({...event,target:{closest:()=>({})}});
   assert.equal(row.classList.contains("chutey-gallery-expanded"),expanded,"Action buttons remain isolated");
-  console.log("PASS: all density controls, caption expansion, local image lightbox, explicit Shelf handoff and action isolation (DOM fixture)");
+  console.log("PASS: all density controls, direct image preview, local image lightbox, explicit Shelf handoff and action isolation (DOM fixture)");
 })().catch(error=>{console.error(error);process.exitCode=1;});

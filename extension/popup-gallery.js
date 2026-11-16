@@ -8,106 +8,23 @@
   const viewerSize = document.querySelector("#shelf-viewer-size");
   const popupStatus = document.querySelector("#status");
   let opening = false;
-  // Assets are packaged inside the extension. A build helper copies files from
-  // repository /alternate-chuteys into extension/alternate-chuteys and generates
-  // the manifest before Chrome is reloaded. No network access is required.
-  const faces = [];
-  let facesReady = false;
-  function stableHash(value) {
-    let hash = 2166136261;
-    for (const char of String(value || "")) {
-      hash ^= char.codePointAt(0);
-      hash = Math.imul(hash, 16777619);
-    }
-    return hash >>> 0;
-  }
-  function allocateFaces() {
-    if (!facesReady) return;
-    const tiles = Array.from(document.querySelectorAll("#files .chutey-gallery-tile"));
-    const columns = Number(document.body.style.getPropertyValue("--chutey-gallery-columns")) || 4;
-    // The original mascot is always one face in the palette. With even one
-    // alternate face, a checkerboard is possible without duplicate neighbors.
-    const palette = ["icons/icon32.png", ...faces];
-    const assigned = [];
-    for (let position = 0; position < tiles.length; position++) {
-      const tile = tiles[position];
-      const image = tile.querySelector(".chutey-tile-mascot");
-      if (!image) { assigned.push(null); continue; }
-      const file = tile.__galleryFile;
-      if (fileKind(file) !== "link") {
-        if (image.getAttribute("src") !== palette[0]) image.src = palette[0];
-        // Image fallback is not one of the decorated link tiles.
-        assigned.push(null); continue;
-      }
-      const forbidden = new Set();
-      if (position % columns !== 0 && assigned[position - 1] != null) forbidden.add(assigned[position - 1]);
-      if (position >= columns && assigned[position - columns] != null) forbidden.add(assigned[position - columns]);
-      const candidates = palette.map((_, i) => i).filter(i => !forbidden.has(i));
-      // If there are no alternates, retain the old mascot rather than hiding
-      // link tiles; the no-adjacent-duplicate constraint requires >= 2 faces.
-      const choice = candidates.length ? candidates[stableHash(file.id) % candidates.length] : 0;
-      const chosenSrc = palette[choice];
-      if (image.src !== new URL(chosenSrc, location.href).href) image.src = chosenSrc;
-      assigned.push(choice);
-      image.onerror = () => { image.onerror = null; image.src = "icons/icon32.png"; };
-    }
-  }
-  async function loadFacePack() {
-    try {
-      const response = await fetch(chrome.runtime.getURL("alternate-chuteys/manifest.json"));
-      if (!response.ok) throw new Error("No face pack");
-      const names = await response.json();
-      if (Array.isArray(names)) {
-        for (const name of names) {
-          if (typeof name === "string" && /^[a-zA-Z0-9][a-zA-Z0-9_.-]*\.(png|webp|gif|jpg|jpeg)$/i.test(name)) {
-            faces.push(chrome.runtime.getURL("alternate-chuteys/" + name));
-          }
-        }
-      }
-    } catch (error) { console.debug("Optional Chutey faces unavailable:", error); }
-    facesReady = true;
-    allocateFaces();
-  }
-  void loadFacePack();
-  let layoutRefreshScheduled = false;
-  function scheduleFaceLayout() {
-    if (layoutRefreshScheduled) return;
-    layoutRefreshScheduled = true;
-    requestAnimationFrame(() => {
-      layoutRefreshScheduled = false; allocateFaces();
-    });
-  }
-
   function applyLayout(value) {
     const n = Number(value);
     const step = Number.isFinite(n) ? Math.max(0, Math.min(3, Math.round(n))) : 0;
     const choice = layouts[step];
+    try { localStorage.setItem("chuteyPopupGridStep",String(step)); } catch {}
     document.body.style.setProperty("--chutey-gallery-columns", String(choice.columns));
     document.body.style.setProperty("--chutey-gallery-rows", String(choice.rows));
     document.body.dataset.galleryLayout = choice.columns + "x" + choice.rows;
     if (dial) dial.value = String(step);
     if (readout) readout.textContent = choice.columns + " × " + choice.rows;
-    queueMicrotask(sizeGridCells);
-    scheduleFaceLayout();
+    window.ChuteyPopupLayout?.paintPlaceholders();
+
+
     return step;
   }
-  applyLayout(0);
+  try { applyLayout(localStorage.getItem("chuteyPopupGridStep")); } catch { applyLayout(0); }
   const grid = document.querySelector("#files");
-  // A fixed geometric cell track stops expanded cards from redefining implicit
-  // row heights and colliding at every density (4x4 through 6x5).
-  function sizeGridCells() {
-    if (!grid) return;
-    const style = getComputedStyle(grid);
-    const columns = Number(document.body.style.getPropertyValue("--chutey-gallery-columns")) || 4;
-    const space = grid.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight);
-    const gap = parseFloat(style.columnGap) || 0;
-    const cell = (space - gap * (columns - 1)) / columns;
-    if (cell > 0) grid.style.setProperty("--chutey-gallery-cell", cell + "px");
-  }
-  if (grid && typeof ResizeObserver !== "undefined") new ResizeObserver(sizeGridCells).observe(grid);
-  window.addEventListener("resize",sizeGridCells);
-  sizeGridCells();
-
   dial?.addEventListener("input", () => {
     const step = applyLayout(dial.value);
     void chrome.storage.sync.set({chutePopupGridStep:step}).catch(console.warn);
@@ -272,12 +189,7 @@
     if (icon && (fileKind(file) === "link" || isPreviewableImage(file))) {
       const fallback = icon.querySelector(".file-fallback");
       if (fallback) {
-        const mascot = document.createElement("img");
-        mascot.className = "chutey-tile-mascot";
-        mascot.src = "icons/icon32.png";
-        mascot.alt = "";
-        mascot.draggable = false;
-        fallback.replaceChildren(mascot);
+        window.ChuteyPresentation?.decorate(icon);
         icon.classList.add("chutey-mascot-fallback");
         if (fileKind(file) === "link") {
           const kindLabel = document.createElement("span");
@@ -306,7 +218,7 @@
     } else {
       row.removeAttribute("aria-expanded");
     }
-    scheduleFaceLayout();
+
     return row;
   };
 })();

@@ -1,4 +1,4 @@
-"""Real installed Chromium extension, production API and inline interaction checks."""
+"""Chromium, production API, overlay geometry and independent thumbnails."""
 from __future__ import annotations
 
 import io
@@ -65,7 +65,7 @@ def main():
                 if fixture_mode:
                     browser = playwright.chromium.launch(executable_path=os.environ.get("CHUTE_TEST_CHROME") or shutil.which("chromium"), headless=True, args=["--no-sandbox"])
                     context = browser.new_context()
-                    context.add_init_script("""window.chrome = {storage:{local:{get:async d=>Object.assign({},d,window.__local||{}),set:async x=>{window.__local=Object.assign(window.__local||{},x)}},sync:{get:async d=>d},session:{get:async d=>d,remove:async()=>{}},onChanged:{addListener(){}}},runtime:{sendNativeMessage:async()=>({ok:true,explorer_protocol:'1.1',protocol:'1.1',read_only:true,token:window.__nativeSessionToken}),sendMessage:async()=>({}),onMessage:{addListener(){}},connectNative(){throw Error('fixture: no native host')}}};""")
+                    context.add_init_script("""window.chrome = {storage:{local:{get:async d=>Object.assign({},d,window.__local||{}),set:async x=>{window.__local=Object.assign(window.__local||{},x)}},sync:{get:async d=>d},session:{get:async d=>d,remove:async()=>{}},onChanged:{addListener(){}}},runtime:{getURL:path=>new URL(path,location.href).href,sendNativeMessage:async()=>({ok:true,explorer_protocol:'1.1',protocol:'1.1',read_only:true,token:window.__nativeSessionToken}),sendMessage:async()=>({}),onMessage:{addListener(){}},connectNative(){throw Error('fixture: no native host')}}};""")
                     origin = "chrome-extension://abcdefghijklmnopabcdefghijklmnop"
                     # Test-only transport: real browser/GUI/API, not extension enrollment proof.
                     context.route("http://127.0.0.1:17891/api/explorer/**", lambda route: route.fulfill(response=route.fetch(headers={**route.request.headers, "origin": origin})))
@@ -124,8 +124,32 @@ def main():
                     after = page.evaluate(metrics)
                     assert before["width"] == after["width"] and before["height"] == after["height"], (before,after)
                     assert after["scroll"] > after["client"]
-                    inline = page.evaluate("""() => { const p=document.querySelector('.ex-preview'); const prior=p.previousElementSibling; return p.parentElement.classList.contains('ex-list') && p.getBoundingClientRect().top >= prior.getBoundingClientRect().bottom; }""")
-                    assert inline, "Preview must follow its row in document flow"
+                    def assert_geometry():
+                        actual = page.evaluate(metrics)
+                        for key in ("x","y","width","height","workHeight","scroll","client"):
+                            assert abs(actual[key]-before[key]) < 1, (key,before,actual)
+                        assert page.locator(".ex-preview").evaluate("node => node.parentElement.id === 'chutey-explorer-view'")
+                        assert page.locator(".ex-preview").bounding_box()["y"] >= page.locator(".ex-filter").bounding_box()["y"] + page.locator(".ex-filter").bounding_box()["height"] - 1
+                    assert_geometry()
+                    normal = page.locator(".ex-preview").bounding_box()
+                    page.get_by_role("button",name="Expand preview",exact=True).click()
+                    assert_geometry()
+                    assert page.locator(".ex-preview").bounding_box()["height"] > normal["height"]
+                    page.get_by_role("button",name="Restore preview height",exact=True).click()
+                    assert_geometry()
+                    assert abs(page.locator(".ex-preview").bounding_box()["height"]-normal["height"]) < 1
+                    grip=page.get_by_role("separator",name="Resize preview",exact=True)
+                    grip.focus(); page.keyboard.press("ArrowUp")
+                    assert_geometry()
+                    assert page.locator(".ex-preview").bounding_box()["height"] > normal["height"]
+                    divider=grip.bounding_box()
+                    page.mouse.move(divider["x"]+30,divider["y"]+3)
+                    page.mouse.down(); page.mouse.move(divider["x"]+30,page.locator(".ex-filter").bounding_box()["y"]-30); page.mouse.up()
+                    assert_geometry()
+                    page.get_by_role("button",name="Expand preview",exact=True).click()
+                    page.get_by_role("button",name="Restore preview height",exact=True).click()
+                    # Return to a small overlay so row click hit targets are exposed.
+                    grip.focus(); page.keyboard.press("Home")
                     # Open preview follows arrows; closed preview remains closed.
                     if width == 390:
                         picture.focus()
@@ -179,12 +203,12 @@ def main():
                     history_row.click()
                     expect(page.locator(".chutey-shelf-viewer")).to_be_visible()
                     expect(page.locator(".chutey-shelf-viewer img")).to_have_js_property("naturalWidth",400)
-                    assert page.locator(".chutey-shelf-viewer").evaluate("node => node.parentElement.id === 'files' && node.getBoundingClientRect().top >= node.previousElementSibling.getBoundingClientRect().bottom")
+                    assert page.locator(".chutey-shelf-viewer").evaluate("node => node.parentElement.id === 'chutey-history-view' && getComputedStyle(node).position === 'fixed'")
                     page.get_by_role("tab", name="File Explorer", exact=True).click()
                     assert page.locator(".ex-list").evaluate("node => node.scrollTop") == 100
                     assert page.locator("#chutey-workspace-tabs button").first.inner_text() == "File Explorer"
                     page.locator(".ex-list").evaluate("node => node.scrollTop=0")
-                    results.append({"transport": "fixture; not installed extension" if fixture_mode else "installed extension; native selection simulated", "width": width, "inline_geometry": "PASS", "thumbnail_original_pixels": "PASS", "document_scroll": "PASS", "history": "PASS including real saved PNG thumbnail", "menu_keyboard": "PASS", "metrics": after})
+                    results.append({"transport": "fixture; not installed extension" if fixture_mode else "installed extension; native selection simulated", "width": width, "overlay_geometry": "PASS", "thumbnail_original_pixels": "PASS", "document_scroll": "PASS", "history": "PASS including real saved PNG thumbnail", "menu_keyboard": "PASS", "metrics": after})
                 assert not errors, errors
                 (out / "results.json").write_text(json.dumps(results, indent=2))
                 print(json.dumps(results, indent=2))

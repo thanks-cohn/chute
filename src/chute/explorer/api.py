@@ -4,10 +4,12 @@ from __future__ import annotations
 import json
 import os
 import threading
+import secrets
+import time
 from urllib.parse import urlparse
 
 from .protocol import ExplorerError
-from .preview import byte_range, preview_kind, thumbnail
+from .preview import byte_range, media_mime, preview_kind, thumbnail
 
 
 class ExplorerAPI:
@@ -16,6 +18,8 @@ class ExplorerAPI:
         from .transfers import Transfers
         self.transfers = Transfers(engine)
         self.slots = threading.BoundedSemaphore(4)
+        self.media = {}
+        self.media_lock = threading.Lock()
 
     def headers(self, handler, status, mime, length, extra=()):
         handler._explorer_headers_sent = True
@@ -23,7 +27,7 @@ class ExplorerAPI:
         handler.send_header("Access-Control-Allow-Origin", self.session.origin)
         handler.send_header("Vary", "Origin")
         handler.send_header("Access-Control-Allow-Headers", "Authorization, Content-Type, Range, X-Chute-Destination, X-Chute-Filename, X-Chute-Operation")
-        handler.send_header("Access-Control-Allow-Methods", "POST, OPTIONS")
+        handler.send_header("Access-Control-Allow-Methods", "POST, GET, HEAD, OPTIONS")
         handler.send_header("Access-Control-Expose-Headers", "Content-Range, Accept-Ranges")
         handler.send_header("Cache-Control", "no-store")
         handler.send_header("X-Content-Type-Options", "nosniff")
@@ -37,7 +41,8 @@ class ExplorerAPI:
     def json(self, handler, value, status=200):
         body = json.dumps(value, ensure_ascii=False).encode()
         self.headers(handler, status, "application/json; charset=utf-8", len(body))
-        handler.wfile.write(body)
+        if handler.command != "HEAD":
+            handler.wfile.write(body)
 
     def route(self, handler):
         handler._explorer_headers_sent = False
@@ -65,6 +70,15 @@ class ExplorerAPI:
                 raise ExplorerError("UNAUTHORIZED", "Enrolled extension origin required.")
             if handler.command == "OPTIONS":
                 self.headers(handler, 204, "application/json", 0)
+                return True
+            if path.startswith("/api/explorer/v1/media/") and handler.command in {"GET","HEAD"}:
+                ticket = path.removeprefix("/api/explorer/v1/media/")
+                with self.media_lock:
+                    source = self.media.get(ticket)
+                if not source or time.monotonic() >= source["expires"]:
+                    raise ExplorerError("STREAM_EXPIRED", "The media session expired. Select the file again.")
+                self.session.authorize(handler.headers.get("Origin", ""), source["authorization"])
+                self.content(handler, source["file"], authorization=source["authorization"], media=source)
                 return True
             self.session.authorize(handler.headers.get("Origin", ""), handler.headers.get("Authorization", ""))
             if handler.command != "POST":
@@ -120,7 +134,38 @@ class ExplorerAPI:
                         "original_bytes":True,"one_use_export":True,
                         "write_consent_required":True,"conflicts":["keep_both","skip"],
                         "commands":["prepare_export","export_to_live","receive_from_live","reconcile_transfer"],
-                        "interop_enabled":False}}}
+                        "interop_enabled":False},"media":{"commands":["media_source","release_media"],"methods":["GET","HEAD"],"ranges":True,"ticket_limit":32,"ticket_seconds":600}}}
+                elif body["command"] == "media_source":
+                    args = body.get("args", {})
+                    if set(args) != {"handle", "identity"} or not all(isinstance(value,str) for value in args.values()):
+                        raise ExplorerError("INVALID_ARGUMENT", "A file handle and identity are required.")
+                    with self.engine.lock:
+                        grant = self.engine.grant_for(args["handle"])
+                        with grant.open(args["handle"]) as fd:
+                            row = self.engine._record(grant, grant.parts(args["handle"]), os.fstat(fd), fd=fd)
+                        if row["identity"] != args["identity"]:
+                            raise ExplorerError("FILE_CHANGED", "The file changed. Refresh the folder.")
+                        if preview_kind(row) != "video":
+                            raise ExplorerError("PREVIEW_UNAVAILABLE", "Streaming is available for MP4, WebM and Ogg video containers; browser codec support varies.")
+                    ticket = secrets.token_urlsafe(32)
+                    # A short-lived, read-only, origin-bound authority for one file.
+                    # Never put the general session token or a filesystem path in a URL.
+                    expiry = min(self.session.expires, time.monotonic() + 600)
+                    with self.media_lock:
+                        self.media = {key:value for key,value in self.media.items() if value["expires"] > time.monotonic()}
+                        if len(self.media) >= 32:
+                            raise ExplorerError("BUSY", "Close an unused media preview before opening another.")
+                        self.media[ticket] = {"file":args, "expires":expiry, "authorization":handler.headers.get("Authorization", ""),"revoked":False}
+                    result = {"state":"completed", "result":{"url":"/api/explorer/v1/media/" + ticket,
+                        "ticket":ticket,"expires_in":max(0,int(expiry-time.monotonic())),"mime":row["mime"],"size":row["size"],"range":True}}
+                elif body["command"] == "release_media":
+                    args = body.get("args", {})
+                    if set(args) != {"ticket"} or not isinstance(args["ticket"],str):
+                        raise ExplorerError("INVALID_ARGUMENT", "A media ticket is required.")
+                    with self.media_lock:
+                        released = self.media.pop(args["ticket"],None)
+                        if released: released["revoked"] = True
+                    result = {"state":"completed", "result":{"released":True}}
                 elif body["command"] == "prepare_export":
                     with self.engine.lock:
                         result={"state":"completed","result":self.transfers.prepare(**body.get("args",{}))}
@@ -175,7 +220,7 @@ class ExplorerAPI:
                 pass
         return True
 
-    def content(self, handler, body):
+    def content(self, handler, body, *, authorization=None, media=None):
         grant = self.engine.grant_for(body["handle"])
         with grant.open(body["handle"]) as fd:
             row = self.engine._record(grant, grant.parts(body["handle"]), os.fstat(fd), fd=fd)
@@ -199,18 +244,27 @@ class ExplorerAPI:
                 raise ExplorerError("PREVIEW_LIMIT", "Text preview is limited to 256 KiB.")
             if kind == "image" and size > 32 * 1024 * 1024:
                 raise ExplorerError("PREVIEW_LIMIT", "Image preview is limited to 32 MiB.")
-            start, end, partial = byte_range(handler.headers.get("Range"), size)
+            try:
+                start, end, partial = byte_range(handler.headers.get("Range") if handler.command != "HEAD" else None, size)
+            except ExplorerError:
+                self.headers(handler, 416, row["mime"], 0, [("Content-Range", f"bytes */{size}"), ("Accept-Ranges","bytes")])
+                return
             extra = [("Accept-Ranges", "bytes")]
             if partial:
                 extra.append(("Content-Range", f"bytes {start}-{end - 1}/{size}"))
-            mime = "text/plain; charset=utf-8" if kind == "text" else row["mime"]
+            mime = "text/plain; charset=utf-8" if kind == "text" else media_mime(row)
             if original:
                 extra.append(("Content-Disposition", "attachment"))
             self.headers(handler, 206 if partial else 200, mime, end - start, extra)
+            if handler.command == "HEAD":
+                return
             os.lseek(fd, start, os.SEEK_SET)
             remaining = end - start
             while remaining:
-                self.session.authorize(handler.headers.get("Origin", ""), handler.headers.get("Authorization", ""))
+                if media and (media["revoked"] or time.monotonic() >= media["expires"]):
+                    handler.close_connection = True
+                    return
+                self.session.authorize(handler.headers.get("Origin", ""), authorization or handler.headers.get("Authorization", ""))
                 data = os.read(fd, min(262144, remaining))
                 if not data:
                     break

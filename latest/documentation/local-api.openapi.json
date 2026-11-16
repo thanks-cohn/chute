@@ -1,0 +1,510 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Chutey scoped local Explorer API",
+    "version": "1.0-phase1",
+    "description": "Implemented contracts only; optional Phase 1 media commands marked. Independent automation enrollment, batch jobs and adapter registry are not implemented. See LOCAL-API.md."
+  },
+  "servers": [
+    {
+      "url": "http://127.0.0.1:17891"
+    }
+  ],
+  "paths": {
+    "/api/explorer/v1/command": {
+      "post": {
+        "summary": "Versioned permission-checked Explorer command",
+        "security": [
+          {
+            "SessionBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Origin"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "command"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "command": {
+                    "type": "string",
+                    "enum": [
+                      "capabilities",
+                      "roots",
+                      "list",
+                      "search",
+                      "stat",
+                      "preview",
+                      "resume_location",
+                      "remember_location",
+                      "revoke_access",
+                      "prepare_export",
+                      "export_to_live",
+                      "receive_from_live",
+                      "recent_transfers",
+                      "reconcile_transfer",
+                      "media_source",
+                      "release_media"
+                    ]
+                  },
+                  "args": {
+                    "type": "object",
+                    "description": "Command-specific parameters in LOCAL-API.md; media_source/release_media require the optional test worker."
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Completed receipt (not an asynchronous job acceptance)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Receipt"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Failed operation; inspect state and error.code",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Receipt"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Failed operation; inspect state and error.code",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Receipt"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Failed operation; inspect state and error.code",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Receipt"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/explorer/v1/content": {
+      "post": {
+        "summary": "Authorized preview, original (newer worker only), or bounded image thumbnail",
+        "security": [
+          {
+            "SessionBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Origin"
+          },
+          {
+            "name": "Range",
+            "in": "header",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Single bytes=start-end, bytes=start-, or bytes=-suffix range."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "handle",
+                  "identity"
+                ],
+                "properties": {
+                  "handle": {
+                    "type": "string"
+                  },
+                  "identity": {
+                    "type": "string"
+                  },
+                  "thumbnail": {
+                    "type": "boolean",
+                    "default": false
+                  },
+                  "original": {
+                    "type": "boolean",
+                    "description": "Omit entirely on November 4 worker; false is also rejected there."
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Guarded content bytes",
+            "content": {
+              "application/octet-stream": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "206": {
+            "description": "Partial bytes; Content-Range, Content-Length, Accept-Ranges returned"
+          },
+          "400": {
+            "description": "Failed operation; inspect state and error.code",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Receipt"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Failed operation; inspect state and error.code",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Receipt"
+                }
+              }
+            }
+          },
+          "416": {
+            "description": "Unsatisfiable/invalid range; Content-Range: bytes */size"
+          },
+          "429": {
+            "description": "Failed operation; inspect state and error.code",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Receipt"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/explorer/v1/receive": {
+      "post": {
+        "summary": "Existing synchronous guarded upload; no batch job API",
+        "security": [
+          {
+            "SessionBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Origin"
+          },
+          {
+            "name": "X-Chute-Destination",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Approved writable folder handle"
+          },
+          {
+            "name": "X-Chute-Filename",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Percent-encoded filename"
+          },
+          {
+            "name": "X-Chute-Operation",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Unique operation ID for native reconciliation"
+          },
+          {
+            "name": "Content-Length",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Known byte count"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/octet-stream": {
+              "schema": {
+                "type": "string",
+                "format": "binary"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Transfer receipt: require state COMMITTED; uncertain results require reconciliation"
+          },
+          "400": {
+            "description": "Failed operation; inspect state and error.code",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Receipt"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Failed operation; inspect state and error.code",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Receipt"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Failed operation; inspect state and error.code",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Receipt"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/explorer/v1/media/{ticket}": {
+      "get": {
+        "summary": "Origin-bound optional Phase 1 test-worker media stream",
+        "security": [],
+        "description": "The opaque single-file read ticket is minted with authenticated media_source; exact enrolled Origin is still required. No general bearer token in URL. Not available on archived installed worker.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Origin"
+          },
+          {
+            "name": "ticket",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9_-]+$"
+            }
+          },
+          {
+            "name": "Range",
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Full bytes or HEAD metadata; Content-Length, Content-Type, Accept-Ranges"
+          },
+          "206": {
+            "description": "Range bytes, Content-Range and length"
+          },
+          "400": {
+            "description": "Failed operation; inspect state and error.code",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Receipt"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Failed operation; inspect state and error.code",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Receipt"
+                }
+              }
+            }
+          },
+          "416": {
+            "description": "Invalid range, Content-Range: bytes */size"
+          },
+          "429": {
+            "description": "Failed operation; inspect state and error.code",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Receipt"
+                }
+              }
+            }
+          }
+        }
+      },
+      "head": {
+        "summary": "Media metadata without response body; Range ignored",
+        "security": [],
+        "description": "The opaque single-file read ticket is minted with authenticated media_source; exact enrolled Origin is still required. No general bearer token in URL. Not available on archived installed worker.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Origin"
+          },
+          {
+            "name": "ticket",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9_-]+$"
+            }
+          },
+          {
+            "name": "Range",
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Full bytes or HEAD metadata; Content-Length, Content-Type, Accept-Ranges"
+          },
+          "206": {
+            "description": "Range bytes, Content-Range and length"
+          },
+          "400": {
+            "description": "Failed operation; inspect state and error.code",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Receipt"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Failed operation; inspect state and error.code",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Receipt"
+                }
+              }
+            }
+          },
+          "416": {
+            "description": "Invalid range, Content-Range: bytes */size"
+          },
+          "429": {
+            "description": "Failed operation; inspect state and error.code",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Receipt"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "SessionBearer": {
+        "type": "http",
+        "scheme": "bearer",
+        "description": "Native approved session, not independently enrolled script credentials."
+      }
+    },
+    "parameters": {
+      "Origin": {
+        "name": "Origin",
+        "in": "header",
+        "required": true,
+        "schema": {
+          "type": "string",
+          "pattern": "^chrome-extension://[a-p]{32}$"
+        },
+        "description": "Exact enrolled extension origin; header alone supplies no authority."
+      }
+    },
+    "schemas": {
+      "Receipt": {
+        "type": "object",
+        "required": [
+          "state"
+        ],
+        "properties": {
+          "version": {
+            "type": "string"
+          },
+          "operation_id": {
+            "type": "string"
+          },
+          "state": {
+            "enum": [
+              "completed",
+              "failed"
+            ]
+          },
+          "result": {
+            "type": "object"
+          },
+          "error": {
+            "type": "object",
+            "required": [
+              "code",
+              "message"
+            ],
+            "properties": {
+              "code": {
+                "type": "string"
+              },
+              "message": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

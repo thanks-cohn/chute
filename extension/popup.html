@@ -4,12 +4,14 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Chutey</title>
+  <script src="popup-layout.js"></script>
   <link rel="stylesheet" href="shared.css">
   <link rel="stylesheet" href="popup-gallery.css">
   <style>
     body { width: 390px; height: 590px; overflow: hidden; }
     .popup-note { padding: 0 13px 11px; color: #8f9882; font-size: 10px; }
   </style>
+  <link rel="stylesheet" href="default-presentation.css">
 </head>
 <body class="chutey-gallery-popup">
   <header class="topbar">
@@ -25,6 +27,7 @@
   <details class="settings-panel">
     <summary>⚙ Settings</summary>
     <section class="settings" aria-label="Chute settings">
+      <fieldset data-presentation-settings></fieldset>
       <div class="setting-label">Gallery density</div>
       <div class="gallery-density-control">
         <input id="gallery-density" type="range" min="0" max="3" step="1" value="0" aria-label="Gallery grid density, four by four through six by five">
@@ -147,8 +150,10 @@
   <div class="popup-note">Latest is your live working Chute. Dated history stays on disk and remains available in the Shelf or by choosing a date.</div>
   </section>
 
+  <script src="popup-placeholders.js"></script>
   <script src="native-wake-page.js"></script>
   <script src="bridge-reconnect.js"></script>
+  <script src="default-presentation.js"></script>
   <script src="shelf.js"></script>
   <script src="companion-help.js"></script>
   <script src="workflow-fixes.js"></script>

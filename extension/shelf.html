@@ -9,6 +9,7 @@
   <link rel="stylesheet" href="explorer-shell.css">
   <link rel="stylesheet" href="explorer-view.css">
   <link rel="stylesheet" href="shelf-gallery-preview.css">
+  <link rel="stylesheet" href="default-presentation.css">
 </head>
 <body>
   <header class="topbar">
@@ -18,7 +19,7 @@
     </div>
     <div class="actions">
       <button id="refresh" class="icon-button" title="Refresh">↻</button>
-      <button id="clear" class="icon-button chute-clear-button" type="button" title="Clear Live Chutey" aria-label="Clear Live Chutey"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h16M10 4h4M6.5 7l1 13h9l1-13M10 11v6M14 11v6"/></svg></button>
+      <button id="clear" class="icon-button chute-clear-button" type="button" title="Empty live basket (keep history)" aria-label="Empty live basket (keep history)"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h16M10 4h4M6.5 7l1 13h9l1-13M10 11v6M14 11v6"/></svg></button>
     </div>
   </header>
 
@@ -26,6 +27,7 @@
     <button id="chutey-tab-history" class="chutey-tab is-active" type="button" role="tab" aria-controls="chutey-history-view" aria-selected="true" tabindex="0">History</button>
     <button id="chutey-tab-explorer" class="chutey-tab" type="button" role="tab" aria-controls="chutey-explorer-view" aria-selected="false" tabindex="-1">File Explorer</button>
   </nav>
+  <details class="chutey-presentation-options"><summary>Image and background settings</summary><fieldset data-presentation-settings></fieldset></details>
   <section id="chutey-history-view" role="tabpanel" aria-labelledby="chutey-tab-history">
   <div class="history-nav">
     <button id="history-prev" class="icon-button" type="button" title="Older day">‹</button>
@@ -66,6 +68,7 @@
   </section>
   <script src="native-wake-page.js"></script>
   <script src="bridge-reconnect.js"></script>
+  <script src="default-presentation.js"></script>
   <script src="shelf.js"></script>
   <script src="companion-help.js"></script>
   <script src="workflow-fixes.js"></script>

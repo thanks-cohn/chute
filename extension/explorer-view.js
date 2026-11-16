@@ -9,11 +9,11 @@
     <div class="ex-filter"><input type="search" placeholder="Search this folder" aria-label="Search this folder"><select aria-label="Sort files"><option value="name">Name</option><option value="type">Type</option><option value="date">Date</option><option value="size">Size</option></select></div>
     <div class="ex-workspace"><aside class="ex-tree" aria-label="Folder navigator"></aside><div class="ex-column-resize" role="separator" tabindex="0" aria-label="Resize folders and files columns" aria-orientation="vertical" aria-valuemin="15" aria-valuemax="75" aria-valuenow="36" title="Drag to resize folders"></div><div class="ex-list" role="listbox" aria-label="Local files" aria-multiselectable="true" tabindex="0"></div></div>
     <div class="ex-status" role="status" aria-live="polite">Choose Browse once to access a local folder.</div>
-    <section class="ex-preview" aria-label="File preview" hidden><div class="ex-resize" role="separator" aria-label="Resize preview" aria-orientation="horizontal" tabindex="0"></div><header><strong></strong><button data-action="close" title="Close preview" aria-label="Close preview">×</button></header><div class="ex-preview-body"></div></section><div class="ex-menu" role="menu" hidden></div>`;
+    <section class="ex-preview" aria-label="File preview" hidden><div class="ex-resize" role="separator" aria-label="Resize preview" aria-orientation="horizontal" tabindex="0"></div><header><strong></strong><button data-action="expand" title="Expand preview" aria-label="Expand preview">Expand</button><button data-action="close" title="Close preview" aria-label="Close preview">×</button></header><div class="ex-preview-body"></div></section><div class="ex-menu" role="menu" hidden></div>`;
   const $ = selector => host.querySelector(selector);
   const list = $(".ex-list"), tree = $(".ex-tree"), preview = $(".ex-preview"), status = $(".ex-status"), menu = $(".ex-menu");
   let current = null, parent = null, rows = [], roots = [], selected = new Set(), back = [], forward = [];
-  let offset = 0, requestId = 0, previewId = 0, abort = null, urls = [], grid = false;
+  let offset = 0, requestId = 0, previewId = 0, abort = null, urls = [], grid = false, mediaTicket = null;
   let lastExplorerSignature = null;
   // Folder navigation can be resized by mouse or keyboard. Persist only a
   // non-sensitive ratio; never store a private root path or access token.
@@ -57,6 +57,8 @@
     setFolderWidth(value.chuteyFolderPanePercent);
   }).catch(() => {});
   const thumbnails = new Map();
+  let thumbnailAbort = new AbortController(), thumbnailEpoch = 0;
+  const isImage = row => /^image\/(png|jpeg|gif|webp|bmp|avif)$/i.test(row.mime || "") || /\.(png|jpe?g|gif|webp|bmp|avif)$/i.test(row.name || "");
   const liveCopies = new Map();
   let writable = false, anchor = null, clipboardFile = null;
   const say = text => { status.textContent = text; };
@@ -65,25 +67,53 @@
     const node = document.createElement("button"); node.type = "button"; node.title = label; node.setAttribute("aria-label", label); node.textContent = text; node.onclick = safe(fn); return node;
   }
   function releaseThumbnails() {
+    thumbnailAbort.abort(); thumbnailAbort = new AbortController(); ++thumbnailEpoch;
     for (const url of thumbnails.values()) URL.revokeObjectURL(url);
     thumbnails.clear();
   }
   function closePreview() {
     ++previewId; abort?.abort(); abort = null;
+    if (mediaTicket) { void api.command("release_media",{ticket:mediaTicket}).catch(() => {}); mediaTicket = null; }
     $(".ex-preview-body").querySelectorAll("video").forEach(video => { video.pause(); video.removeAttribute("src"); video.load(); });
     $(".ex-preview-body").replaceChildren();
-    for (const url of urls) URL.revokeObjectURL(url); urls = []; preview.hidden = true; host.append(preview);
+    for (const url of urls) URL.revokeObjectURL(url); urls = []; preview.hidden = true;
   }
   async function showPreview(row) {
     closePreview(); const id = previewId; preview.hidden = false;
-    positionPreview(row);
+    resizePreview();
     $(".ex-preview strong").textContent = row.name;
     const body = $(".ex-preview-body"); body.textContent = "Loading preview…";
     abort = new AbortController(); const signal = abort.signal;
     try {
       const meta = await api.command("preview", {handle: row.handle});
+      if (meta.handle !== row.handle || (row.identity && meta.identity !== row.identity)) {
+        throw new Error("The file changed. Refresh the folder before previewing it.");
+      }
       if (id !== previewId) return;
-      // Media controls use bounded in-memory Blobs. HTTP range support is separately tested.
+      if (meta.preview === "video") {
+        const video = document.createElement("video"); video.controls = true; video.preload = "metadata";
+        video.autoplay = false; video.crossOrigin = "anonymous"; video.setAttribute("referrerpolicy","no-referrer");
+        if (!video.canPlayType(meta.mime)) { body.textContent = "This browser does not support this video container or codec."; return; }
+        try {
+          const source = await api.mediaSource(meta);
+          if (id !== previewId) { void api.command("release_media",{ticket:source.ticket}).catch(() => {}); return; }
+          mediaTicket = source.ticket; video.src = source.url;
+        } catch (error) {
+          if (id !== previewId) return;
+          // The installed worker remains supported for bounded small clips.
+          // Never materialize a whole movie as a Blob on an older companion.
+          if (error.code !== "UNSUPPORTED_COMMAND" || meta.size > 32 * 1024 * 1024) {
+            body.textContent = error.code === "UNSUPPORTED_COMMAND" ? "This companion supports only small video previews. Range streaming requires the separate test worker; the installed worker has not been changed." : error.message;
+            return;
+          }
+          const blob = await api.content(meta,{signal});
+          if (id !== previewId) return;
+          const url = URL.createObjectURL(blob); urls.push(url); video.src = url;
+        }
+        video.onerror = () => { if (id === previewId) body.textContent = "Video unavailable: unsupported codec, expired media session, or disconnected companion. Select the file again to retry."; };
+        body.replaceChildren(video); return;
+      }
+      // Non-video previews retain the existing bounded content API.
       if (meta.preview === "unavailable" || meta.size > 64 * 1024 * 1024) {
         body.textContent = "Preview unavailable. Large media requires native streaming integration."; return;
       }
@@ -97,25 +127,59 @@
       const url = URL.createObjectURL(blob); urls.push(url);
       const node = document.createElement(meta.preview === "image" ? "img" : meta.preview === "video" ? "video" : "iframe");
       if (meta.preview === "pdf") { node.setAttribute("sandbox", ""); node.title = row.name; }
-      if (meta.preview === "video") node.controls = true;
-      if (meta.preview === "image") { node.alt = row.name; node.onclick = () => node.classList.toggle("ex-zoom"); }
-      node.onerror = () => { body.textContent = "Preview unavailable: this browser could not decode the saved file."; };
+      if (meta.preview === "video") { node.controls = true; node.preload = "metadata"; node.autoplay = false; }
+      if (meta.preview === "image") { node.alt = row.name;  }
+      node.onerror = () => { if (id !== previewId) return; body.textContent = "Preview unavailable: this browser could not decode the saved file."; };
       node.src = url; body.append(node);
     } catch (error) { if (id === previewId && error.name !== "AbortError") body.textContent = error.message; }
   }
-  function positionPreview(row) {
-    const cards = [...list.querySelectorAll(".ex-row")];
-    const card = cards.find(node => node.dataset.handle === row.handle);
-    if (!card) return;
-    // Remove the full-width panel before measuring row geometry.
-    host.append(preview);
-    let after = card;
-    if (grid) for (const node of cards.slice(cards.indexOf(card)+1)) {
-      if (Math.abs(node.offsetTop-card.offsetTop)>2) break;
-      after = node;
-    }
-    after.after(preview);
+  // The overlay is a sibling of the workspace for its entire lifetime.
+  // Only its own box changes; no measuring or insertion among directory rows.
+  let previewRatio = 1 / 3, expanded = false;
+  const resize = $(".ex-resize");
+  function previewBounds() {
+    const outer = host.getBoundingClientRect(), content = workspace.getBoundingClientRect();
+    return {bottom: outer.bottom, max: Math.max(0, outer.bottom - content.top)};
   }
+  function resizePreview() {
+    const bounds = previewBounds();
+    const height = expanded ? bounds.max : Math.min(bounds.max, Math.max(Math.min(120, bounds.max), host.clientHeight * previewRatio));
+    preview.style.height = height + "px";
+    resize.setAttribute("aria-valuemin", String(Math.min(120, Math.round(bounds.max))));
+    resize.setAttribute("aria-valuemax", String(Math.round(bounds.max)));
+    resize.setAttribute("aria-valuenow", String(Math.round(height)));
+    const expand = $("[data-action=expand]");
+    expand.textContent = expanded ? "Restore" : "Expand";
+    expand.setAttribute("aria-label", expanded ? "Restore preview height" : "Expand preview");
+  }
+  function setPreviewHeight(height, persist = false) {
+    expanded = false;
+    const maximum = previewBounds().max;
+    previewRatio = Math.min(maximum, Math.max(Math.min(120, maximum), height)) / Math.max(1,host.clientHeight);
+    resizePreview();
+    if (persist) void chrome.storage.local.set({chuteyPreviewRatio:previewRatio}).catch(() => {});
+  }
+  resize.onpointerdown = event => {
+    if (event.button !== 0) return;
+    event.preventDefault(); resize.setPointerCapture(event.pointerId);
+  };
+  resize.onpointermove = event => {
+    if (resize.hasPointerCapture(event.pointerId)) setPreviewHeight(previewBounds().bottom - event.clientY);
+  };
+  for (const name of ["pointerup", "pointercancel", "lostpointercapture"]) resize.addEventListener(name, () => {
+    void chrome.storage.local.set({chuteyPreviewRatio:previewRatio}).catch(() => {});
+  });
+  resize.onkeydown = event => {
+    if (!["ArrowUp","ArrowDown","Home","End"].includes(event.key)) return;
+    event.preventDefault(); event.stopPropagation();
+    if (event.key === "End") { expanded = true; resizePreview(); }
+    else setPreviewHeight(event.key === "Home" ? 120 : preview.offsetHeight + (event.key === "ArrowUp" ? 16 : -16), true);
+  };
+  void chrome.storage.local.get({chuteyPreviewRatio:1/3}).then(settings => {
+    const ratio = settings.chuteyPreviewRatio;
+    if (typeof ratio === "number" && Number.isFinite(ratio) && ratio > 0 && ratio <= 1) previewRatio = ratio;
+    if (!preview.hidden) resizePreview();
+  }).catch(() => {});
   function select(row, event = {}) {
     if (row.kind === "blocked") return;
     const eligible = rows.filter(value => value.kind !== "blocked");
@@ -168,6 +232,9 @@
       $(".ex-filter input").value, result.next_offset,
       result.entries.map(row => [row.handle,row.identity,row.name,row.size,row.mime,row.kind])]);
     if (!append && handle === current && freshSignature === lastExplorerSignature) {
+      for (const node of list.querySelectorAll('[data-thumbnail="failed"]')) {
+        delete node.dataset.thumbnail; observer.observe(node);
+      }
       say(result.total ? `${rows.length} of ${result.total} items` : "This folder is empty");
       return;
     }
@@ -201,33 +268,24 @@
             event.dataTransfer.setData("text/plain", token);
             // Registration exports no bytes. The receiving adapter reads the
             // guarded original on this first drop, including on a cold worker.
-            void chrome.runtime.sendMessage({type:"chutey-register-explorer-drag",id,row:source}).catch(error => { say(error.code === "CANCELLED" ? previousStatus : error.message); });
+            void chrome.runtime.sendMessage({type:"chutey-register-explorer-drag",id,row:source}).catch(error => { say(error.message); });
           } catch (error) { event.preventDefault(); say(error.message); }
         };
       }
-      node.onclick = event => select(row, event);
+      node.onclick = event => {
+        select(row, event);
+        if (!preview.hidden) { if (row.kind === "file") void showPreview(row); else closePreview(); }
+      };
       node.ondblclick = safe(() => row.kind === "directory" ? load(row.handle) : showPreview(row));
       node.oncontextmenu = event => { event.preventDefault(); if (!selected.has(row.handle)) select(row); showMenu(event.clientX, event.clientY, row); };
       node.onkeydown = safe(async event => {
         if (event.key === "Enter") { event.preventDefault(); if (row.kind === "directory") await load(row.handle); else await showPreview(row); }
         if (event.key === " " ) { event.preventDefault(); select(row, event); }
-        if (event.key === "ArrowDown" || event.key === "ArrowUp") {
-          event.preventDefault();
-          const cards = [...list.querySelectorAll(".ex-row")];
-          const columns = grid ? Math.max(1,cards.filter(card => Math.abs(card.offsetTop-cards[0].offsetTop)<2).length) : 1;
-          const index = Math.max(0,Math.min(cards.length-1,cards.indexOf(node)+(event.key === "ArrowDown" ? columns : -columns)));
-          const target = cards[index], next = rows.find(value => value.handle === target.dataset.handle);
-          const open = !preview.hidden;
-          select(next,event); target.focus({preventScroll:true});
-          if (open && next.kind === "file") await showPreview(next);
-          else if (open) closePreview();
-          target.scrollIntoView({block:"nearest"});
-        }
         if (event.key === "Home") list.firstElementChild?.focus();
         if (event.key === "End") list.lastElementChild?.focus();
         if (event.key === "ContextMenu" || (event.shiftKey && event.key === "F10")) { event.preventDefault(); const rect = node.getBoundingClientRect(); showMenu(rect.left + 20, rect.top, row); }
       });
-      if (row.mime?.match(/^image\/(png|jpeg|gif|webp|bmp)$/)) observer.observe(node);
+      if (isImage(row)) observer.observe(node);
     }
     if (offset !== null) { const more = button("Load more files", "···", () => load(current, {append: true})); more.className = "ex-more"; list.append(more); }
     say(result.total ? `${rows.length} of ${result.total} items · ${writable ? "Write approved" : "Read only"}` : "This folder is empty · Read only");
@@ -239,11 +297,24 @@
     const node = queue.shift(); const row = rows.find(row => row.handle === node.dataset.handle);
     if (!row || !node.isConnected) { void pump(); return; }
     active++;
+    const epoch = thumbnailEpoch, signal = thumbnailAbort.signal;
+    let url;
     try {
-      const blob = await api.content(row, {thumbnail: true});
-      if (node.isConnected) { const url = URL.createObjectURL(blob); thumbnails.set(row.handle, url); const img = document.createElement("img"); img.alt = ""; img.src = url; node.querySelector(".ex-icon").replaceChildren(img); }
-    } catch { /* Keep truthful type icon on decode/size failures. */ }
-    finally { active--; void pump(); }
+      const blob = await api.content(row, {thumbnail: true, signal});
+      if (signal.aborted || epoch !== thumbnailEpoch || !node.isConnected) return;
+      url = URL.createObjectURL(blob);
+      const img = document.createElement("img"); img.alt = ""; img.src = url;
+      await img.decode();
+      if (signal.aborted || epoch !== thumbnailEpoch || !node.isConnected) return;
+      thumbnails.set(row.handle, url); url = null;
+      node.querySelector(".ex-icon").replaceChildren(img);
+      node.dataset.thumbnail = "ready";
+    } catch (error) {
+      if (!signal.aborted && epoch === thumbnailEpoch && node.isConnected) {
+        node.dataset.thumbnail = "failed";
+        node.title = row.name + " — Thumbnail unavailable: " + error.message + ". Refresh to retry.";
+      }
+    } finally { if (url) URL.revokeObjectURL(url); active--; void pump(); }
   }
   const observer = new IntersectionObserver(entries => { for (const entry of entries) if (entry.isIntersecting) { observer.unobserve(entry.target); queue.push(entry.target); void pump(); } }, {root: list});
   async function branch(row, container) {
@@ -300,7 +371,20 @@
   document.addEventListener("pointerdown", event => { if (!menu.contains(event.target)) menu.hidden = true; });
   list.addEventListener("click",event => { if (event.target === list) { selected.clear(); anchor=null; paintSelection(); } });
   host.addEventListener("keydown", safe(async event => {
-    if (event.target.closest("input,textarea,select,[contenteditable=true]")) return;
+    if (event.target.closest("input,textarea,select,video,audio,[role=separator],[role=menu],[contenteditable=true]")) return;
+    if (["ArrowDown","ArrowUp"].includes(event.key)) {
+      const cards = [...list.querySelectorAll(".ex-row")].filter(card => rows.find(row => row.handle === card.dataset.handle)?.kind !== "blocked");
+      if (!cards.length) return;
+      event.preventDefault();
+      const columns = grid ? Math.max(1,cards.filter(card => Math.abs(card.offsetTop-cards[0].offsetTop)<2).length) : 1;
+      const focused = event.target.closest(".ex-row");
+      const prior = focused || cards.find(card => card.dataset.handle === anchor);
+      const index = prior ? Math.max(0,Math.min(cards.length-1,cards.indexOf(prior)+(event.key === "ArrowDown" ? columns : -columns))) : 0;
+      const target = cards[index], next = rows.find(row => row.handle === target.dataset.handle);
+      select(next,event); target.focus({preventScroll:true}); target.scrollIntoView({block:"nearest"});
+      if (!preview.hidden) { if (next.kind === "file") await showPreview(next); else closePreview(); }
+      return;
+    }
     if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "a") {
       event.preventDefault(); selected = new Set(rows.filter(row => row.kind !== "blocked").map(row => row.handle)); paintSelection();
     }
@@ -407,16 +491,13 @@
     select: async () => { say("Opening Windows folder picker…"); const session = await api.nativeSession(true); writable = !session.read_only; liveCopies.clear(); await chrome.storage.local.remove("chuteyExplorerLastHandle"); await connect(); },
     resume: async () => { const session = await api.nativeSession(false); writable = !session.read_only; await connect(); },
     refresh: () => current && load(current, {remember: false}), parent: () => parent && load(parent), roots: () => roots[0] && load(roots[0].handle), close: closePreview,
+    expand: () => { expanded = !expanded; resizePreview(); },
     back: async () => { if (back.length) { const target = back.pop(); forward.push(current); await load(target, {remember: false}); } },
     forward: async () => { if (forward.length) { const target = forward.pop(); back.push(current); await load(target, {remember: false}); } },
     grid: () => { grid = !grid; list.classList.toggle("ex-grid", grid); void rememberView(); }
   };
   host.querySelectorAll("[data-action]").forEach(node => { node.onclick = safe(actions[node.dataset.action]); });
   void chrome.storage.local.get({chuteyExplorerView: "list"}).then(settings => { grid = settings.chuteyExplorerView === "grid"; list.classList.toggle("ex-grid", grid); }).catch(() => {});
-  const resize = $(".ex-resize");
-  resize.onpointerdown = event => { resize.setPointerCapture(event.pointerId); };
-  resize.onpointermove = event => { if (resize.hasPointerCapture(event.pointerId)) { const bounds = host.getBoundingClientRect(); preview.style.height = Math.max(bounds.height * .3, Math.min(bounds.height * .7, bounds.bottom - event.clientY)) + "px"; } };
-  resize.onkeydown = event => { if (["ArrowUp", "ArrowDown"].includes(event.key)) { event.preventDefault(); const bounds = host.getBoundingClientRect(); preview.style.height = Math.max(bounds.height * .3, Math.min(bounds.height * .7, preview.offsetHeight + (event.key === "ArrowUp" ? 16 : -16))) + "px"; } };
   // display:none tabs can reset a flex viewport's scroll offset in Chromium.
   let rememberedScroll = 0;
   document.querySelector("#chutey-workspace-tabs")?.addEventListener("click", () => {
@@ -432,10 +513,11 @@
   } });
   new MutationObserver(() => {
     if (!host.hidden) list.scrollTop = rememberedScroll;
+    else closePreview();
   }).observe(host, {attributes: true, attributeFilter: ["hidden"]});
   // Native protected consent remints handles after companion restart; no picker on resume.
-  if (chrome.runtime?.sendNativeMessage) void api.nativeSession(false).then(session => { writable = !session.read_only; return connect(); }).catch(error => { say(error.code === "CANCELLED" ? previousStatus : error.message); });
+  if (chrome.runtime?.sendNativeMessage) void api.nativeSession(false).then(session => { writable = !session.read_only; return connect(); }).catch(error => { say(error.message); });
   else $(".ex-connect").hidden = false; // Explicit developer/fixture fallback only.
-  new ResizeObserver(() => { if (!preview.hidden) { const row = rows.find(value => value.name === $(".ex-preview strong")?.textContent); if (row) positionPreview(row); } }).observe(list);
+  new ResizeObserver(() => { if (!preview.hidden) resizePreview(); }).observe(host);
   window.addEventListener("pagehide", () => { closePreview(); releaseThumbnails(); api.connect(""); });
 })();

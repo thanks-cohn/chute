@@ -18,7 +18,7 @@ const before = get("extension/workflow-fixes.js");
 assert(html.includes('id="chutey-tab-history"'));
 assert(html.includes('id="chutey-tab-explorer"'));
 assert(html.includes('role="tabpanel"'));
-assert(html.includes('title="Clear Live Chutey" aria-label="Clear Live Chutey"'));
+assert(html.includes('title="Empty live basket (keep history)" aria-label="Empty live basket (keep history)"'));
 assert(html.includes('Your Everything'));
 assert(html.includes('class="logo"><img src="icons/icon32.png"'));
 assert(css.includes("background: #11130f;") && css.includes("image-rendering: pixelated;"));
