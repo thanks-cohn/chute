@@ -137,9 +137,10 @@ function hideTest(mode,autoHide){
     }
     now=end;
   }
-  const host={style:{},addEventListener() {},getBoundingClientRect(){return {left:920,right:1010,top:700,bottom:802};}};
-  const document={documentElement:{},hidden:false,getElementById:id=>id==="__chute_sticky_host"?host:null,addEventListener(){}};
-  const window={innerWidth:1024,innerHeight:768,addEventListener(){},visualViewport:null};
+  const hostHandlers={},windowHandlers={},documentHandlers={};
+  const host={style:{},addEventListener(name,fn) {hostHandlers[name]=fn;},getBoundingClientRect(){return {left:920,right:1010,top:700,bottom:802};}};
+  const document={documentElement:{},hidden:false,getElementById:id=>id==="__chute_sticky_host"?host:null,addEventListener(name,fn){documentHandlers[name]=fn;}};
+  const window={innerWidth:1024,innerHeight:768,addEventListener(name,fn){windowHandlers[name]=fn;},visualViewport:null};
   window.top=window;
   const chrome={storage:{sync:{
     get(_defaults,callback){callback({chuteAutoHide:autoHide,chuteAccessMode:mode,chuteBinVisible:mode!=="context"});},
@@ -152,6 +153,14 @@ function hideTest(mode,autoHide){
   tick(2);
   if(autoHide && mode==="floating") assert(host.style.transform.includes("translateX(calc"),"After 10 seconds, mascot tucks away");
   else assert.equal(host.style.transform,"translateX(0)","Always must never disappear");
+  if (autoHide && mode === 'floating') {
+    hostHandlers['chute-context-active']({detail:{active:true}});
+    windowHandlers.blur();tick(15000);
+    assert.equal(host.style.transform,'translateX(0)','An open mascot context menu survives blur and all hide timers');
+    hostHandlers['chute-context-active']({detail:{active:false}});tick(9999);
+    assert.equal(host.style.transform,'translateX(0)','Dismissal restarts the visible interaction window');
+    tick(2);assert(host.style.transform.includes('translateX(calc'),'Normal auto-hide resumes after dismissal');
+  }
 }
 (async()=>{
   await tabsTest();

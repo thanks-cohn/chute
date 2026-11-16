@@ -1,5 +1,7 @@
 # Chutey API-first direction and implementation boundary
 
+> Development 1 update: this document records the earlier candidate. For current repairs, scoped Open/Reveal support and the outstanding Windows acceptance gate, see [Development 1 results](../../codex-11.16.2026/DEVELOPMENT1-IMPLEMENTATION-AND-VALIDATION.md).
+
 The owner's November 16 addenda extend the authoritative
 `CHUTEY-MASCOT-AND-EXPLORER-DIRECTION-2026-11-16.md`. They do not change
 its Phase 1 → Phase 2 → Phase 3 validation gates. The GUI is one authorized

@@ -27,7 +27,7 @@
     <button id="chutey-tab-history" class="chutey-tab is-active" type="button" role="tab" aria-controls="chutey-history-view" aria-selected="true" tabindex="0">History</button>
     <button id="chutey-tab-explorer" class="chutey-tab" type="button" role="tab" aria-controls="chutey-explorer-view" aria-selected="false" tabindex="-1">File Explorer</button>
   </nav>
-  <details class="chutey-presentation-options"><summary>Image and background settings</summary><fieldset data-presentation-settings></fieldset></details>
+  <details class="chutey-presentation-options"><summary>Image and background settings</summary><div class="chutey-shared-options"><fieldset data-presentation-settings></fieldset><fieldset data-file-action-settings></fieldset></div></details>
   <section id="chutey-history-view" role="tabpanel" aria-labelledby="chutey-tab-history">
   <div class="history-nav">
     <button id="history-prev" class="icon-button" type="button" title="Older day">‹</button>
@@ -69,6 +69,7 @@
   <script src="native-wake-page.js"></script>
   <script src="bridge-reconnect.js"></script>
   <script src="default-presentation.js"></script>
+  <script src="file-actions.js"></script>
   <script src="shelf.js"></script>
   <script src="companion-help.js"></script>
   <script src="workflow-fixes.js"></script>

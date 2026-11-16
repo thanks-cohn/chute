@@ -314,6 +314,14 @@ function setDragVisual(active) {
   bin.classList.toggle("dragover", Boolean(active));
 }
 
+// Native context menus can blur the tab and move the pointer out of the frame.
+// Pin only visibility; preserve the existing right-click menu and mascot art.
+bin.addEventListener("pointerdown", () => { window.parent.postMessage({type:"chute-mascot-context",active:false},"*"); });
+bin.addEventListener("contextmenu", () => {
+  cancelSupportClose();
+  window.parent.postMessage({type:"chute-mascot-context",active:true},"*");
+});
+
 bin.addEventListener("pointerenter", () => {
   if (!supportCard) return;
   cancelSupportClose();

@@ -2,7 +2,8 @@
 
 Read-only directory sharing prevents rename/delete/reparse substitution while a
 path is used. Files are opened from guarded parents, with writes/deletes denied.
-UNC, device namespaces, volume roots and Windows system trees are not grants.
+UNC, device namespaces and Windows system trees are not grants. Local drive
+roots require explicit native selection and retain protected descendant checks.
 """
 from __future__ import annotations
 import contextlib
@@ -27,14 +28,16 @@ def validate_root(path):
         raise ctypes.WinError(ctypes.get_last_error())
     # Expand DOS aliases only, never resolve a junction/symlink into an authorized root.
     root = Path(buffer.value)
-    if root == Path(root.anchor):
-        raise ExplorerError('UNSAFE_ROOT', 'Select a folder rather than an entire drive.')
-    protected = [Path(os.environ.get('WINDIR', r'C:\Windows')),
-                 Path(os.environ.get('ProgramFiles', r'C:\Program Files')),
-                 Path(os.environ.get('ProgramData', r'C:\ProgramData'))]
-    if any(root == p or root.is_relative_to(p) for p in protected):
+    if protected_path(root):
         raise ExplorerError('UNSAFE_ROOT', 'System folders are not available to Explorer.')
     return root
+
+
+def protected_path(path):
+    protected = [Path(os.environ.get(name, fallback)) for name,fallback in (
+        ('WINDIR', r'C:\Windows'), ('ProgramFiles', r'C:\Program Files'),
+        ('ProgramFiles(x86)', r'C:\Program Files (x86)'), ('ProgramData', r'C:\ProgramData'))]
+    return any(path == directory or path.is_relative_to(directory) for directory in protected)
 
 
 class WindowsFS:
@@ -45,7 +48,7 @@ class WindowsFS:
             self.identity = info.st_dev, info.st_ino
 
     @contextlib.contextmanager
-    def guard(self, parts, *, directory=False):
+    def guard(self, parts, *, directory=False, attributes_only=False):
         if self.closed:
             raise ExplorerError('EXPIRED', 'Select the folder again.')
         kernel = ctypes.WinDLL('kernel32', use_last_error=True)
@@ -63,11 +66,13 @@ class WindowsFS:
         for part in parts:
             from .security import component
             component(part); path=path / part; paths.append(path)
+        if protected_path(path):
+            raise ExplorerError('UNSAFE_ROOT','Windows system folders remain protected even inside a selected drive root.')
         try:
             for index, candidate in enumerate(paths):
                 last=index == len(paths)-1
                 # OPEN_EXISTING, OPEN_REPARSE_POINT, BACKUP_SEMANTICS. No write/delete sharing.
-                access=0x80000000 if last and not directory else 0x80
+                access=0x80000000 if last and not directory and not attributes_only else 0x80
                 handle=create(str(candidate),access,1,None,3,0x02200000,None)
                 if handle == ctypes.c_void_p(-1).value:
                     raise ctypes.WinError(ctypes.get_last_error())
@@ -131,5 +136,5 @@ class WindowsFS:
         if fd is not None:
             import msvcrt
             return self.handle_identity(msvcrt.get_osfhandle(fd))
-        with self.guard(parts) as (handle,_):
+        with self.guard(parts, attributes_only=True) as (handle,_):
             return self.handle_identity(handle)

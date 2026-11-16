@@ -47,3 +47,8 @@ This archive is read-only historical evidence for future REDOWN / Universal File
 - [Machine-readable HTTP definitions](local-api.openapi.json)
 - [Versioned media adapter design requirement](MEDIA-ADAPTER-CONTRACT.md)
 - [Phase 1 evidence and isolated Windows handoff](PHASE1-WINDOWS-HANDOFF.md)
+
+## Sequential developments — current repair candidate
+
+[Development 1 implementation, validation and Windows gate](../../codex-11.16.2026/DEVELOPMENT1-IMPLEMENTATION-AND-VALIDATION.md).
+Development 2 (including the portable Explorer's yellow legal-pad theme) remains gated on owner validation of Development 1.

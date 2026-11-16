@@ -4,16 +4,16 @@
   const host = document.querySelector("#chutey-explorer-view");
   if (!host) return;
   const api = window.ChuteyExplorerAPI;
-  host.innerHTML = `<div class="ex-native"><button type="button" data-action="select" aria-label="Choose another Windows folder" title="Browse for another folder">▰ Browse</button><details class="ex-more-settings"><summary title="Folder access and transfers" aria-label="More file options">⚙ <span>Folder Access</span></summary><div class="ex-advanced-actions"><button type="button" data-action="resume">Retry connection</button><button type="button" data-action="write">Allow saving here…</button><button type="button" data-action="live">Copy selected to Chutey</button><button type="button" data-action="reconcile">Check transfer</button><button type="button" data-action="revoke">Remove folder access</button></div></details></div><form class="ex-connect" hidden><label>Local read session <input type="password" autocomplete="off" aria-label="Local read session token" required></label><button title="Connect" aria-label="Connect">↗</button></form>
+  host.innerHTML = `<div class="ex-native"><button type="button" data-action="select" aria-label="Choose another Windows folder" title="Browse for another folder">▰ Browse</button><details class="ex-more-settings"><summary title="Folder access and transfers" aria-label="More file options">⚙ <span>Folder Access</span></summary><div class="ex-advanced-actions"><label><input type="checkbox" data-setting="thumbnails" checked> Show image thumbnails</label><button type="button" data-action="resume">Retry connection</button><button type="button" data-action="write">Allow saving here…</button><button type="button" data-action="live">Copy selected to Chutey</button><button type="button" data-action="reconcile">Check transfer</button><button type="button" data-action="revoke">Remove folder access</button></div></details></div><form class="ex-connect" hidden><label>Local read session <input type="password" autocomplete="off" aria-label="Local read session token" required></label><button title="Connect" aria-label="Connect">↗</button></form>
     <div class="ex-toolbar"><button data-action="back" title="Back" aria-label="Back">‹</button><button data-action="forward" title="Forward" aria-label="Forward">›</button><button data-action="parent" title="Parent folder" aria-label="Parent folder">↑</button><button data-action="roots" title="Approved folders" aria-label="Approved folders">⌂</button><button data-action="refresh" title="Refresh" aria-label="Refresh">↻</button><span class="ex-breadcrumb">Local files</span><button data-action="grid" title="Toggle grid" aria-label="Toggle grid">▦</button></div>
     <div class="ex-filter"><input type="search" placeholder="Search this folder" aria-label="Search this folder"><select aria-label="Sort files"><option value="name">Name</option><option value="type">Type</option><option value="date">Date</option><option value="size">Size</option></select></div>
     <div class="ex-workspace"><aside class="ex-tree" aria-label="Folder navigator"></aside><div class="ex-column-resize" role="separator" tabindex="0" aria-label="Resize folders and files columns" aria-orientation="vertical" aria-valuemin="15" aria-valuemax="75" aria-valuenow="36" title="Drag to resize folders"></div><div class="ex-list" role="listbox" aria-label="Local files" aria-multiselectable="true" tabindex="0"></div></div>
     <div class="ex-status" role="status" aria-live="polite">Choose Browse once to access a local folder.</div>
-    <section class="ex-preview" aria-label="File preview" hidden><div class="ex-resize" role="separator" aria-label="Resize preview" aria-orientation="horizontal" tabindex="0"></div><header><strong></strong><button data-action="expand" title="Expand preview" aria-label="Expand preview">Expand</button><button data-action="close" title="Close preview" aria-label="Close preview">×</button></header><div class="ex-preview-body"></div></section><div class="ex-menu" role="menu" hidden></div>`;
+    <section class="ex-preview" aria-label="File preview" hidden><div class="ex-resize" role="separator" aria-label="Resize preview" aria-orientation="horizontal" tabindex="0"></div><header><button data-action="previous" title="Previous file" aria-label="Previous file">‹</button><strong></strong><button data-action="next" title="Next file" aria-label="Next file">›</button><button data-action="expand" title="Expand preview" aria-label="Expand preview">Expand</button><button data-action="close" title="Close preview" aria-label="Close preview">×</button></header><div class="ex-preview-body"></div></section><div class="ex-menu" role="menu" hidden></div>`;
   const $ = selector => host.querySelector(selector);
   const list = $(".ex-list"), tree = $(".ex-tree"), preview = $(".ex-preview"), status = $(".ex-status"), menu = $(".ex-menu");
   let current = null, parent = null, rows = [], roots = [], selected = new Set(), back = [], forward = [];
-  let offset = 0, requestId = 0, previewId = 0, abort = null, urls = [], grid = false, mediaTicket = null;
+  let offset = 0, requestId = 0, previewId = 0, abort = null, urls = [], grid = false, mediaTicket = null, previewRow = null;
   let lastExplorerSignature = null;
   // Folder navigation can be resized by mouse or keyboard. Persist only a
   // non-sensitive ratio; never store a private root path or access token.
@@ -56,11 +56,13 @@
   void chrome.storage.local.get({chuteyFolderPanePercent:36}).then(value => {
     setFolderWidth(value.chuteyFolderPanePercent);
   }).catch(() => {});
-  const thumbnails = new Map();
+  const thumbnails = new Map(), visibleThumbnails = new Set(), activeThumbnails = new Map();
+  let showExplorerThumbnails = true;
   let thumbnailAbort = new AbortController(), thumbnailEpoch = 0;
   const isImage = row => /^image\/(png|jpeg|gif|webp|bmp|avif)$/i.test(row.mime || "") || /\.(png|jpe?g|gif|webp|bmp|avif)$/i.test(row.name || "");
   const liveCopies = new Map();
   let writable = false, anchor = null, clipboardFile = null;
+  const savedLocations = new Set();
   const say = text => { status.textContent = text; };
   const safe = fn => (...args) => { const previousStatus = status.textContent; try { return Promise.resolve(fn(...args)).catch(error => { say(error.code === "CANCELLED" ? previousStatus : error.message); }); } catch (error) { say(error.message); } };
   function button(label, text, fn) {
@@ -68,18 +70,21 @@
   }
   function releaseThumbnails() {
     thumbnailAbort.abort(); thumbnailAbort = new AbortController(); ++thumbnailEpoch;
+    for (const controller of activeThumbnails.values()) controller.abort();
+    visibleThumbnails.clear();
     for (const url of thumbnails.values()) URL.revokeObjectURL(url);
     thumbnails.clear();
   }
   function closePreview() {
-    ++previewId; abort?.abort(); abort = null;
+    ++previewId; abort?.abort(); abort = null; previewRow = null;
     if (mediaTicket) { void api.command("release_media",{ticket:mediaTicket}).catch(() => {}); mediaTicket = null; }
-    $(".ex-preview-body").querySelectorAll("video").forEach(video => { video.pause(); video.removeAttribute("src"); video.load(); });
+    $(".ex-preview-body").querySelectorAll("video,audio").forEach(video => { video.pause(); video.removeAttribute("src"); video.load(); });
     $(".ex-preview-body").replaceChildren();
     for (const url of urls) URL.revokeObjectURL(url); urls = []; preview.hidden = true;
   }
   async function showPreview(row) {
-    closePreview(); const id = previewId; preview.hidden = false;
+    closePreview(); const id = previewId; previewRow = row; preview.hidden = false;
+    if (!selected.has(row.handle)) select(row); updateGalleryButtons();
     resizePreview();
     $(".ex-preview strong").textContent = row.name;
     const body = $(".ex-preview-body"); body.textContent = "Loading preview…";
@@ -90,8 +95,9 @@
         throw new Error("The file changed. Refresh the folder before previewing it.");
       }
       if (id !== previewId) return;
-      if (meta.preview === "video") {
-        const video = document.createElement("video"); video.controls = true; video.preload = "metadata";
+      const audio = meta.preview === "audio" || /^audio\//i.test(meta.mime || '') || /\.(mp3|m4a|wav|flac|oga)$/i.test(row.name);
+      if (meta.preview === "video" || audio) {
+        const video = document.createElement(audio ? 'audio':'video'); video.controls = true; video.preload = "metadata";
         video.autoplay = false; video.crossOrigin = "anonymous"; video.setAttribute("referrerpolicy","no-referrer");
         if (!video.canPlayType(meta.mime)) { body.textContent = "This browser does not support this video container or codec."; return; }
         try {
@@ -102,15 +108,15 @@
           if (id !== previewId) return;
           // The installed worker remains supported for bounded small clips.
           // Never materialize a whole movie as a Blob on an older companion.
-          if (error.code !== "UNSUPPORTED_COMMAND" || meta.size > 32 * 1024 * 1024) {
-            body.textContent = error.code === "UNSUPPORTED_COMMAND" ? "This companion supports only small video previews. Range streaming requires the separate test worker; the installed worker has not been changed." : error.message;
+          if (error.code !== "UNSUPPORTED_COMMAND" || meta.size > 32 * 1024 * 1024 || meta.preview === "unavailable") {
+            body.textContent = error.code === "UNSUPPORTED_COMMAND" ? "This companion supports only small audio/video previews. Range streaming requires the separate test worker; the installed worker has not been changed." : error.message;
             return;
           }
           const blob = await api.content(meta,{signal});
           if (id !== previewId) return;
           const url = URL.createObjectURL(blob); urls.push(url); video.src = url;
         }
-        video.onerror = () => { if (id === previewId) body.textContent = "Video unavailable: unsupported codec, expired media session, or disconnected companion. Select the file again to retry."; };
+        video.onerror = () => { if (id === previewId) body.textContent = "Media unavailable: unsupported codec, expired media session, or disconnected companion. Select the file again to retry."; };
         body.replaceChildren(video); return;
       }
       // Non-video previews retain the existing bounded content API.
@@ -180,6 +186,46 @@
     if (typeof ratio === "number" && Number.isFinite(ratio) && ratio > 0 && ratio <= 1) previewRatio = ratio;
     if (!preview.hidden) resizePreview();
   }).catch(() => {});
+  function updateGalleryButtons() {
+    const files = rows.filter(row => row.kind === "file");
+    const index = files.findIndex(row => row.handle === previewRow?.handle);
+    $("[data-action=previous]").disabled = index <= 0;
+    $("[data-action=next]").disabled = index < 0 || (index === files.length-1 && offset === null);
+  }
+  let galleryLoading = false;
+  async function navigatePreview(delta) {
+    if (!previewRow || galleryLoading) return;
+    let files = rows.filter(row => row.kind === "file");
+    let index = files.findIndex(row => row.handle === previewRow.handle);
+    if (delta > 0 && index === files.length-1 && offset !== null) {
+      galleryLoading = true;
+      try { await load(current,{append:true}); } finally { galleryLoading = false; }
+      files = rows.filter(row => row.kind === "file");
+    }
+    const next = files[index+delta];
+    if (!next) return;
+    select(next); await showPreview(next);
+    const card = [...list.querySelectorAll('.ex-row')].find(node => node.dataset.handle === next.handle);
+    card?.focus({preventScroll:true});
+  }
+  const thumbnailToggle = $('[data-setting=thumbnails]');
+  function applyThumbnails(enabled) {
+    showExplorerThumbnails = enabled !== false; thumbnailToggle.checked = showExplorerThumbnails;
+    observer.disconnect(); queue.length = 0; releaseThumbnails();
+    for (const node of list.querySelectorAll('.ex-row')) {
+      node.querySelector('.ex-icon img')?.remove(); delete node.dataset.thumbnail;
+      const row = rows.find(value => value.handle === node.dataset.handle);
+      if (showExplorerThumbnails && row?.kind === 'file' && isImage(row)) observer.observe(node);
+    }
+  }
+  thumbnailToggle.onchange = safe(async () => {
+    applyThumbnails(thumbnailToggle.checked);
+    await chrome.storage.sync.set({chuteyExplorerThumbnails:showExplorerThumbnails});
+  });
+  void chrome.storage.sync.get({chuteyExplorerThumbnails:true}).then(value => applyThumbnails(value.chuteyExplorerThumbnails)).catch(() => {});
+  chrome.storage.onChanged.addListener((changes, area) => {
+    if (area === 'sync' && changes.chuteyExplorerThumbnails) applyThumbnails(changes.chuteyExplorerThumbnails.newValue);
+  });
   function select(row, event = {}) {
     if (row.kind === "blocked") return;
     const eligible = rows.filter(value => value.kind !== "blocked");
@@ -226,6 +272,7 @@
       throw error;
     }
     if (id !== requestId) return;
+    if (typeof result.writable === "boolean") writable = result.writable;
     // A refresh of an unchanged folder must not destroy rows, previews,
     // selections, thumbnail URLs or scroll position just to repaint the same data.
     const freshSignature = JSON.stringify([handle, $(".ex-filter select").value,
@@ -233,7 +280,7 @@
       result.entries.map(row => [row.handle,row.identity,row.name,row.size,row.mime,row.kind])]);
     if (!append && handle === current && freshSignature === lastExplorerSignature) {
       for (const node of list.querySelectorAll('[data-thumbnail="failed"]')) {
-        delete node.dataset.thumbnail; observer.observe(node);
+        delete node.dataset.thumbnail; observer.unobserve(node); if (showExplorerThumbnails) observer.observe(node);
       }
       say(result.total ? `${rows.length} of ${result.total} items` : "This folder is empty");
       return;
@@ -254,6 +301,7 @@
       const name = document.createElement("span"); name.className = "ex-name"; name.textContent = row.name; name.title = row.name;
       const size = document.createElement("small"); size.textContent = row.kind === "directory" ? "Folder" : `${row.size.toLocaleString()} B`;
       node.append(icon, name, size); list.append(node);
+      if (row.error) { node.title = row.error.message + " (" + row.error.code + ")"; node.setAttribute("aria-disabled","true"); }
       if (row.kind === "file") {
         node.draggable = true;
         node.ondragstart = event => {
@@ -276,16 +324,16 @@
         select(row, event);
         if (!preview.hidden) { if (row.kind === "file") void showPreview(row); else closePreview(); }
       };
-      node.ondblclick = safe(() => row.kind === "directory" ? load(row.handle) : showPreview(row));
+      node.ondblclick = safe(() => row.kind === "directory" ? load(row.handle) : fileAction(row,"open"));
       node.oncontextmenu = event => { event.preventDefault(); if (!selected.has(row.handle)) select(row); showMenu(event.clientX, event.clientY, row); };
       node.onkeydown = safe(async event => {
-        if (event.key === "Enter") { event.preventDefault(); if (row.kind === "directory") await load(row.handle); else await showPreview(row); }
+        if (event.key === "Enter") { event.preventDefault(); if (row.kind === "directory") await load(row.handle); else await fileAction(row,"open"); }
         if (event.key === " " ) { event.preventDefault(); select(row, event); }
         if (event.key === "Home") list.firstElementChild?.focus();
         if (event.key === "End") list.lastElementChild?.focus();
         if (event.key === "ContextMenu" || (event.shiftKey && event.key === "F10")) { event.preventDefault(); const rect = node.getBoundingClientRect(); showMenu(rect.left + 20, rect.top, row); }
       });
-      if (isImage(row)) observer.observe(node);
+      if (showExplorerThumbnails && isImage(row)) observer.observe(node);
     }
     if (offset !== null) { const more = button("Load more files", "···", () => load(current, {append: true})); more.className = "ex-more"; list.append(more); }
     say(result.total ? `${rows.length} of ${result.total} items · ${writable ? "Write approved" : "Read only"}` : "This folder is empty · Read only");
@@ -295,9 +343,11 @@
   async function pump() {
     if (active >= 3 || !queue.length) return;
     const node = queue.shift(); const row = rows.find(row => row.handle === node.dataset.handle);
-    if (!row || !node.isConnected) { void pump(); return; }
+    if (!row || !node.isConnected || !showExplorerThumbnails || !visibleThumbnails.has(node)) { void pump(); return; }
     active++;
-    const epoch = thumbnailEpoch, signal = thumbnailAbort.signal;
+    const epoch = thumbnailEpoch, controller = new AbortController(), folderSignal = thumbnailAbort.signal;
+    const cancel = () => controller.abort(); folderSignal.addEventListener('abort',cancel,{once:true});
+    const signal = controller.signal; activeThumbnails.set(node,controller);
     let url;
     try {
       const blob = await api.content(row, {thumbnail: true, signal});
@@ -307,16 +357,29 @@
       await img.decode();
       if (signal.aborted || epoch !== thumbnailEpoch || !node.isConnected) return;
       thumbnails.set(row.handle, url); url = null;
-      node.querySelector(".ex-icon").replaceChildren(img);
+      node.querySelector(".ex-icon").append(img);
       node.dataset.thumbnail = "ready";
     } catch (error) {
       if (!signal.aborted && epoch === thumbnailEpoch && node.isConnected) {
         node.dataset.thumbnail = "failed";
         node.title = row.name + " — Thumbnail unavailable: " + error.message + ". Refresh to retry.";
       }
-    } finally { if (url) URL.revokeObjectURL(url); active--; void pump(); }
+    } finally {
+      if (url) URL.revokeObjectURL(url); folderSignal.removeEventListener('abort',cancel);
+      activeThumbnails.delete(node); active--;
+      if (signal.aborted && epoch === thumbnailEpoch && visibleThumbnails.has(node)) queue.push(node);
+      void pump();
+    }
   }
-  const observer = new IntersectionObserver(entries => { for (const entry of entries) if (entry.isIntersecting) { observer.unobserve(entry.target); queue.push(entry.target); void pump(); } }, {root: list});
+  const observer = new IntersectionObserver(entries => {
+    for (const entry of entries) {
+      const node = entry.target;
+      if (!entry.isIntersecting) { visibleThumbnails.delete(node); activeThumbnails.get(node)?.abort(); continue; }
+      visibleThumbnails.add(node);
+      if (!node.querySelector('.ex-icon img') && node.dataset.thumbnail !== 'failed' && !activeThumbnails.has(node) && !queue.includes(node)) queue.push(node);
+    }
+    void pump(); void pump(); void pump();
+  }, {root:list});
   async function branch(row, container) {
     const item = document.createElement("div"); item.className = "ex-branch"; item.dataset.destination = row.handle;
     const children = document.createElement("div"); children.className = "ex-children"; children.hidden = true;
@@ -348,9 +411,47 @@
 
     }
   }
+  async function revealHere(row) {
+    const meta = await api.command('stat',{handle:row.handle});
+    if (!meta.parent) throw Error('This item has no containing folder.');
+    $('.ex-filter input').value = '';
+    await load(meta.parent,{remember:false});
+    while (!rows.some(value => value.handle === row.handle) && offset !== null) await load(current,{append:true});
+    const found = rows.find(value => value.handle === row.handle);
+    if (!found) throw Error('The file is no longer in this folder. Refresh to retry.');
+    select(found);
+    const card = [...list.querySelectorAll('.ex-row')].find(node => node.dataset.handle === found.handle);
+    card?.focus({preventScroll:true}); card?.scrollIntoView({block:'nearest'});
+  }
+  async function fileAction(row,action) {
+    await window.ChuteyFileActions.ready;
+    const target = window.ChuteyFileActions.get()[action === 'open' ? 'chuteyOpenTarget':'chuteyRevealTarget'];
+    if (target === 'system') return api.command(action,{handle:row.handle,identity:row.identity});
+    if (action === 'reveal') return revealHere(row);
+    return showPreview(row); // Open inside Chutey, separate from explicit Preview.
+  }
+  async function savedAction(file,action) {
+    const meta = await api.command('locate_saved',{id:file.id});
+    if (meta.parent) savedLocations.add(meta.parent);
+    document.querySelector('#chutey-tab-explorer')?.click();
+    await revealHere(meta);
+    if (action === 'open') await fileAction(meta,'open');
+  }
+  window.ChuteyExplorerNavigation = Object.freeze({saved:savedAction});
+  async function consumeAction(intent) {
+    if (!intent || !/^[a-f0-9]{32}$/.test(intent.id || '') || !['open','reveal'].includes(intent.action) || Math.abs(Date.now()-intent.issuedAt)>60000) return;
+    await chrome.storage.session.remove('chuteyFileActionIntent');
+    document.querySelector('#chutey-tab-explorer')?.click();
+    await api.nativeSession(false); await savedAction({id:intent.id},intent.action);
+  }
+  chrome.storage.onChanged.addListener((changes,area) => {
+    if (area === 'session' && changes.chuteyFileActionIntent?.newValue) void safe(consumeAction)(changes.chuteyFileActionIntent.newValue);
+  });
+  void chrome.storage.session.get({chuteyFileActionIntent:null}).then(value => safe(consumeAction)(value.chuteyFileActionIntent));
   function showMenu(x, y, row) {
     menu.replaceChildren();
     const actions = row ? [[row.kind === "directory" ? "Open folder" : "Preview", () => row.kind === "directory" ? load(row.handle) : showPreview(row)], ["Properties", async () => { const meta = await api.command("stat", {handle: row.handle}); say(`${meta.name} · ${meta.size.toLocaleString()} bytes · ${new Date(meta.modified_ns / 1e6).toLocaleString()}`); }]] : [["Refresh", () => current && load(current, {remember: false})]];
+    if (row?.kind === 'file') actions.push(['Open',() => fileAction(row,'open')],['Reveal / GO TO',() => fileAction(row,'reveal')]);
     for (const [name, fn] of actions) { const node = button(name, name, async () => { menu.hidden = true; await fn(); }); node.role = "menuitem"; menu.append(node); }
     for (const [label, fn] of [["Copy",copySelection],["Paste",() => pasteSelection(row?.kind === "directory" ? row.handle : current)]]) {
       const node = button(label,label,async () => { menu.hidden=true; await fn(); }); node.role="menuitem";
@@ -372,6 +473,12 @@
   list.addEventListener("click",event => { if (event.target === list) { selected.clear(); anchor=null; paintSelection(); } });
   host.addEventListener("keydown", safe(async event => {
     if (event.target.closest("input,textarea,select,video,audio,[role=separator],[role=menu],[contenteditable=true]")) return;
+    if (!preview.hidden && ["ArrowLeft","ArrowRight","ArrowUp","ArrowDown"].includes(event.key)) {
+      event.preventDefault();
+      if (event.key === "ArrowLeft" || event.key === "ArrowRight") await navigatePreview(event.key === "ArrowLeft" ? -1 : 1);
+      else $(".ex-preview-body").scrollBy({top:event.key === "ArrowDown" ? 48 : -48,behavior:"instant"});
+      return;
+    }
     if (["ArrowDown","ArrowUp"].includes(event.key)) {
       const cards = [...list.querySelectorAll(".ex-row")].filter(card => rows.find(row => row.handle === card.dataset.handle)?.kind !== "blocked");
       if (!cards.length) return;
@@ -459,7 +566,7 @@
   }
   $(".ex-connect").onsubmit = safe(async event => { event.preventDefault(); api.connect($(".ex-connect input").value); $(".ex-connect input").value = ""; await connect(); });
   async function rememberView() {
-    if (!current) return;
+    if (!current || savedLocations.has(current)) return;
     try { await api.command("remember_location", {handle:current, view:{sort:$(".ex-filter select").value,
       query:$(".ex-filter input").value, grid, scroll:Math.round(list.scrollTop)}}); }
     catch { /* Older paired companions remain browse-compatible. */ }
@@ -491,6 +598,7 @@
     select: async () => { say("Opening Windows folder picker…"); const session = await api.nativeSession(true); writable = !session.read_only; liveCopies.clear(); await chrome.storage.local.remove("chuteyExplorerLastHandle"); await connect(); },
     resume: async () => { const session = await api.nativeSession(false); writable = !session.read_only; await connect(); },
     refresh: () => current && load(current, {remember: false}), parent: () => parent && load(parent), roots: () => roots[0] && load(roots[0].handle), close: closePreview,
+    previous: () => navigatePreview(-1), next: () => navigatePreview(1),
     expand: () => { expanded = !expanded; resizePreview(); },
     back: async () => { if (back.length) { const target = back.pop(); forward.push(current); await load(target, {remember: false}); } },
     forward: async () => { if (forward.length) { const target = forward.pop(); back.push(current); await load(target, {remember: false}); } },

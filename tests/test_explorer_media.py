@@ -128,6 +128,38 @@ class MediaAPITests(unittest.TestCase):
         self.assertTrue(handler.close_connection)
         if before is not None:self.assertEqual(len(os.listdir('/proc/self/fd')),before)
 
+    def test_large_audio_uses_same_bounded_stream_api(self):
+        path=self.root/'large.mp3'
+        with path.open('wb') as stream:stream.write(b'audio');stream.truncate(96*1024**2)
+        grant=self.engine.grant_for(self.row['handle'])
+        row=self.engine.execute('preview',handle=grant.handle(('large.mp3',)))['result']
+        self.assertEqual(row['preview'],'audio')
+        source=self.command('media_source',{key:row[key] for key in ('handle','identity')})
+        with self.request(source['url'],headers={'Range':'bytes=0-4'}) as response:
+            self.assertEqual(response.status,206);self.assertEqual(response.read(),b'audio')
+        self.command('release_media',{'ticket':source['ticket']})
+
+    def test_saved_location_is_scoped_to_store_not_client_path(self):
+        item=self.server.store.add_stream('saved.txt',io.BytesIO(b'saved proof'),11,mime='text/plain')
+        row=self.command('locate_saved',{'id':item.id})
+        self.assertEqual(row['kind'],'file');self.assertNotIn(str(self.root),json.dumps(row))
+        parent=self.command('list',{'handle':row['parent']})
+        self.assertIn(row['handle'],[file['handle'] for file in parent['entries']])
+        with self.request('/api/explorer/v1/content',{key:row[key] for key in ('handle','identity')}) as response:
+            self.assertEqual(response.read(),b'saved proof')
+        with self.assertRaises(HTTPError):self.command('locate_saved',{'id':item.id,'path':str(self.root)})
+        with self.assertRaises(HTTPError):self.command('locate_saved',{'id':'0'*32})
+
+    def test_external_actions_require_session_and_origin_before_dispatch(self):
+        from unittest.mock import patch
+        with patch('chute.explorer.file_actions.external_action') as dispatch:
+            for action in ('open','reveal'):
+                for headers in ({'Authorization':'Bearer wrong'},{'Origin':'https://evil.test'}):
+                    with self.assertRaises(HTTPError) as error:
+                        self.request('/api/explorer/v1/command',{'command':action,'args':{key:self.row[key] for key in ('handle','identity')}},headers=headers)
+                    self.assertEqual(error.exception.code,403)
+            dispatch.assert_not_called()
+
     def test_ticket_cap_and_idempotent_release(self):
         sources=[self.source() for _ in range(32)]
         with self.assertRaises(HTTPError) as raised: self.source()

@@ -153,7 +153,7 @@ def main():
                     # Open preview follows arrows; closed preview remains closed.
                     if width == 390:
                         picture.focus()
-                        page.keyboard.press("ArrowDown")
+                        page.keyboard.press("ArrowRight")
                         expect(page.locator(".ex-preview-body pre")).to_be_visible()
                         picture.dblclick()
                         expect(page.locator(".ex-preview-body img")).to_be_visible()

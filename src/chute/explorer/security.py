@@ -39,7 +39,7 @@ class RootGrant:
                 raise ExplorerError("UNSAFE_ROOT", "Select a real directory without symbolic links.")
             self.fd = os.open(raw, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
         self.id = secrets.token_urlsafe(24)
-        self.label = label or raw.name or "Local files"
+        self.label = label or raw.name or raw.anchor or "Local files"
         self.handles = {self.id: ()}
         self._reverse = {(): self.id}
 
@@ -98,7 +98,7 @@ class RootGrant:
 
     def stat(self, handle):
         if self.windows:
-            with self.windows.guard(self.parts(handle), directory=False) as (_, info):
+            with self.windows.guard(self.parts(handle), attributes_only=True) as (_, info):
                 return info
         with self.open(handle) as fd:
             return os.fstat(fd)

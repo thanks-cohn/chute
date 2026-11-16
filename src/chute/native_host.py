@@ -8,6 +8,7 @@ import struct
 import subprocess
 import sys
 import time
+import tempfile
 import urllib.error
 import urllib.request
 from pathlib import Path
@@ -178,7 +179,7 @@ def _discover_chute_extension_ids() -> list[str]:
     for root in _chrome_user_data_roots():
         if not root.is_dir():
             continue
-        candidates = list(root.glob("*/Preferences"))
+        candidates = list(root.glob("*/Preferences")) + list(root.glob("*/Secure Preferences"))
         root_preferences = root / "Preferences"
         if root_preferences.is_file():
             candidates.append(root_preferences)
@@ -220,6 +221,17 @@ def _allowed_extension_ids() -> list[str]:
         if candidate not in ids:
             ids.append(candidate)
 
+    # The manifest is also an explicit local enrollment record. Regeneration
+    # must not drop IDs merely because a test profile is temporarily unavailable.
+    try:
+        existing = json.loads(native_manifest_path().read_text(encoding="utf-8"))
+        if existing.get("name") == HOST_NAME and existing.get("type") == "stdio":
+            for origin in existing.get("allowed_origins", []):
+                if not isinstance(origin, str): continue
+                match = re.fullmatch(r"chrome-extension://([a-p]{32})/", origin)
+                if match and match[1] not in ids: ids.append(match[1])
+    except (OSError, ValueError, TypeError, AttributeError):
+        pass
     path = extra_origins_path()
     if path.is_file():
         try:
@@ -249,7 +261,13 @@ def register_native_host(target: Path | None = None) -> Path:
             f"chrome-extension://{extension_id}/" for extension_id in _allowed_extension_ids()
         ],
     }
-    manifest.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+    descriptor, pending = tempfile.mkstemp(prefix='.chute-manifest-',suffix='.json',dir=manifest.parent)
+    try:
+        with os.fdopen(descriptor,'w',encoding='utf-8') as stream:
+            stream.write(json.dumps(payload,indent=2)+'\n'); stream.flush(); os.fsync(stream.fileno())
+        os.replace(pending,manifest)
+    finally:
+        Path(pending).unlink(missing_ok=True)
     with winreg.CreateKey(winreg.HKEY_CURRENT_USER, _NATIVE_KEY) as key:
         winreg.SetValueEx(key, "", 0, winreg.REG_SZ, str(manifest.resolve()))
     return manifest

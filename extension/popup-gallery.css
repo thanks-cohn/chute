@@ -269,7 +269,10 @@ body.chutey-gallery-popup { width:390px; min-width:390px; max-width:390px; heigh
   background:#bada9c0c;
 }
 
-/* Width and scrollbar are fixed before scripts or bridge responses run. */
-.chutey-gallery-popup #files { --chutey-gallery-cell:calc((100% - 21px) / 4); grid-auto-rows:auto; }
-.chutey-gallery-popup #files .chutey-popup-placeholder, .chutey-gallery-popup #files .chutey-gallery-tile { aspect-ratio:1 / 1!important; height:auto; }
-.chutey-gallery-popup #files { grid-template-rows:repeat(var(--chutey-gallery-rows,4),min-content); }
+/* Every row, including offscreen implicit rows, uses the same square track.
+   cqw measures the gallery wrapper; scrollbar width is reserved from first paint. */
+.chutey-gallery-popup #chutey-popup-gallery { container-type:inline-size; }
+.chutey-gallery-popup #files { --chutey-gallery-cell:calc((100cqw - 32px - (var(--chutey-gallery-columns,4) - 1)*7px)/var(--chutey-gallery-columns,4)); grid-template-rows:none; grid-auto-rows:var(--chutey-gallery-cell); }
+.chutey-gallery-popup #files::-webkit-scrollbar { width:12px; }
+.chutey-gallery-popup #files .chutey-popup-placeholder,
+.chutey-gallery-popup #files .chutey-gallery-tile { aspect-ratio:auto!important; height:100%; }

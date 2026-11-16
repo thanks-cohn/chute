@@ -8,6 +8,7 @@ import re
 from .protocol import ExplorerError
 
 SAFE_IMAGES = {"image/png", "image/jpeg", "image/gif", "image/webp", "image/bmp"}
+SAFE_AUDIO = {"audio/mpeg", "audio/mp3", "audio/mp4", "audio/ogg", "audio/wav", "audio/x-wav", "audio/webm", "audio/flac", "audio/x-flac"}
 SAFE_VIDEO = {"video/mp4", "video/webm", "video/ogg"}
 
 
@@ -20,7 +21,7 @@ def media_mime(row):
     suffix = str(row.get("name", "")).rsplit(".", 1)[-1].lower()
     return {"png":"image/png", "jpg":"image/jpeg", "jpeg":"image/jpeg", "gif":"image/gif",
             "webp":"image/webp", "bmp":"image/bmp", "mp4":"video/mp4", "webm":"video/webm",
-            "ogv":"video/ogg"}.get(suffix, mime or "application/octet-stream")
+            "mp3":"audio/mpeg", "m4a":"audio/mp4", "wav":"audio/wav", "flac":"audio/flac", "oga":"audio/ogg", "ogv":"video/ogg"}.get(suffix, mime or "application/octet-stream")
 
 
 def preview_kind(row):
@@ -29,6 +30,8 @@ def preview_kind(row):
         return "unavailable"
     if mime in SAFE_IMAGES:
         return "image"
+    if mime in SAFE_AUDIO:
+        return "audio"
     if mime in SAFE_VIDEO:
         return "video"
     if mime == "application/pdf":

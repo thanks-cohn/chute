@@ -2,8 +2,8 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Chutey scoped local Explorer API",
-    "version": "1.0-phase1",
-    "description": "Implemented contracts only; optional Phase 1 media commands marked. Independent automation enrollment, batch jobs and adapter registry are not implemented. See LOCAL-API.md."
+    "version": "1.0-development1",
+    "description": "Implemented contracts only; optional Phase 1 media commands marked. Independent automation enrollment, batch jobs and adapter registry are not implemented. See LOCAL-API.md. Development 1 adds authenticated locate_saved and distinct scoped Windows open/reveal actions, and audio sources. See LOCAL-API.md."
   },
   "servers": [
     {
@@ -53,7 +53,10 @@
                       "recent_transfers",
                       "reconcile_transfer",
                       "media_source",
-                      "release_media"
+                      "release_media",
+                      "locate_saved",
+                      "open",
+                      "reveal"
                     ]
                   },
                   "args": {

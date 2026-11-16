@@ -21,4 +21,4 @@ html[data-chutey-background-animation=false] .file-icon::after { animation:none!
 
 .file-icon.chutey-mascot-fallback::before,.file-icon.chutey-mascot-fallback::after { animation-duration:var(--chutey-background-period)!important; }
 .chutey-presentation-options { position:relative; padding:4px 12px; font-size:12px; }
-.chutey-presentation-options[open] > fieldset { position:absolute; z-index:40; left:0; right:0; top:100%; max-height:300px; overflow:auto; background:#151a13; }
+.chutey-presentation-options[open] > .chutey-shared-options { position:absolute; z-index:40; left:0; right:0; top:100%; max-height:300px; overflow:auto; background:#151a13; }

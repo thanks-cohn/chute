@@ -35,6 +35,31 @@ class WindowsBrowseTests(unittest.TestCase):
         self.assertEqual(self.command('stat',handle=folder['handle'])['kind'],'directory')
         with self.grant.open(file['handle']) as fd:
             self.assertEqual(os.read(fd,100),b'exact fixture bytes')
+    def test_explicit_local_drive_root_validates_but_system_descendants_do_not(self):
+        from chute.explorer.windows_fs import validate_root, protected_path
+        drive=Path(self.root.anchor)
+        self.assertEqual(validate_root(drive),drive)
+        with self.assertRaises(ExplorerError): validate_root(Path(os.environ.get('WINDIR',r'C:\Windows')))
+        self.assertTrue(protected_path(Path(os.environ.get('WINDIR',r'C:\Windows'))/'System32'))
+
+    def test_locked_profile_style_file_does_not_block_ordinary_siblings(self):
+        import ctypes
+        from ctypes import wintypes
+        path=self.root/'NTUSER.DAT';path.write_bytes(b'locked fixture')
+        (self.root/'visible.txt').write_bytes(b'visible')
+        kernel=ctypes.WinDLL('kernel32',use_last_error=True)
+        create=kernel.CreateFileW;create.argtypes=[wintypes.LPCWSTR,wintypes.DWORD,wintypes.DWORD,ctypes.c_void_p,wintypes.DWORD,wintypes.DWORD,wintypes.HANDLE];create.restype=wintypes.HANDLE
+        close=kernel.CloseHandle;close.argtypes=[wintypes.HANDLE]
+        handle=create(str(path),0x80000000,0,None,3,0,None)
+        self.assertNotEqual(handle,ctypes.c_void_p(-1).value)
+        try:
+            listing=self.command('list',handle=self.grant.id)
+            rows={row['name']:row for row in listing['entries']}
+            self.assertEqual(rows['visible.txt']['kind'],'file')
+            self.assertEqual(rows['NTUSER.DAT']['kind'],'blocked')
+            self.assertEqual(rows['NTUSER.DAT']['error']['code'],'FILE_IN_USE')
+        finally:close(handle)
+
     def test_reparse_junction_blocked(self):
         outside=self.root/'outside'; outside.mkdir()
         link=self.root/'link'

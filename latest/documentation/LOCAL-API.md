@@ -63,12 +63,35 @@ identity. Page entries must be followed using `next_offset`; an empty page is
 not permission to scan another root. File/folder replacement and links are
 checked by RootGrant. No client-side path resolution.
 
-`mkdir`, `rename`, `copy`, `move`, `trash`, `receive`, `open`, `reveal` in the
-existing command dispatcher are deliberately rejected pending verified native
-consent/safety. Actual upload uses the separate `receive` HTTP endpoint below.
-There is no implemented batch job creation/progress/pause/resume API. Do not
-advertise these names as supported merely because they appear in the blocked
-catalog. Preview does not open the default application or reveal in Explorer.
+`mkdir`, `rename`, `copy`, `move`, `trash`, and `receive` in the core command
+dispatcher remain gated; HTTP uploads use the separate receive endpoint.
+There is no batch job creation/progress/pause/resume API.
+
+Development 1 candidate additions (separate worker; not the installed baseline):
+
+| Command | Parameters | Result / scope |
+| --- | --- | --- |
+| locate_saved | id (32 hex characters, no path) | Store-resolved file metadata, parent and scoped read handles for existing saved-file/custom-derivative storage only |
+| open | handle, identity | Windows only; dispatch to associated application, result action=open/status=accepted; this does not claim the application displayed the file |
+| reveal | handle, identity | Windows only; preserve the existing Shell selection/reveal helper; result action=reveal/status=selected or folder |
+
+Open/Reveal require the exact enrolled session/origin and current identity.
+They resolve the path only inside the guarded grant, never from an HTTP path.
+System Open is restricted to known passive image/audio/video/text/PDF suffixes
+and previewable types; executables, scripts and shortcuts are rejected even
+if their MIME registration says text/plain. The core engine's generic open/
+reveal commands remain gated; the authenticated HTTP adapter explicitly owns
+these checked actions. Capabilities advertises them separately. Older workers
+return UNSUPPORTED_COMMAND or NATIVE_CONSENT_REQUIRED truthfully.
+
+The GUI defaults to Chutey for Reveal (containing folder + exact file selected)
+and Open (inside Chutey). Explicit Preview always stays inside Chutey regardless
+of the Open preference. Preferences `chuteyRevealTarget` and `chuteyOpenTarget`
+accept `chutey`/`system` in extension sync storage. Saved-file Windows Reveal
+continues to use the unchanged `/api/reveal/{id}` endpoint, including on the
+old worker. New saved-file Chutey navigation uses locate_saved in the candidate;
+it does not fabricate a native handle from a saved item ID. These source/API
+changes require Windows validation before promotion.
 
 ## Content, thumbnails and compatibility
 
@@ -81,7 +104,7 @@ POST `/api/explorer/v1/content` with authenticated JSON:
 Returns actual JPEG thumbnail bytes (up to 256×256), or guarded preview bytes.
 Thumbnail input is bounded to 16 MiB / 24 million pixels; decoder failures and
 unsupported formats are explicit. PNG/JPEG/GIF/WebP/BMP are current image
-formats; SVG/AVIF/HEIC are not promised. Video containers MP4/WebM/Ogg depend on
+formats; SVG/AVIF/HEIC are not promised. Audio previews include MP3/M4A/WAV/FLAC/Ogg/WebM where the browser supports their codecs. Video containers MP4/WebM/Ogg depend on
 browser codecs, not universal decoding. Images cap at 32 MiB; text at 256 KiB;
 HTML/JavaScript previews are not executable. Content supports single byte ranges.
 Cancel the request to stop unnecessary work; browser workers cap thumbnail
@@ -97,7 +120,7 @@ worker for image previews or thumbnails.
 
 ## Optional Phase 1 video source (separate candidate worker)
 
-`media_source` validates the current authorized video identity and issues one
+`media_source` validates the current authorized audio/video identity and issues one
 origin-bound random read ticket for a single file; no general session token or
 filesystem path is placed in its URL. At most 32 tickets per adapter; lifetime
 is min(600 seconds, session lifetime). GET and HEAD the returned URL using the
@@ -118,7 +141,7 @@ This is an Explorer preview interface, with the existing four-request adapter
 limit. It is not yet the format-independent Phase 2 media engine, has no codec
 probe/adapter registry, and cannot claim fair sustained movie workloads. A
 future Phase 2 registry will use shared scoped source/output abstractions.
-The old worker returns UNSUPPORTED_COMMAND for media_source: small clips use a
+The old worker returns UNSUPPORTED_COMMAND for media_source: previously supported small video clips use a
 bounded 32 MiB fallback; large files report the required separate test worker.
 No installed executable is replaced automatically.
 
@@ -177,3 +200,7 @@ $listing = Invoke-RestMethod "$base/command" -Method Post -Headers $headers -Con
 Native Windows authorization, installed-extension parity, default application
 opening and Explorer revealing still require real Windows integration tests.
 Linux fixture success is not that evidence.
+
+## Development 1 repair acceptance
+
+See [Development 1 results and Windows gate](../../codex-11.16.2026/DEVELOPMENT1-IMPLEMENTATION-AND-VALIDATION.md). The new Windows-specific tests are unrun on Linux. Do not treat mock Shell calls as real Windows application/reveal evidence.

@@ -113,3 +113,8 @@
 body:has(#chutey-explorer-view:not([hidden])) { height:100vh; display:flex; flex-direction:column; overflow:hidden; }
 body:has(#chutey-explorer-view:not([hidden])) > :is(.topbar,.chutey-workspace-tabs,.chutey-presentation-options) { flex-shrink:0; }
 body:has(#chutey-explorer-view:not([hidden])) #chutey-explorer-view { flex:1; height:auto; min-height:0; }
+
+#chutey-explorer-view .ex-icon { position:relative; }
+#chutey-explorer-view .ex-icon img { position:absolute; inset:0; background:var(--chutey-explorer-panel); }
+#chutey-explorer-view .ex-preview-body audio { display:block; width:100%; margin:12px auto; }
+#chutey-explorer-view .ex-advanced-actions label { display:flex; gap:8px; align-items:center; padding:6px; }

@@ -382,6 +382,10 @@
 
   window.addEventListener("message", (event) => {
     if (event.source !== frame.contentWindow) return;
+    if (event.data?.type === "chute-mascot-context") {
+      // Only messages from this mascot frame reach this boundary.
+      host.dispatchEvent(new CustomEvent("chute-context-active",{detail:{active:event.data.active !== false}}));
+    }
     if (event.data?.type === "chute-open-side-panel") {
       chrome.runtime.sendMessage({ type: "open-side-panel" });
     }

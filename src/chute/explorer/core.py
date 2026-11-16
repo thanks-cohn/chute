@@ -51,7 +51,11 @@ class Explorer:
             code = {errno.ENOENT: "NOT_FOUND", errno.EACCES: "PERMISSION_DENIED",
                     errno.EPERM: "PERMISSION_DENIED", errno.ELOOP: "UNSAFE_LINK",
                     errno.ENOTDIR: "NOT_DIRECTORY"}.get(exc.errno, "UNAVAILABLE")
-            message = "The item is unavailable or cannot be accessed safely."
+            if getattr(exc, 'winerror', None) in {32, 33}:
+                code = "FILE_IN_USE"
+            message = {"FILE_IN_USE":"This item is locked by another application. Close it and retry.",
+                       "PERMISSION_DENIED":"Windows denied access to this item. Choose an authorized folder or check its permissions.",
+                       "NOT_FOUND":"This item no longer exists. Refresh the folder."}.get(code, "The item is unavailable or cannot be accessed safely.")
         except (TypeError, ValueError, KeyError):
             code, message = "INVALID_ARGUMENT", "Check the command arguments."
         return {"version": VERSION, "operation_id": operation_id, "state": "failed",
@@ -104,6 +108,11 @@ class Explorer:
                     continue
                 except FileNotFoundError:
                     raise ExplorerError("DIRECTORY_CHANGED", "Folder changed; refresh before continuing.")
+                except OSError as error:
+                    code = 'FILE_IN_USE' if getattr(error,'winerror',None) in {32,33} else 'PERMISSION_DENIED' if isinstance(error,PermissionError) else 'UNAVAILABLE'
+                    rows.append({"handle":grant.handle(parts+(entry.name,)), "name":entry.name,
+                        "kind":"blocked", "identity":None,"size":0,"modified_ns":0,"mime":None,
+                        "error":{"code":code,"message":"Metadata for this entry is unavailable. Check device access, permissions or application locks."}})
         key = {"name": lambda r: (r["name"].casefold(), r["name"]),
                "size": lambda r: (r["size"], r["name"]),
                "date": lambda r: (r["modified_ns"], r["name"]),
@@ -115,8 +124,15 @@ class Explorer:
             # No recursive scan and no handle-open for every unreturned entry.
             for row in page:
                 if row['kind'] != 'blocked':
-                    row['identity']=grant.windows.file_identity(grant.parts(row['handle']))
-        return {"entries": page, "total": len(rows),
+                    try:
+                        row['identity']=grant.windows.file_identity(grant.parts(row['handle']))
+                    except (OSError, ExplorerError) as error:
+                        # NTUSER.DAT and other individually locked/inaccessible
+                        # entries must not make the whole selected profile fail.
+                        row['kind'] = 'blocked'; row['identity'] = None
+                        code = error.code if isinstance(error, ExplorerError) else ('FILE_IN_USE' if getattr(error,'winerror',None) in {32,33} else 'PERMISSION_DENIED' if isinstance(error,PermissionError) else 'UNAVAILABLE')
+                        row['error'] = {'code':code,'message':'This entry cannot be read safely. Check its permissions or close the application using it.'}
+        return {"entries": page, "total": len(rows), "writable":grant.writable,
                 "next_offset": offset + limit if offset + limit < len(rows) else None,
                 "parent": grant.handle(parts[:-1]) if parts else None,
                 "name": parts[-1] if parts else grant.label,

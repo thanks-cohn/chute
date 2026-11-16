@@ -340,14 +340,21 @@ function createRow(file, index) {
 
     const open = document.createElement("button");
     open.className = "secondary-button open";
-    open.title = "Show this saved file in your computer's file manager";
+    open.title = "Reveal / GO TO — use the location preference in Settings";
     open.textContent = "Reveal";
 
     const remove = document.createElement("button");
     remove.className = "icon-button remove";
     remove.title = "Remove from the live chute";
     remove.textContent = "×";
-    tools.append(open, remove);
+    const openFile = document.createElement('button'); openFile.className = 'secondary-button open-file'; openFile.textContent = 'Open';
+    openFile.title = 'Open using the Chutey or system preference in Settings';
+    openFile.onclick = async () => {
+      openFile.disabled = true;
+      try { await window.ChuteyFileActions.saved(file,'open'); } catch(error) { setStatus(error.message,true); }
+      finally { openFile.disabled = false; }
+    };
+    tools.append(openFile, open, remove);
 
     row.addEventListener("dragstart", (event) => {
       const transfer = event.dataTransfer;
@@ -379,7 +386,7 @@ function createRow(file, index) {
       try {
         // Successful Open is self-evident in the OS file manager.
         // Preserve the current Shelf status instead of printing internal feedback.
-        await api(`/api/reveal/${encodeURIComponent(file.id)}`, { method: "POST" });
+        await window.ChuteyFileActions.saved(file,"reveal");
       } catch (error) {
         setStatus(error.message || "Could not open the file location.", true);
       } finally {

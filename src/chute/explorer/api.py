@@ -129,12 +129,47 @@ class ExplorerAPI:
                     raise ExplorerError("INVALID_ARGUMENT", "Invalid command envelope.")
                 if body["command"] == "capabilities":
                     from .protocol import catalog
-                    result={"state":"completed","result":{**catalog(),"transfer":{
+                    capabilities = catalog()
+                    capabilities['commands'] += ['locate_saved','open','reveal','media_source','release_media']
+                    capabilities['blocked'] = {key:value for key,value in capabilities['blocked'].items() if key not in {'open','reveal'}}
+                    result={"state":"completed","result":{**capabilities,"transfer":{
                         "source_kind":"local_explorer","maximum_chunk_bytes":262144,
                         "original_bytes":True,"one_use_export":True,
                         "write_consent_required":True,"conflicts":["keep_both","skip"],
                         "commands":["prepare_export","export_to_live","receive_from_live","reconcile_transfer"],
-                        "interop_enabled":False},"media":{"commands":["media_source","release_media"],"methods":["GET","HEAD"],"ranges":True,"ticket_limit":32,"ticket_seconds":600}}}
+                        "interop_enabled":False},"media":{"commands":["media_source","release_media"],"methods":["GET","HEAD"],"ranges":True,"ticket_limit":32,"ticket_seconds":600},"file_actions":{"commands":["locate_saved","open","reveal"],"system_platform":"windows","system_open":"previewable files only"}}}
+                elif body["command"] == "locate_saved":
+                    from .security import RootGrant
+                    import re
+                    args = body.get("args", {})
+                    if set(args) != {"id"} or not isinstance(args['id'],str) or re.fullmatch(r'[a-f0-9]{32}',args['id']) is None:
+                        raise ExplorerError('INVALID_ARGUMENT','A saved Chutey item ID is required.')
+                    found = handler.server.store.get(args['id'])
+                    if not found: raise ExplorerError('NOT_FOUND','The saved item no longer exists.')
+                    _, path = found
+                    # Store, never client input, supplies this directory. It is
+                    # already readable through the existing saved-file interface.
+                    directory = path.parent
+                    if directory not in {handler.server.store.files_dir, handler.server.store.custom_thumbs_dir}:
+                        raise ExplorerError('UNSAFE_ROOT','Saved file is outside its permitted storage.')
+                    with self.engine.lock:
+                        grants = getattr(self, 'saved_grants', {})
+                        grant = grants.get(directory)
+                        if grant is None:
+                            grant = RootGrant(directory, label='Saved Chutey files')
+                            self.engine.grants[grant.id] = grant; grants[directory] = grant; self.saved_grants = grants
+                        parts = path.relative_to(directory).parts
+                        handle = grant.handle(parts)
+                        receipt = self.engine.execute('stat',handle=handle)
+                    result = receipt
+                elif body["command"] in {"open", "reveal"}:
+                    from .file_actions import external_action
+                    args = body.get('args',{})
+                    if set(args) != {'handle','identity'} or not all(isinstance(value,str) for value in args.values()):
+                        raise ExplorerError('INVALID_ARGUMENT','A file handle and canonical identity are required.')
+                    with self.engine.lock:
+                        value = external_action(self.engine,body['command'],**args)
+                    result = {'state':'completed','result':value}
                 elif body["command"] == "media_source":
                     args = body.get("args", {})
                     if set(args) != {"handle", "identity"} or not all(isinstance(value,str) for value in args.values()):
@@ -145,8 +180,8 @@ class ExplorerAPI:
                             row = self.engine._record(grant, grant.parts(args["handle"]), os.fstat(fd), fd=fd)
                         if row["identity"] != args["identity"]:
                             raise ExplorerError("FILE_CHANGED", "The file changed. Refresh the folder.")
-                        if preview_kind(row) != "video":
-                            raise ExplorerError("PREVIEW_UNAVAILABLE", "Streaming is available for MP4, WebM and Ogg video containers; browser codec support varies.")
+                        if preview_kind(row) not in {"video", "audio"}:
+                            raise ExplorerError("PREVIEW_UNAVAILABLE", "This file has no supported audio/video preview. Browser codec support varies.")
                     ticket = secrets.token_urlsafe(32)
                     # A short-lived, read-only, origin-bound authority for one file.
                     # Never put the general session token or a filesystem path in a URL.

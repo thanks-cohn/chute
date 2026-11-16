@@ -1,5 +1,7 @@
 # Phase 1 candidate: isolated Windows validation handoff
 
+> Development 1 update: this document records the earlier candidate. For current repairs, scoped Open/Reveal support and the outstanding Windows acceptance gate, see [Development 1 results](../../codex-11.16.2026/DEVELOPMENT1-IMPLEMENTATION-AND-VALIDATION.md).
+
 Status: **Phase 1 partially implemented; Windows acceptance pending.**
 Do not proceed to worker performance optimization or Movie Mode until the
 Phase 1 gates below pass. The owner elected to run these Windows checks.

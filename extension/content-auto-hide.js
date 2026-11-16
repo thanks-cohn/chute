@@ -18,6 +18,7 @@
   let pointerNearZone = false;
   let supportActive = false;
   let dragActive = false;
+  let contextActive = false;
   let hideTimer = null;
   let initialTimer = null;
   let edgeHoldTimer = null;
@@ -64,7 +65,8 @@
       !hostHovered &&
       !pointerNearZone &&
       !supportActive &&
-      !dragActive
+      !dragActive &&
+      !contextActive
     );
   }
 
@@ -176,6 +178,10 @@
   function attachHost(nextHost) {
     if (!nextHost || host === nextHost) return;
     host = nextHost;
+    host.addEventListener("chute-context-active", event => {
+      if (event.detail?.active === false) { releaseContext(); return; }
+      contextActive = true; clearInitialTimer(); clearHideTimer(); reveal();
+    });
     host.style.transition = "transform 180ms cubic-bezier(.2,.8,.2,1)";
     host.style.willChange = "transform";
 
@@ -200,6 +206,7 @@
   }
 
   document.addEventListener("mousemove", (event) => {
+    if (contextActive && document.hasFocus?.()) releaseContext();
     if (!host || !autoHide || !floatingEnabled(accessMode)) return;
     const wasNear = pointerNearZone;
     rememberPointer(event.clientX, event.clientY);
@@ -261,6 +268,15 @@
     requestAnimationFrame(resyncPointerAfterViewportChange);
   });
 
+  function releaseContext() {
+    if (!contextActive) return;
+    contextActive = false;
+    // A dismissed menu starts a new visible interaction window.
+    beginInitialWindow();
+  }
+  document.addEventListener("pointerdown", releaseContext, true);
+  document.addEventListener("keydown", event => { if (event.key === "Escape") releaseContext(); }, true);
+  window.addEventListener("focus", releaseContext);
   window.addEventListener("blur", () => {
     clearTransientInteraction({ clearDrag: true });
     scheduleHide(0);
