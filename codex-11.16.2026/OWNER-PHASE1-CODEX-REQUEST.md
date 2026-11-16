@@ -23,7 +23,8 @@ Large MP3 reports "Preview unavailable. Large media requires native streaming in
 Right-clicking existing mascot currently makes it hide. Fix handler/auto-hide interaction so right-click and any open menu leave the original mascot visible. Don't remake its appearance or break established click and drop actions.
 
 ## Owner-requested settings and navigation direction
-**Reveal/GO TO preference:** Existing Windows-location Reveal behavior is liked and should remain default. Settings should offer alternative: Reveal/GO TO inside Chutey File Explorer, opening containing directory and selecting target file. Don't conflate this with a NEW "Open in default app" action (assistant suggestion only).
+**Reveal / GO TO (owner's revised preference):** Default should navigate inside **Chutey File Explorer** to the containing directory and select the target file. **Keep the CURRENT working Windows Reveal/GO TO functionality** as an explicit, persistent Settings alternative; verify it end-to-end and repair anything incomplete rather than deleting or replacing it. Do not regress existing Windows-location behavior.
+**Open (owner's revised preference):** Default opens supported files **inside Chutey**. Settings can switch Open to the system's default associated application. **Preview is already covered** as a separate action: preserve its agreed gallery behavior and avoid conflating Open, Preview and Reveal.
 **Existing mascot Expand and desktop sticky behavior** plus drag/drop destination, docking and interactions are documented separately in `/experimental/CHUTEY-MASCOT-STICKY-EXPLORER-CHANGES-2026-11-16.md`. Do not merge that major expansion into the Phase 1 hotfix; immediate right-click *hides mascot* regression should be fixed now.
 
 ## Codex execution and acceptance
