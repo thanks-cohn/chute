@@ -1,6 +1,6 @@
 # CODEX REQUEST 3D — DEVELOPMENT 1 ONLY: Highlighted text -> daily file; popup text preview; History GO TO; background animation OFF
 
-**Owner follow-up, November 16, 2026.** Repository `thanks-cohn/chute`, branch `codex/2026-11-16-phase1-repairs`. Issue [#19](https://github.com/thanks-cohn/chute/issues/19). Read the master [Request 3](CODEX-REQUEST-3-DEVELOPMENT1-OWNER-ACCEPTANCE.md) and Requests 3A/3B/3C first. This is part of **Development 1**, and **Development 2 remains explicitly unauthorized**.
+**Owner follow-up, November 16, 2026.** Repository `thanks-cohn/chute`, branch `codex/2026-11-16-phase1-repairs`. Issue [#19](https://github.com/thanks-cohn/chute/issues/19). Read the master [Request 3](CODEX-REQUEST-3-DEVELOPMENT1-OWNER-ACCEPTANCE.md); implementation order is 3A, 3C, **this 3D**, then 3B **worker streaming last**. Do not start 3B's worker rewrite while working on this request. This is part of **Development 1**, and **Development 2 remains explicitly unauthorized**.
 
 ## 1. Highlight text → right-click "Chutey" → timestamped DAILY TEXT file
 
