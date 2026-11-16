@@ -97,6 +97,21 @@ Do not obscure or displace those controls. Do not open a browser-level fullscree
 6. Verify opening/revealing in Windows works separately from previewing, including reproduction and resolution of `Expected a file handle.`.
 7. Validate actual behavior in Chrome on Windows with both native bridge connected and disconnected; automated unit/UI tests alone are insufficient.
 
+## G. UX BUG: misleading global trash icon in File Explorer
+
+**User report:** Selecting an entry in File Explorer and pressing the top-right trash button appears to do nothing. The control's purpose is unclear.
+
+**Source inspection:** `extension/shelf.html` declares `#clear` with title and accessibility label `Clear Live Chutey`, shared above History and File Explorer tabs. `extension/shelf.js` binds its click to `POST /api/clear`, then refreshes History. It is **not connected to the Explorer selection** and does not delete the highlighted local file.
+
+**Required UI correction:**
+- Remove or hide this global Clear Live Chutey control when the File Explorer tab is active; expose the live-basket clear action only where its scope is obvious.
+- Give the operation a plain-language label and an appropriate confirmation so users understand what will be emptied; keep dated history protected.
+- Never reinterpret the existing `/api/clear` as deletion of selected local files.
+- If actual filesystem deletion is offered in a future task, implement it as a separately permissioned action with clear selected-file scope, confirmation, and recoverability where supported.
+- Test History versus File Explorer tab switches, empty basket, populated basket, and native disconnection; no silent or misleading outcomes.
+
+**Status:** Design correction documented; existing code not modified by this document.
+
 ## Implementation order and safety gates
 
 1. Reproduce and instrument the native `Expected a file handle.` failure in the current pairing without changing the installed worker.
