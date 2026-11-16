@@ -25,7 +25,7 @@ Right-clicking existing mascot currently makes it hide. Fix handler/auto-hide in
 ## Owner-requested settings and navigation direction
 **Reveal / GO TO (owner's revised preference):** Default should navigate inside **Chutey File Explorer** to the containing directory and select the target file. **Keep the CURRENT working Windows Reveal/GO TO functionality** as an explicit, persistent Settings alternative; verify it end-to-end and repair anything incomplete rather than deleting or replacing it. Do not regress existing Windows-location behavior.
 **Open (owner's revised preference):** Default opens supported files **inside Chutey**. Settings can switch Open to the system's default associated application. **Preview is already covered** as a separate action: preserve its agreed gallery behavior and avoid conflating Open, Preview and Reveal.
-**Existing mascot Expand and desktop sticky behavior** plus drag/drop destination, docking and interactions are documented separately in `/experimental/CHUTEY-MASCOT-STICKY-EXPLORER-CHANGES-2026-11-16.md`. Do not merge that major expansion into the Phase 1 hotfix; immediate right-click *hides mascot* regression should be fixed now.
+**Existing mascot Expand and desktop sticky behavior** plus drag/drop destination and docking are documented separately in `/experimental/CHUTEY-MASCOT-STICKY-EXPLORER-CHANGES-2026-11-16.md`. Do not merge that major expansion into the Phase 1 hotfix; immediate right-click *hides mascot* regression should be fixed now.
 
 ## Codex execution and acceptance
 - Trace root causes rather than speculate, compare against last successful version, preserve all existing image/history assets.
