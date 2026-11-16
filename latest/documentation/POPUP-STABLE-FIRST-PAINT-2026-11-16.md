@@ -25,8 +25,8 @@ On clicking the extension popup, owner sees upper-left region appear, then right
 5. Run existing popup/gallery tests and Chrome screenshots before merging.
 6. Confirm there are no new animations, popup resizes, excessive image requests, or worker changes.
 
-## Deferred future design — DO NOT IMPLEMENT IN THIS STABILITY PATCH
-Owner wants a deliberate **four-corners-first opening animation**, followed by the rest of the popup. That is a future visual feature, not the current accidental staggered paint. It must be opt-in/design-reviewed, not be confused with image decode delays, and support reduced-motion preferences.
+## Explicit scope exclusion for this Codex run
+**DO NOT IMPLEMENT any entrance animation, including the earlier four-corners-first concept.** No staged corner reveal, decorative popup open effects, sequential shell construction, or animation-dependent opening. The sole goal is an immediate complete stable popup outline with placeholders first and progressive image loading inside fixed tiles. Any future four-corner entrance animation is a separate project and outside this run.
 
 ## Baseline
 Source branch based on `archive-chutey-11.16.2026`. Original extension source commit `45dc8f034045c8807f5b712f7e8915c7ba76313a`. Native worker is the released November 4 TEST EXE matching SHA-256 `C193FE77CC3E7DB9FA1B661F98FC3416AD42067B9B86BD496E2F00ED0CC4944B`; **not modified by this branch**.
