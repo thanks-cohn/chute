@@ -197,6 +197,18 @@ The Shelf's persistent tabs should ultimately be **History | File Explorer | Mov
 - Preserve tabs and coherent navigation; offer an explicit "Watch in Movie Mode" entry from Explorer media selection. When leaving Movie Mode, specify and test whether playback pauses or continues rather than accidentally leaking playback.
 - Do not let Movie Mode or an active stream starve file transfers, directory listings or the popup. Media playback must coexist with the file engine.
 
+## Movie Mode media adapters: MKV and FLV are explicit future priorities
+
+**Both MKV (Matroska) and FLV (Flash Video) must be supported by the modular adapter design.** MP4 and WebM may be initial working adapters in Phase 3, but must not be hard-coded as the only possible formats.
+
+- **MKV:** Anticipate large movies, multiple audio tracks, subtitle tracks, variable codec combinations, track selection, seeking, chapters and metadata. Probe actual streams, not just a `.mkv` extension. Prefer direct playback where supported, then streaming remux to a browser-compatible container when codecs allow, then optional transcoding.
+- **FLV:** Anticipate archived Flash Video files with older H.264/AVC, Sorenson Spark, VP6, MP3, AAC, or other legacy combinations. Probe codecs; remux where compatible, decode/transcode only as required. Do not assume modern browsers natively support FLV.
+- The core worker must expose format-independent authorized byte-range reading, streaming, cancellation, bounded resource use and file metadata. A media-adapter registry/capability contract chooses playback strategy without altering the core file engine.
+- Expose versioned APIs for probing, preparing, starting, seeking and closing playback sessions; ensure track metadata and explicit unsupported-codec responses. Keep security and playback stability independent of adapters.
+- Include a lightweight test/dummy adapter proving that another format can be registered without modifying the worker streaming core. **Actual MKV and FLV playback adapters may be implemented later**; document the missing support honestly.
+- This is primarily a **Movie Mode** extensibility requirement, not a demand for every legacy format in the smaller File Explorer preview overlay.
+- Do not let future MKV/FLV support force another worker rewrite. Some additions may still require adapter-specific libraries, codecs, packaging and extensive compatibility tests.
+
 ## Mandatory Codex execution sequence (strict)
 
 **PHASE 1 — Appearance / Explorer behavior FIRST.** Finish stable first-paint popup (placeholders first, no entrance animation); mascot/default image and background module/settings; Grid View real image thumbnails; correct image/video previews and native `Expected a file handle.` issue; bottom-anchored **overlay** preview at one-third Shelf height with draggable top edge, Expand/restore/X, no file-grid reflow, unchanged Up/Down directory navigation; correct trash-button scope. Validate these independently on the current working pairing. Avoid unnecessary native binary changes while tracing any API defects.
