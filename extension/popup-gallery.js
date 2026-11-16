@@ -247,6 +247,11 @@
     } finally { opening = false; }
   });
   new MutationObserver(() => {
+    // First-paint skeletons never depend on image decoding; the History
+    // renderer replaces them after its data response, not after thumbnails.
+    if (grid && !grid.querySelector(".chutey-popup-placeholder")) {
+      grid.removeAttribute("aria-busy");
+    }
     if (!lightbox.hidden && !activeFile()) closePreview();
   }).observe(document.querySelector("#files"),{childList:true});
 
