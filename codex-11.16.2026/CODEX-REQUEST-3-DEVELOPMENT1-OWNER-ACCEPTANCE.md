@@ -4,7 +4,7 @@
 **Repository:** `thanks-cohn/chute`
 **Authorized working branch:** `codex/2026-11-16-phase1-repairs`
 **Working binary source baseline:** `62694d6f821481c7857d134a8ddd1ba6e6aded83` (installed Windows Development 1 test candidate; this addendum commits **documents only**, not a changed worker).
-**Status:** OWNER WINDOWS TEST IN PROGRESS. **Development 1 is not approved**; user says worker now runs, but large-file reliability, MP4/WebM/MP3 acceptance and popup/Shelf UX need repairs.
+**Status:** OWNER WINDOWS TEST IN PROGRESS. **Development 1 is not approved**; user says worker now runs, but large-file reliability, local MP4/WebM/MP3 streaming, popup/Shelf UX, daily highlighted-text capture and decoration defaults need repairs.
 
 ## STOP RULE — BINDING
 
@@ -12,22 +12,35 @@ This is an **addendum** to [Development 1 Request 1](CODEX-REQUEST-1-DEVELOPMENT
 
 **Do not interpret this document as permission to run any existing self-installing executable or overwrite a running worker.** Owner installed a matching new candidate. The original Windows worker and native helper have been archived and checked on GitHub on branch `archive/chutey-11.16-worker`, commit `d0939d5`, path `chutey/archive/11.16_worker/`. Preserve them. Preserve installed user files, original history, Chrome production profile, recovery/tag/checkpoints. Build new **test** binaries separately only after source changes; owner explicitly chooses when to install.
 
-## EXECUTE ALL THREE Development 1 REPAIR DOCUMENTS
+## MANDATORY ORDER — UI AND HISTORY FIRST, WORKER LAST
 
-Read in this order, then implement systematically, keeping changes small and independently testable:
+The owner explicitly requires the **rest of the functionality to be finished before large-file/worker streaming work**. Complete and validate each stage in order. Preserve working source and functionality, and run relevant regressions before moving to the next stage. An initial source-level audit of media interfaces is permitted, but **do not start the invasive worker streaming implementation, Windows rebuild, or replacement until Stage 4**. All four are **Development 1**, not Development 2.
 
-1. **[Request 3A — Mini-popup + Shelf UI](CODEX-REQUEST-3A-POPUP-AND-SHELF-UX.md)**. GitHub issues [#15](https://github.com/thanks-cohn/chute/issues/15) and [#16](https://github.com/thanks-cohn/chute/issues/16).
-   - The **tiny Chrome extension popup** is NOT Shelf. Popup `Settings` must show **ONE single vertical, top-to-bottom scrollbar for the entire popup**: **NO horizontal/lateral scrollbar** and **NO nested separate Settings/gallery scrollbars**. Reflow all controls and keep images/history reachable; don't merely hide overflow. Test at actual 390x590px Chrome popup, opened and closed Settings.
-   - Popup image tile **click -> enlarge** immediately. No Expand button, no X close button; preserve Escape/click-away closure and navigation. Right-click a tile or its enlarged image for a small temporary trash-can icon and **exactly `Trash It!`** (not Remove from Chutey). Remove only the live presentation/basket, NEVER the dated History or original bytes; archived items remain available and recallable.
-   - On **Shelf History cards**, show `DRAG ME!` **together on one readable aligned line**, even at narrow widths. Avoid lonely `ME!` and action-button collisions.
+### Stage 1 — Popup + Shelf UI (Request 3A)
+**[Request 3A — Mini-popup + Shelf UI](CODEX-REQUEST-3A-POPUP-AND-SHELF-UX.md)**. Issues [#15](https://github.com/thanks-cohn/chute/issues/15), [#16](https://github.com/thanks-cohn/chute/issues/16).
+- The **little Chrome extension popup** is a separate surface from Shelf. Its Settings must fit vertically and share **ONE up/down scrollbar across the complete popup**, with **ZERO lateral/horizontal scrollbars and ZERO nested competing scrollbars**. Settings open in normal document flow, not a floating internally-scrollable overlay; controls remain reachable at 390px.
+- Clicking a popup image tile expands it immediately, without a separate Expand or X control; use Escape/click-away to close. Right click shows a small, temporary trash-can icon and **exactly `Trash It!`**. Trash removes only the *live* item/presentation and **never** deletes permanent dated History or original bytes; archived item handling is safe.
+- Shelf History cards keep **`DRAG ME!`** on a single legible aligned line, with buttons not colliding.
 
-2. **[Request 3B — Reliable big files and media](CODEX-REQUEST-3B-LARGE-FILES-MP4-WEBM-MP3.md)**. GitHub issue [#18](https://github.com/thanks-cohn/chute/issues/18).
-   - Reproduce user failures by gesture/path before inferring root cause. Known source path rejects Explorer drag >32 MiB; separate browser base64 path can inflate memory. Differentiate from the normal streamed 8-GiB backend limit, destination free space, and disabled 300-MB experimental interop limit.
-   - Add safe bounded large-file transport on supported paths with accurate receipts. Real `MP4`, `WebM`, `MP3` import, browser-preview playback, pause, seek, outbound copy and byte verification; differentiate codec unsupported from app error. Test on a 4 GB RAM-class Windows environment and with full/damaged/unknown-size input; avoid large in-memory `Blob` or base64 transfers. Never claim unsupported cross-app drag works.
-   - Protect verified YUMMY animation from false success, retain all data and runtime safety.
+### Stage 2 — Shelf History export (Request 3C)
+**[Request 3C — Shelf Settings History Export](CODEX-REQUEST-3C-SHELF-HISTORY-EXPORT.md)**. Issue [#17](https://github.com/thanks-cohn/chute/issues/17).
+- **Shelf settings**, not little popup Settings: **Export History** with From Beginning/All History, Today, inclusive custom date range; CSV/JSON, correct local timezone boundaries, read-only, metadata not full original files, and bounded memory across all dates/pages.
+- Finish and test complete exports, record immutability and original History preservation before Stage 3.
 
-3. **[Request 3C — Shelf Settings History Export](CODEX-REQUEST-3C-SHELF-HISTORY-EXPORT.md)**. GitHub issue [#17](https://github.com/thanks-cohn/chute/issues/17).
-   - The **Shelf's Settings**, **NOT the little popup's Settings**, need an **Export History** section with "From the beginning / All history", "Today", and inclusive "Selected date range". CSV and JSON with well-defined history metadata/events, clear timezone boundaries, non-destructive bounded export, not only current live 30 items. Preserve History files and original content.
+### Stage 3 — Daily highlighted text, popup text reader and decoration default (Request 3D)
+**[Request 3D — Daily text highlights and background animation OFF](CODEX-REQUEST-3D-TEXT-HIGHLIGHTS-AND-ANIMATION.md)**. Issue [#19](https://github.com/thanks-cohn/chute/issues/19).
+- Highlight webpage text -> right-click Chutey -> persist each timestamped passage in a **daily UTF-8 text file**, one file per local day, with recoverable per-capture History identity. Don't overwrite, misdate, duplicate or lose original captures.
+- In the small popup, clicking a text file expands a **vertically scrollable text reader** preserving literal saved text. In Shelf History, GO TO/Reveal locates the real daily text file and ideally its correct timestamped passage. Preserve other file GO TO behavior.
+- Turn **decorative spinning background behind Chutey images OFF by default**, with an explicit persistent opt-in under **Shelf → Image and background settings**, not little popup Settings. Apply across popup and Shelf; keep YUMMY success animation unchanged.
+- Finish UI/backend-as-needed for these features and tests before Stage 4; do not combine this step with the streaming worker rewrite.
+
+### Stage 4 — LAST: large-file transfer and robust LOCAL media streaming (Request 3B)
+**[Request 3B — Large files + local MP4/WebM/MP3 streaming](CODEX-REQUEST-3B-LARGE-FILES-MP4-WEBM-MP3.md)**. Issue [#18](https://github.com/thanks-cohn/chute/issues/18).
+- **Only after Stages 1–3 are implemented and tested**, investigate and repair supported large-file transfer paths: distinguish actual 32 MiB browser Explorer drag limit, 8 GiB streamed upload server limit, experimental disabled 300 MB cap, browser restrictions, and available disk space. Avoid giant base64/Blob copies and use bounded verified streams.
+- Worker must stream actual **MP4, WebM and MP3 files directly from authorized local directories** in BOTH **Shelf → File Explorer preview pane** AND **the little Chrome extension popup's expanded preview**. The popup currently shows Chutey live/history; add a securely authorized source bridge/navigation, not arbitrary path access or a false claim that local files are already in the popup.
+- Both players support play/pause/seek and resource-efficient HTTP byte-range streaming with cancellation and scoped permission; never load whole movies/music into memory. Test genuine playable codecs and report unsupported codecs honestly. Capture distinct real-Chrome evidence for each surface and format on constrained Windows hardware. Leave folder navigation and thumbnails responsive.
+- Protect verifiable receipts, original saved files, original YUMMY animation, safe recovery, history and low-resource performance.
+- **Worker/browser matching build and Windows package comes after Stage 4**. Do not auto-install/replace the owner's working worker.
 
 ## TEST SCOPE AND PRE-EXISTING REQUIREMENTS
 
@@ -57,5 +70,5 @@ Before editing, read:
 
 ## Lightweight Codex starter prompt
 ```text
-In thanks-cohn/chute, work ONLY on Development 1 branch codex/2026-11-16-phase1-repairs. First read codex-11.16.2026/CODEX-REQUEST-3-DEVELOPMENT1-OWNER-ACCEPTANCE.md and ALL three linked 3A/3B/3C task documents, plus existing CODEX-REQUEST-1-DEVELOPMENT1-FIX-AND-STOP.md. Implement and test the entire owner-feedback repair bundle: mini Chrome popup ONE vertical scrollbar and NO horizontal/nested scrollbars, popup tile click to enlarge and right-click temporary trash icon labeled exactly "Trash It!" (never delete History), Shelf "DRAG ME!" wrap, large-file and MP4/WebM/MP3 integrity/playback, and Shelf Settings History Export (all/today/date range). Preserve running installed worker, backups, file data, YUMMY and history. Build matching isolated Windows test worker only if needed; never silently install or replace. Push fixes with exact evidence and owner test steps; STOP. Do not start or create Development 2.
+In thanks-cohn/chute, work ONLY on Development 1 branch codex/2026-11-16-phase1-repairs. First read codex-11.16.2026/CODEX-REQUEST-3-DEVELOPMENT1-OWNER-ACCEPTANCE.md and all four linked 3A/3C/3D/3B task documents in that exact implementation order, plus existing CODEX-REQUEST-1-DEVELOPMENT1-FIX-AND-STOP.md. Implement and test the entire owner-feedback repair bundle: FIRST popup ONE vertical scrollbar and NO lateral/nested scrollbars, popup image click enlargement and right-click Trash It! without History deletion, Shelf DRAG ME! alignment; SECOND Shelf Settings History Export; THIRD daily highlighted-text file, expanded popup text reader, History GO TO, default-off image backdrop animation via Shelf Settings; LAST worker/large-file repairs including direct local-directory MP4/WebM/MP3 streaming in both Shelf preview and little Chrome popup expanded preview. Preserve running installed worker, backups, file data, YUMMY and history. Build matching isolated Windows test worker ONLY in final worker stage if needed; never silently install or replace. Push fixes with exact evidence and owner test steps; STOP. Do not start or create Development 2.
 ```
