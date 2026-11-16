@@ -1,54 +1,31 @@
-# CODEX — TWO SEQUENTIAL DEVELOPMENT BRANCHES (Owner instructions, 2026-11-16)
+# Chutey — Two SEPARATE Codex requests (2026-11-16)
 
-**Read this document first. Follow the OWNER requirements, not assistant-only recommendations.**
-Repository: `thanks-cohn/chute`.
+**This file is an INDEX, not a single executable two-stage Codex prompt.**
 
-**Required pre-repair reading:** `codex-11.16.2026/DEVELOPMENT1-SOURCE-AUDIT-CRASHES-POLLING-ANIMATION.md` documents verified source findings for excessive `/api/files` polling, unbounded logs, mascot success-animation code paths, and risky process-wide native restart logic. Use these findings as the starting point for Development 1's outstanding Windows repairs; distinguish source evidence from crash-cause hypotheses.
-Protected source branch: `fix/chutey-popup-stable-first-paint-2026-11-16`.
-Already-created **Development 1** branch: `codex/2026-11-16-phase1-repairs`.
-**Development 2** branch to create LATER, only after Development 1 is complete and owner-validated: `codex/2026-11-16-sticky-mascot`, forked from the **final successful HEAD of the Development 1 branch** (NOT the old reference branch; NOT main).
+Repository: `thanks-cohn/chute`
 
-Do not reset branches or overwrite the owner's existing installed Windows worker, original Chrome extension, saved images, histories, archives or releases. No native installer launch on production host. Original worker SHA-256 `C193FE77CC3E7DB9FA1B661F98FC3416AD42067B9B86BD496E2F00ED0CC4944B`. Use separate test build/profile and truthful Windows test evidence.
+## CURRENTLY AUTHORIZED: Request 1 ONLY
+**Read and execute:** [CODEX-REQUEST-1-DEVELOPMENT1-FIX-AND-STOP.md](CODEX-REQUEST-1-DEVELOPMENT1-FIX-AND-STOP.md)
 
-## STAGE 1 — FIX WHAT ALREADY EXISTS FIRST
-Execute full `codex-11.16.2026/OWNER-PHASE1-CODEX-REQUEST.md` on `codex/2026-11-16-phase1-repairs`. This is the owner-approved repair specification. Do not work on Stage 2 in this branch.
+Branch already exists: `codex/2026-11-16-phase1-repairs`.
 
-### Stage 1 required deliverables/acceptance
-1. Fix newly introduced dashboard popup sliver/collapsed image regression, diff the previous good version `45dc8f034045c8807f5b712f7e8915c7ba76313a`; keep all cards full-sized beyond initial 4×4 or 5×5, maintain lazy loading and stable layout, do not alter stored images.
-2. Make actual image thumbnails the default in Chutey **File Explorer**, with persistent Settings alternative for generic icons.
-3. Preview/gallery: visible left/right buttons, keyboard Left/Right next/previous file; Up/Down scroll content of currently previewed TXT/documents; wheel scrolls; Escape/X closes; overlay size unchanged and underlying Explorer doesn't reflow.
-4. Diagnose/fix selected Windows profile access `The item is unavailable or cannot be accessed safely.`; enable authorized USB drive-root browsing safely, preserve secure scoped handles and report real failures.
-5. Native messaging: fix test extension enrollment IDs disappearing from generated host manifest; preserve explicit authorized IDs and original production access.
-6. Media: large MP3 preview failure, add appropriate audio player; small MP4 **DOES work**, preserve it; provide bounded large MP4 streaming through a separately validated candidate worker, graceful capability and codec errors; never install over original.
-7. Fix right-click existing mascot unexpectedly hiding (current regression); menu interaction should keep it visible.
-8. User's file action defaults: **Reveal / GO TO = Chutey File Explorer** at containing directory with target selected; Settings alternative = preserve and repair CURRENT functioning Windows Reveal. **Open = inside Chutey** by default; Settings alternative = system associated app. Preview remains distinct. Implement only when the existing workflows can be preserved and safely verified.
-9. **NEW Windows crash regression:** Chutey reportedly crashed/disappeared and required clicking a notification to restart. Implement autonomous, bounded recovery with automatic reload as LAST-RESORT fallback wherever Chrome permits, and no mandatory notification click. Identify whether the failed layer was mascot/content script, MV3 worker, native host or Chute.exe. Preserve intentional auto-hide and Chrome-controlled pin/enable semantics; don't claim an extension can reenable itself after Chrome disables it. Reuse existing wake/reconnect logic; independent low-cost recovery trigger for full companion death; backoff, rate limiting, no duplicate instances, safe pending saves and real Windows fault-injection tests. Full specification: P0 crash recovery section in OWNER-PHASE1-CODEX-REQUEST.md.
-10. **NEW Windows machine instability + lost file-received animation:** Even the separate TEMP Chrome window crashed; do not blame Chutey blindly. Diagnose current free disk/RAM, Chrome vs extension vs worker crash evidence safely before broad auto-restart. Owner reports mascot no longer performs familiar received-file reaction; the animation source still exists, so trace verified drop → success callback → visible animation, restore original behavior without redesign and add actual drop regression tests. Details in the added P0 section of OWNER-PHASE1-CODEX-REQUEST.md.
-11. **CONFIRMED idle polling/log-growth issue:** Owner's existing `chute.log` is 373,125,474 bytes; current `extension/bin.js` requests `GET /api/files` every 1200ms and `server.py` logs routine successes, while `windows_app.py` appends to an unbounded log. Reduce redundant idle requests, preserve immediate verified-save updates, add bounded Windows-safe log rotation, preserve crash diagnostics, and test idle/active tabs. Do not automatically truncate active installed worker logs. Full P0 in OWNER-PHASE1-CODEX-REQUEST.md.
-12. Maintain existing first-paint, images, thumbnails, preview and other working behaviors. Real Windows Chrome / filesystem evidence; automated regression tests; report skipped/blocked checks honestly.
+Task: finish code repairs, crash investigation, bounded recovery, redundant polling/unbounded logs, missing original received-file animation; protect previously implemented popup/file explorer features. Read the source audit and full original owner requirements. Commit and push repair candidate, provide real Windows acceptance checklist, **then STOP and await the owner**.
 
-**Gate:** Stage 1 complete means all owner-specified tests and real-machine acceptance passed or clearly identified Windows tests reviewed by owner. Commit and push Stage 1, report SHA, branch, exact CMD `git fetch && git switch && git pull --ff-only` sequence, known limitations and protected baseline state. Do NOT declare Stage 1 done merely because Linux tests pass. Do NOT create or implement Stage 2 while Stage 1 is unfinished.
+## NOT AUTHORIZED: Request 2 (READ ONLY)
+**Held specification:** [CODEX-REQUEST-2-DEVELOPMENT2-HELD-UNTIL-OWNER-APPROVAL.md](CODEX-REQUEST-2-DEVELOPMENT2-HELD-UNTIL-OWNER-APPROVAL.md)
 
-## STAGE 2 — FORK FROM THE COMPLETED STAGE 1 BRANCH AND BUILD EXISTING MASCOT EXPANSION
-Only after Stage 1 completed and confirmed, create `codex/2026-11-16-sticky-mascot` **from the final Stage 1 commit**. All fixes in Stage 1 must be inherited. No detached old implementation, no rebasing it onto the original `fix/...` branch.
+Future branch name, **NOT TO BE CREATED NOW**: `codex/2026-11-16-sticky-mascot`.
 
-Implement the owner-approved scope of `experimental/CHUTEY-MASCOT-STICKY-EXPLORER-CHANGES-2026-11-16.md`. Work exclusively on the existing mascot and its sticky File Explorer.
+Task *only if later explicitly authorized by the user*: expand existing mascot with modular menu, Assign, Pick Me Up/Drop Off, real native resizable always-on-top Explorer with X/minimize/maximize and full nostalgic yellow legal-pad styling, correct per-directory and sibling-image drops. This second phase uses the FINAL OWNER-ACCEPTED Development 1 commit as its parent.
 
-### Stage 2 features explicitly requested by owner
-**Modular right-click context menu:** The EXISTING mascot, no redesign. Separate reusable module. **Brownish menu background; yellow notepad-like option cards; black letters with bluish outline/accent** (not metallic gold). A right-click must not hide mascot. At minimum state-appropriate actions: **Expand**, **Assign**, **Pick Me Up** / **Drop Off**. Don't invent other options without approval.
+## NON-NEGOTIABLE USER ACCEPTANCE GATE
+- Codex must NOT create the second branch simply because it completed Phase 1, CI passed, tests passed, files were committed, or a review says ready.
+- A draft, this file, a preserved annotated Git tag, or an assistant statement does NOT count as permission.
+- The USER PERSONALLY must test Development 1 on their actual Windows system. After they say the product is up to par, they must send a **separate explicit instruction** to begin Development 2.
+- If validation finds bugs, fix them in Development 1; repeat owner testing. Keep Development 2 completely untouched.
+- Do NOT pre-create an empty second branch, write code there, auto-queue work, or self-start after a passing test.
 
-**Expanded Explorer theme — important clarification:** The **always-on-top portable File Explorer window itself** (not just the mascot's context menu) should have a **nostalgic yellow legal-pad aesthetic**: warm legal-pad yellow/paper-like surfaces, restrained brown accents and stationery-inspired styling. Keep image thumbnails, file names, folders, preview/lightbox and controls fully readable, functional and uncluttered. This theme belongs in Development 2, not Phase 1 repairs.
+## Protected context
+Working original Windows `Chute.exe` SHA-256 `C193FE77CC3E7DB9FA1B661F98FC3416AD42067B9B86BD496E2F00ED0CC4944B`; original installed extension/native host, user files/history, snapshots, archive and Git checkpoint tag. No unapproved replacement, restart loops, deletion or data migration.
 
-**Expand and full native sticky Explorer:** Right-click **Expand** creates/activates one **movable, persistent, ALWAYS-ON-TOP native Windows File Explorer / gallery / lightbox** that stays over Chrome as users change websites and over other normal desktop windows. It is the real Explorer: browse folders, see thumbnail-first grid, preview images, documents, audio/video as supported; visible working **X (close)**, **– (minimize to mascot)**, **□ (expand/maximize and restore)**; **user resizes width/height by dragging window edges and corners**, and moves the window by titlebar. Preserve file selection/scroll and correctly adapt layout within resized window. Distinguish native outer window resizing from non-reflow overlay behavior.
-
-**Minimize and reappearance:** Minimizing always-on-top Explorer returns it to the **existing mascot at the saved last Drop Off resting position**; only then the collapsed mascot disappears after **10 seconds of inactivity**. To summon it again user deliberately **hovers over bottom-right screen activation hotspot**, even if mascot last rested somewhere else. Random mouse hovering over the page must not summon it. Menus, drag/drop and active use block auto-hide; sticky Explorer does not auto-hide.
-
-**Assign, folders, drops:** Before assignment preserve mascot's **current working drop destination**. Right-click **Assign** opens compact Chutey Explorer to pick destination. Right-click a folder in Chutey Explorer -> **Make Chutey Location!** assigns it to THIS mascot. Drag supported website content/local files into sticky Explorer: dropping **onto a particular directory** saves INTO THAT DIRECTORY, not merely current directory. Dropping in empty area of current directory saves INTO current directory. Dropping an image onto a LARGE currently previewed image/lightbox saves the dropped image as a **sibling in same containing folder**, never overwrites previewed original; safe unique filename and accurate success confirmation. Dropping onto collapsed mascot uses its assigned destination. Support only demonstrably resolvable website drag payloads and report unsupported ones accurately, never fake success.
-
-**Pick Me Up / Drop Off and memory:** Offer **Pick Me Up** to intentionally carry/reposition the existing mascot; **Drop Off** places it at chosen screen position, persisted as its resting location (must not conflict with file-drag gesture). On re-expansion within a session default to last navigated directory with last opened/previewed file selected (do not auto-open/play). Settings may optionally persist Explorer state after restart, subject to authorization. Distinguish assigned drop destination from last browsed location; when newly expanded use owner-documented rule and avoid silently changing assigned destination.
-
-### Stage 2 verification
-Build isolated candidate desktop window without replacing the installed worker. Test actual Windows topmost behavior over different sites/apps, X/minimize/maximize/edge-resize, persistence, mouse hotspot/10s timing, drag/drop directory semantics, long filenames/collisions, unauthorized paths and errors, no lost files, no duplicate windows, performance on low-memory systems. Report commit SHA, Windows CMD checkout/update commands, demos, limitations. Do not claim completion without Windows validation.
-
-## SEPARATION OF AUTHORITY
-`codex-11.16.2026/OWNER-PHASE1-CODEX-REQUEST.md` and `experimental/CHUTEY-MASCOT-STICKY-EXPLORER-CHANGES-2026-11-16.md` contain owner direction. `codex-11.16.2026/ASSISTANT-INCOMPLETE-ITEMS-AND-RECOMMENDATIONS.md` is advisory only, not extra marching orders. If any technical limitation requires a change to the owner's desired behavior, explain it and preserve the closest feasible behavior rather than silently inserting new features.
+**For Codex RIGHT NOW:** Read and execute Request 1. Do not read the second request as instructions to execute it.
