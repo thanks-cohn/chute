@@ -1,5 +1,7 @@
 # Development 1 repair candidate — November 16, 2026
 
+> Historical candidate report. Current fixes and tests: [final repair handoff](DEVELOPMENT1-FINAL-REPAIR-HANDOFF.md). Execution is governed exclusively by [Request 1](CODEX-REQUEST-1-DEVELOPMENT1-FIX-AND-STOP.md): STOP after Development 1; only a later separate explicit owner instruction can authorize Development 2.
+
 Branch: `codex/2026-11-16-phase1-repairs` (started at `bf02a5b`).
 Status: **source repairs implemented; owner Windows acceptance still pending**.
 This is not permission to replace the working installation or begin Development 2.

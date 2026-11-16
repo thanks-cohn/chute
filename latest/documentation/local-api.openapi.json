@@ -447,6 +447,38 @@
           }
         }
       }
+    },
+    "/api/status": {
+      "get": {
+        "summary": "Lightweight current live-basket count",
+        "security": [],
+        "description": "Existing basket CORS policy; no filesystem grant or native session enrollment. Count is derived from Store.",
+        "responses": {
+          "200": {
+            "description": "Live basket count",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "service",
+                    "count"
+                  ],
+                  "properties": {
+                    "service": {
+                      "const": "chute"
+                    },
+                    "count": {
+                      "type": "integer",
+                      "minimum": 0
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {

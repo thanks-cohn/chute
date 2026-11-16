@@ -98,7 +98,9 @@
       // Only fall back to direct native messaging if the worker route itself was
       // unavailable (for example an unusual service-worker startup failure).
       try {
-        const response = await sendNative({ action: "ensure_bridge" });
+        const capabilities=await sendNative({action:'get_native_capabilities'});
+        if (capabilities?.safe_recovery!==1) return false;
+        const response = await sendNative({ action: 'ensure_bridge' });
         if (!response?.ok) return false;
       } catch (error) {
         console.debug("Chute native wake unavailable:", error.message);

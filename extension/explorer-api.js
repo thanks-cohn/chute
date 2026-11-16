@@ -35,6 +35,14 @@
       if (!capabilities?.ok || capabilities.explorer_protocol !== "1.1") {
         throw new Error("Your Windows companion needs updating. Install the Windows EXE and Chrome extension from the same test pair.");
       }
+      if (capabilities.safe_recovery !== 1) {
+        let healthy=false;
+        try { healthy=(await fetch('http://127.0.0.1:17891/health',{cache:'no-store',signal:AbortSignal.timeout(1200)})).ok; } catch {}
+        if (!healthy) {
+          const error=new Error('The companion is unavailable. Start the existing companion normally, or use the isolated matching test pair for safe recovery.');
+          error.code='LEGACY_RECOVERY_UNSAFE';throw error;
+        }
+      }
       let response;
       for (let attempt=0;attempt<3;attempt++) {
         response = await chrome.runtime.sendNativeMessage("com.thankscohn.chute", {action:select ? (writable ? "explorer_select_write_folder" : "explorer_select_folder") : "explorer_resume"});

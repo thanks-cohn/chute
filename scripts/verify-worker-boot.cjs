@@ -24,6 +24,7 @@ async function boot(offlineInitially) {
       onInstalled: event("installed"),
       onStartup: event("startup"),
       sendNativeMessage: (_name, _message, callback) => {
+        if (_message.action==='get_native_capabilities') {callback({ok:true,safe_recovery:1});return;}
         nativeCalls += 1;
         healthy = true;
         callback({ ok: true });
@@ -63,7 +64,7 @@ async function boot(offlineInitially) {
   const fetchMock = async (url) => ({
     ok: healthy,
     status: healthy ? 200 : 503,
-    json: async () => url.includes("/api/files") ? { files: [] } : { ok: healthy }
+    json: async () => url.includes("/api/files") ? { files: [] } : url.includes("/api/status") ? {service:"chute",count:0} : { ok: healthy }
   });
   let context;
   const runFile = (file) => {
@@ -79,6 +80,7 @@ async function boot(offlineInitially) {
     fetch: fetchMock,
     URL,
     Blob,
+    AbortSignal, AbortController,
     setTimeout,
     clearTimeout,
     console,

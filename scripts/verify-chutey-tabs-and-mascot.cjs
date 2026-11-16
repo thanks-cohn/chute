@@ -111,7 +111,7 @@ function testContentVisibility(){
     ["floating",true,true],["both",true,true],
     ["floating",false,true],["context",false,true],["context",true,false]
   ]){
-    const host={style:{}};
+    const host={style:{},dataset:{}};
     vm.runInNewContext(fn+"\nrenderVisibility();",{
       host,accessMode:mode,autoHide,
       floatingEnabled:m=>m==="floating"||m==="both"

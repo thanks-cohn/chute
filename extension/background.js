@@ -84,7 +84,10 @@ async function uploadBlob(blob, name, source) {
     body: blob
   });
   if (!response.ok) throw new Error(`Chute server returned ${response.status}`);
-  return response.json();
+  const receipt=await response.json();
+  if (!/^[a-f0-9]{32}$/.test(receipt?.file?.id||"") || receipt.file.size!==blob.size) throw Error("Save receipt is incomplete. Check the basket before retrying.");
+  globalThis.ChuteStatus.changed();
+  return receipt;
 }
 
 async function getFiles() {
@@ -95,17 +98,7 @@ async function getFiles() {
 }
 
 async function updateBadge() {
-  try {
-    const files = await getFiles();
-    await chrome.action.setBadgeBackgroundColor({ color: "#d7ff3f" });
-    if (chrome.action.setBadgeTextColor) {
-      await chrome.action.setBadgeTextColor({ color: "#111111" });
-    }
-    await chrome.action.setBadgeText({ text: files.length ? String(files.length) : "" });
-  } catch {
-    await chrome.action.setBadgeText({ text: "!" });
-    await chrome.action.setBadgeBackgroundColor({ color: "#e05d44" });
-  }
+  await globalThis.ChuteStatus.read();
 }
 
 function contextEnabled(mode) {

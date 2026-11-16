@@ -85,50 +85,65 @@ def launch_bridge() -> bool:
         return False
 
 
-def terminate_stale_bridge() -> None:
-    """Kill only the ordinary Chute companion when its health endpoint is dead.
+def terminate_stale_bridge() -> bool:
+    """Compatibility hook: a slow health probe never authorizes termination.
 
-    Sleep/resume or an interrupted Windows session can leave Chute.exe alive but
-    unable to serve localhost. A second Chute.exe is not a reliable recovery
-    path in that state, so clear the stale companion before relaunching it.
+    There is no automatic kill path. A live/unidentified process might hold a
+    pending save; callers must report the uncertainty, not destroy that work.
     """
-    if os.name != "nt":
-        return
-    try:
-        subprocess.run(
-            ["taskkill", "/IM", "Chute.exe", "/F"],
-            stdin=subprocess.DEVNULL,
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-            check=False,
-            creationflags=subprocess.CREATE_NO_WINDOW,
-        )
-    except OSError:
-        pass
+    return False
+
+
+_last_bridge_reason = 'UNKNOWN'
+
+
+def _bridge_result(ok,reason):
+    global _last_bridge_reason
+    _last_bridge_reason=reason
+    return ok
 
 
 def ensure_bridge(timeout: float = 6.0) -> bool:
-    if bridge_alive():
-        return True
-
-    # Avoid killing a healthy companion because of one momentarily slow probe.
-    time.sleep(0.12)
-    if bridge_alive(timeout=0.5):
-        return True
-
-    if os.name == "nt":
-        terminate_stale_bridge()
-        time.sleep(0.18)
-
-    if not launch_bridge():
-        return False
-
-    deadline = time.monotonic() + timeout
-    while time.monotonic() < deadline:
-        if bridge_alive(timeout=0.25):
-            return True
-        time.sleep(0.12)
-    return False
+    if bridge_alive(): return _bridge_result(True,"READY")
+    if os.name != 'nt': return _bridge_result(False,"UNSUPPORTED_PLATFORM")
+    from .windows_processes import matching_pids, launch_guard
+    target=companion_exe()
+    with launch_guard(target) as acquired:
+        if not acquired: return _bridge_result(bridge_alive(timeout=0.5),"BUSY")
+        if bridge_alive(timeout=0.5): return _bridge_result(True,"READY")
+        # Exact image identity, not a name or a pair of failed short probes.
+        # Alive/unknown means no restart and no kill, even when /health hangs.
+        pids=matching_pids(target)
+        if pids is None: return _bridge_result(False,"PROCESS_IDENTITY_UNKNOWN")
+        if pids: return _bridge_result(False,"LIVE_UNRESPONSIVE")
+        state_path=target.parent/'chutey-recovery-state.json'
+        now=time.time()
+        try:
+            if state_path.stat().st_size>2048:return _bridge_result(False,'RECOVERY_STATE_INVALID')
+            state=json.loads(state_path.read_text(encoding='utf-8'))
+        except FileNotFoundError:state={}
+        except (OSError,ValueError):return _bridge_result(False,"RECOVERY_STATE_UNAVAILABLE")
+        if (not isinstance(state,dict) or not isinstance(state.get('attempts',[]),list)
+                or not isinstance(state.get('not_before',0),(int,float))):return _bridge_result(False,'RECOVERY_STATE_INVALID')
+        attempts=[stamp for stamp in state.get('attempts',[]) if isinstance(stamp,(int,float)) and now-stamp<600]
+        if now<state.get('not_before',0): return _bridge_result(False,'BACKOFF')
+        if len(attempts)>=3: return _bridge_result(False,"CIRCUIT_OPEN")
+        attempts.append(now)
+        state={'attempts':attempts,'not_before':now+(120 if len(attempts)>=3 else 2**len(attempts))}
+        try:
+            # Tiny rate-limit metadata only; never paths, tokens or file data.
+            descriptor,pending=tempfile.mkstemp(prefix='.recovery-',dir=target.parent)
+            try:
+                with os.fdopen(descriptor,'w',encoding='utf-8') as output:json.dump(state,output)
+                os.replace(pending,state_path)
+            finally:Path(pending).unlink(missing_ok=True)
+        except OSError: return _bridge_result(False,"RECOVERY_STATE_UNAVAILABLE") # A full/unwritable disk must not cause a launch storm.
+        if not launch_bridge(): return _bridge_result(False,"LAUNCH_FAILED")
+        deadline=time.monotonic()+timeout
+        while time.monotonic()<deadline:
+            if bridge_alive(timeout=0.25): return _bridge_result(True,"RECOVERED")
+            time.sleep(0.12)
+        return _bridge_result(False,"START_TIMEOUT")
 
 
 def _chrome_user_data_roots() -> list[Path]:
@@ -438,7 +453,7 @@ def native_main() -> int:
             if not origin.startswith("chrome-extension://") or origin.removeprefix("chrome-extension://") not in _allowed_extension_ids():
                 _write_message({"ok":False,"error":"Unenrolled native caller"})
             else:
-                _write_message({"ok":True,"explorer_protocol":"1.1","persistent_consent":True})
+                _write_message({"ok":True,"explorer_protocol":"1.1","persistent_consent":True,"safe_recovery":1})
             continue
         if action in {"explorer_select_folder", "explorer_select_write_folder", "explorer_resume"}:
             try:
@@ -469,7 +484,7 @@ def native_main() -> int:
             continue
         if action == "ensure_bridge":
             ok = ensure_bridge()
-            _write_message({"ok": ok, "bridge": "ready" if ok else "unavailable"})
+            _write_message({"ok": ok, "bridge": "ready" if ok else "unavailable", "code":_last_bridge_reason})
             continue
         if action == "ping":
             _write_message({"ok": True, "bridge": bridge_alive()})

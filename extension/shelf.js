@@ -154,6 +154,9 @@ async function api(path, options = {}) {
     } catch {}
     throw new Error(detail || `Local bridge returned ${response.status}`);
   }
+  if (options.method && ['POST','DELETE'].includes(options.method) && /^\/api\/(clear|recall|files)(\/|$)/.test(path)) {
+    void chrome.runtime.sendMessage({type:'chute-count-changed'}).catch(()=>{});
+  }
   return response;
 }
 
@@ -615,7 +618,7 @@ chrome.storage.onChanged.addListener(async (changes, area) => {
 loadSettings().then(() => resetHistory());
 
 async function refreshLatestIfChanged() {
-  if (latestHistoryCheckInFlight || dragOutActive || selectedDay || currentPage !== 0 ||
+  if (document.hidden || latestHistoryCheckInFlight || dragOutActive || selectedDay || currentPage !== 0 ||
       document.querySelector("#chutey-explorer-view:not([hidden])") ||
       location.pathname.endsWith("/popup.html") || window.scrollY >= 8) return;
   latestHistoryCheckInFlight = true;
@@ -632,4 +635,7 @@ async function refreshLatestIfChanged() {
   }
 }
 
-setInterval(refreshLatestIfChanged, 5000);
+setInterval(refreshLatestIfChanged, 15000);
+chrome.storage.onChanged.addListener((changes,area)=>{
+  if (area==='session' && changes.chuteyCountStatus) void refreshLatestIfChanged();
+});

@@ -139,10 +139,21 @@ class ChuteHandler(BaseHTTPRequestHandler):
         self.end_headers()
 
     def log_request(self, code="-", size="-"):
-        if self.path.startswith("/api/explorer/v1/media/"):
-            self.log_message('"%s /api/explorer/v1/media/[redacted] %s" %s %s', self.command, self.request_version, str(code), str(size))
-        else:
-            super().log_request(code, size)
+        try: status=int(code)
+        except (ValueError,TypeError): status=0
+        if self.command in {'GET','HEAD','OPTIONS'} and 200 <= status < 400:
+            return
+        # Route categories, not private file names, search text or media tickets.
+        try: path=urlparse(getattr(self,'path','')).path
+        except ValueError: path=''
+        known={'health','files','status','browse','upload','clear','reveal','recall','thumbnails','custom-thumbnails','explorer','provenance','calendar'}
+        parts=path.strip('/').split('/')
+        route=parts[1] if len(parts)>1 and parts[0]=='api' and parts[1] in known else 'health' if path=='/health' else 'other'
+        self.log_message('request method=%s route=%s status=%s',self.command,route,status)
+
+    def log_error(self, fmt, *args):
+        # send_error also invokes log_request with the status; never log raw URLs.
+        pass
 
     def do_HEAD(self) -> None:  # noqa: N802
         if not self._explorer_route():
@@ -156,6 +167,10 @@ class ChuteHandler(BaseHTTPRequestHandler):
 
         if path == "/health":
             self._json({"ok": True, "service": "chute", "build": "main-2.6.1-upgrades-2026-11-03", "features": ["browse", "calendar", "reveal"]})
+            return
+
+        if path == "/api/status":
+            self._json({"service":"chute","count":len(self.store.list())})
             return
 
         if path == "/api/files":
@@ -462,6 +477,13 @@ def _header_name(name: str) -> str:
 class ChuteServer(ThreadingHTTPServer):
     daemon_threads = True
     allow_reuse_address = True
+
+    def handle_error(self, request, client_address):
+        import sys
+        from .runtime_log import safe_exception
+        error=sys.exc_info()[1]
+        if isinstance(error,(BrokenPipeError,ConnectionResetError)): return
+        if error is not None: print(json.dumps(safe_exception(error)),file=sys.stderr,flush=True)
 
     def __init__(self, address: tuple[str, int], store: Store) -> None:
         super().__init__(address, ChuteHandler)

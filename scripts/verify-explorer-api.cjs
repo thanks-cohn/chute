@@ -11,9 +11,9 @@ function api(host,bridge){
 }
 (async()=>{
   await assert.rejects(api({ok:true},{ok:true,token:'fixture'}).nativeSession(),/needs updating/);
-  await assert.rejects(api({ok:true,explorer_protocol:'1.1'},{ok:true,token:'fixture'}).nativeSession(),/running Windows companion/);
+  await assert.rejects(api({ok:true,explorer_protocol:'1.1',safe_recovery:1},{ok:true,token:'fixture'}).nativeSession(),/running Windows companion/);
   const receipt={ok:true,protocol:'1.1',token:'fixture',read_only:true};
-  assert.equal((await api({ok:true,explorer_protocol:'1.1'},receipt).nativeSession()).protocol,'1.1');
+  assert.equal((await api({ok:true,explorer_protocol:'1.1',safe_recovery:1},receipt).nativeSession()).protocol,'1.1');
   console.log('PASS: stale helper and stale running bridge are independently rejected; matched Explorer protocol connects');
 })().catch(error=>{console.error(error);process.exitCode=1;});
 // Renewal is single-flight, retries the rejected operation once, and can never
@@ -24,7 +24,7 @@ function api(host,bridge){
   vm.runInNewContext(source,{window,fetch:async()=> ++fetches===1 ? {status:403,ok:false,json:async()=>({error:{code:'UNAUTHORIZED'}})} : {status:200,ok:true,json:async()=>({state:'completed',result:{ready:true}})},chrome:{runtime:{sendNativeMessage:async(_name,message)=>{
     actions.push(message.action);
     await Promise.resolve();
-    return message.action==='get_native_capabilities' ? {ok:true,explorer_protocol:'1.1'} : {ok:true,protocol:'1.1',token:'renewed'};
+    return message.action==='get_native_capabilities' ? {ok:true,explorer_protocol:'1.1',safe_recovery:1} : {ok:true,protocol:'1.1',token:'renewed'};
   }}}});
   await Promise.all([window.ChuteyExplorerAPI.nativeSession(false),window.ChuteyExplorerAPI.nativeSession(false)]);
   assert.deepEqual(actions,['get_native_capabilities','explorer_resume']);
@@ -53,4 +53,14 @@ function api(host,bridge){
   assert.equal(calls.length,2,'An incomplete identity never reaches the worker');
   await assert.rejects(window.ChuteyExplorerAPI.content(row,{original:true}),/Expected a file handle/);
   console.log('PASS: preserved November 4 content schema, preview/thumbnail compatibility, explicit newer-export incompatibility');
+})().catch(error=>{console.error(error);process.exitCode=1;});
+
+(async()=>{
+  const window={},actions=[];
+  vm.runInNewContext(source,{window,AbortSignal,fetch:async()=>({ok:false}),chrome:{runtime:{sendNativeMessage:async(_host,message)=>{
+    actions.push(message.action);return {ok:true,explorer_protocol:'1.1'};
+  }}}});
+  await assert.rejects(window.ChuteyExplorerAPI.nativeSession(),error=>error.code==='LEGACY_RECOVERY_UNSAFE');
+  assert.deepEqual(actions,['get_native_capabilities']);
+  console.log('PASS: unavailable legacy helper never receives an automatic resume/wake');
 })().catch(error=>{console.error(error);process.exitCode=1;});

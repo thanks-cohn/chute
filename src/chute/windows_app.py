@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import contextlib
+import json
 import os
 import shutil
 import subprocess
@@ -11,6 +12,7 @@ import urllib.error
 import urllib.request
 from pathlib import Path
 
+from .runtime_log import BoundedLog, resource_snapshot, safe_exception
 from .browser_extensions import discover_chute_extension_ids
 from .native_host import (
     allow_extension,
@@ -54,7 +56,7 @@ def installed_exe() -> Path:
 def log_path() -> Path:
     local = os.environ.get("LOCALAPPDATA")
     base = Path(local) if local else Path.home()
-    path = base / "Chute" / "logs" / "chute.log"
+    path = base / "Chute" / "logs" / "chute-runtime.log"
     path.parent.mkdir(parents=True, exist_ok=True)
     return path
 
@@ -133,21 +135,12 @@ def _start_native_origin_refresh() -> None:
 
 
 def _stop_old_installed_copy() -> None:
-    """Stop Chute.exe before replacing it, even when its health endpoint is dead."""
-    if os.name != "nt":
-        return
-    try:
-        subprocess.run(
-            ["taskkill", "/IM", "Chute.exe", "/F"],
-            stdin=subprocess.DEVNULL,
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-            check=False,
-            creationflags=subprocess.CREATE_NO_WINDOW,
-        )
-    except OSError:
-        return
-    time.sleep(0.45)
+    """Refuse replacing a live/unknown installed process, never kill by name."""
+    if os.name!='nt': return
+    from .windows_processes import matching_pids
+    pids=matching_pids(installed_exe())
+    if pids is None or pids:
+        raise OSError('Exit the installed companion before installing a candidate in an isolated test environment.')
 
 
 def _copy_installed_exe(source: Path, target: Path) -> None:
@@ -210,8 +203,8 @@ def main() -> int:
             allow_extension(args[index + 1])
             return 0
         except (IndexError, ValueError) as exc:
-            with log_path().open("a", encoding="utf-8") as log:
-                print(f"Could not allow development extension: {exc}", file=log)
+            with BoundedLog(log_path()) as log:
+                print(json.dumps(safe_exception(exc)), file=log)
             return 2
 
     _ensure_data_layout()
@@ -220,28 +213,34 @@ def main() -> int:
         if self_install_if_needed():
             return 0
     except OSError as exc:
-        with log_path().open("a", encoding="utf-8") as log:
-            print(f"Chute self-install failed: {exc}", file=log)
+        with BoundedLog(log_path()) as log:
+            print(json.dumps(safe_exception(exc)), file=log)
         return 1
 
-    # Keep learning newly loaded unpacked Chute IDs while the companion is up.
-    _start_native_origin_refresh()
+    from .windows_processes import instance_guard
+    with instance_guard(installed_exe()) as acquired:
+        if not acquired or already_running(): return 0
+        # Only the server owner starts discovery; duplicate launches exit.
+        _start_native_origin_refresh()
+        return _serve_with_logging()
 
-    if already_running():
-        return 0
 
+def _serve_with_logging() -> int:
     path = log_path()
-    with path.open("a", encoding="utf-8", buffering=1) as log:
+    with BoundedLog(path) as log:
         with contextlib.redirect_stdout(log), contextlib.redirect_stderr(log):
             print("Starting Chute for Windows on 127.0.0.1:17891", flush=True)
-            print(f"Chute data: {data_dir()}", flush=True)
+            print(json.dumps(resource_snapshot()), flush=True)
             try:
                 serve(DEFAULT_HOST, DEFAULT_PORT)
             except OSError as exc:
-                print(f"Chute could not start: {exc}", flush=True)
+                print(json.dumps(safe_exception(exc)), flush=True)
                 return 1
             except KeyboardInterrupt:
                 return 0
+            except Exception as exc:
+                print(json.dumps(safe_exception(exc)),flush=True)
+                return 1
     return 0
 
 

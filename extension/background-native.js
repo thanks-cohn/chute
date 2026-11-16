@@ -4,7 +4,24 @@
   const HEALTH_URL = `${CHUTE_ORIGIN}/health`;
   const NATIVE_WAKE_TIMEOUT_MS = 7500;
   const nativeFetch = globalThis.fetch.bind(globalThis);
-  let wakePromise = null;
+  let wakePromise = null, failures = 0, nextWake = 0, outcome = 'unknown';
+  const events = [];
+  const stateLoaded = chrome.storage.session ? chrome.storage.session.get({chuteyRecovery:null}).then(value=>{
+    const saved=value.chuteyRecovery;
+    if (saved && Number.isFinite(saved.nextWake) && saved.nextWake<Date.now()+120001) {
+      nextWake=saved.nextWake;failures=Math.min(8,Math.max(0,Number(saved.failures)||0));
+    }
+  }).catch(()=>{}) : Promise.resolve();
+  function record(reason,layer='native_bridge') {
+    outcome=reason;events.push({at:Date.now(),layer,reason,failures});
+    if (events.length>20) events.shift();
+    if (chrome.storage.session) void chrome.storage.session.set({chuteyRecovery:{failures,nextWake,events:[...events]}}).catch(()=>{});
+  }
+  function failed(reason) {
+    failures++;nextWake=Date.now()+(failures>=3?120000:2000*2**(failures-1));
+    record(reason);if (failures>=3) record('circuit_cooldown');return false;
+  }
+  globalThis.ChuteRecovery=Object.freeze({wake:()=>wakeCompanion(),snapshot:()=>({outcome,failures,nextWake,events:[...events]})});
 
   function sleep(ms) {
     return new Promise((resolve) => setTimeout(resolve, ms));
@@ -17,7 +34,7 @@
   }
 
   function isBridgeRequest(input) {
-    return requestUrl(input).startsWith(CHUTE_ORIGIN);
+    try { return new URL(requestUrl(input)).origin===CHUTE_ORIGIN; } catch { return false; }
   }
 
   function offlineError(cause) {
@@ -60,7 +77,7 @@
 
   async function bridgeHealthy() {
     try {
-      const response = await nativeFetch(HEALTH_URL, { cache: "no-store" });
+      const response = await nativeFetch(HEALTH_URL, { cache: "no-store", signal:AbortSignal.timeout(1200) });
       return response.ok;
     } catch {
       return false;
@@ -70,21 +87,24 @@
   async function wakeCompanion() {
     if (wakePromise) return wakePromise;
     wakePromise = (async () => {
-      if (await bridgeHealthy()) return true;
-
+      await stateLoaded;
+      if (await bridgeHealthy()) { failures=0;nextWake=0;record('healthy');return true; }
+      if (Date.now()<nextWake) { record('backoff');return false; }
+      record('probe_failed');
       try {
+        const capabilities=await sendNative({action:'get_native_capabilities'});
+        if (capabilities?.safe_recovery!==1) return failed('legacy_helper_requires_user_action');
         const response = await sendNative({ action: "ensure_bridge" });
-        if (!response?.ok) return false;
+        if (!response?.ok) return failed(({LIVE_UNRESPONSIVE:'live_process_unresponsive',PROCESS_IDENTITY_UNKNOWN:'process_identity_unknown',BUSY:'busy',BACKOFF:'backoff',CIRCUIT_OPEN:'circuit_cooldown',RECOVERY_STATE_UNAVAILABLE:'recovery_storage_unavailable',START_TIMEOUT:'start_timeout'})[response?.code] || 'native_unavailable');
       } catch (error) {
-        console.debug("Chute background native wake unavailable:", error.message);
-        return false;
+        return failed(/forbidden|not allowed/i.test(error.message)?'native_forbidden':'native_unavailable');
       }
 
       for (const delay of [80, 180, 350, 700, 1200]) {
         await sleep(delay);
-        if (await bridgeHealthy()) return true;
+        if (await bridgeHealthy()) { failures=0;nextWake=0;record("recovered");return true; }
       }
-      return false;
+      return failed("health_timeout");
     })().finally(() => {
       wakePromise = null;
     });
@@ -105,6 +125,11 @@
   // wakes a sleeping MV3 worker, then this worker asks the registered Windows
   // native host to repair/restart Chute.exe.
   chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
+    if (message?.type==='chute-diagnostics') {sendResponse({recovery:globalThis.ChuteRecovery.snapshot(),counts:globalThis.ChuteStatus?.diagnostics()});return false;}
+    if (message?.type==='chute-ui-diagnostic') {
+      if (['host_remounted','remount_cooldown','pending_intake_detached','expected_autohide','floating_disabled'].includes(message.reason)) record(message.reason,'mascot_ui');
+      sendResponse({ok:true});return false;
+    }
     if (message?.type !== "chute-ensure-bridge") return undefined;
 
     wakeCompanion()
@@ -112,7 +137,7 @@
       .catch((error) => sendResponse({
         ok: false,
         bridge: "unavailable",
-        error: error?.message || String(error)
+        code: "RECOVERY_UNAVAILABLE"
       }));
     return true;
   });
@@ -124,10 +149,15 @@
   globalThis.fetch = async function chuteBackgroundFetch(input, init) {
     if (!isBridgeRequest(input)) return nativeFetch(input, init);
     try {
-      return await nativeFetch(input, init);
+      const response=await nativeFetch(input, init);
+      if (response.status===503) throw offlineError();
+      return response;
     } catch (firstError) {
+      if (firstError?.name === "AbortError") throw firstError;
       const recovered = await wakeCompanion();
       if (!recovered) throw offlineError(firstError);
+      const method=String(init?.method||input?.method||'GET').toUpperCase();
+      if (!['GET','HEAD'].includes(method)) throw new Error('Save receipt unavailable. Check the basket before retrying; the write was not replayed.');
       try {
         return await nativeFetch(input, init);
       } catch (secondError) {

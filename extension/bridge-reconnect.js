@@ -5,7 +5,7 @@
   const RAW_TRANSPORT_PATTERN = /(?:127\.0\.0\.1(?::\d+)?|localhost(?::\d+)?|failed to fetch|networkerror|load failed|chute (?:server|bridge) returned|local bridge returned|chute is not running|could not read file \(\d+\)|chutebridgeofflineerror)/i;
 
   let recoveryPromise = null;
-  let lastBridgeState = "unknown";
+  let lastBridgeState = "unknown", nextRecovery=0, recoveryFailures=0;
 
   function sleep(ms) {
     return new Promise((resolve) => setTimeout(resolve, ms));
@@ -22,7 +22,7 @@
   }
 
   function isBridgeRequest(input) {
-    return requestUrl(input).startsWith(CHUTE_ORIGIN);
+    try { return new URL(requestUrl(input)).origin===CHUTE_ORIGIN; } catch { return false; }
   }
 
   function isTransportFailure(value) {
@@ -56,15 +56,18 @@
       emitBridgeState("waking");
 
       if (await rawHealthCheck()) {
+        recoveryFailures=0;nextRecovery=0;
         emitBridgeState("connected", { recovered: false });
         return true;
       }
 
+      if (Date.now()<nextRecovery) {emitBridgeState('offline');return false;}
       // ChuteNativeWake owns exactly one wake sequence: MV3 worker first, then
       // direct native messaging only if the worker route itself is unavailable.
       if (window.ChuteNativeWake?.wake) {
         const woke = await window.ChuteNativeWake.wake();
         if (woke && await rawHealthCheck()) {
+          recoveryFailures=0;nextRecovery=0;
           emitBridgeState("connected", { recovered: true, via: "worker-helper" });
           return true;
         }
@@ -81,6 +84,7 @@
         }
       }
 
+      recoveryFailures++;nextRecovery=Date.now()+Math.min(120000,2000*2**Math.min(recoveryFailures,6));
       emitBridgeState("offline");
       return false;
     })().finally(() => {
@@ -98,6 +102,7 @@
       if (response.ok && lastBridgeState !== "connected") emitBridgeState("connected");
       return response;
     } catch (error) {
+      if (error?.name === "AbortError") throw error;
       const recovered = await recoverBridge();
       if (!recovered) {
         const friendly = new Error("Chute is asleep.");

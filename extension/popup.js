@@ -131,7 +131,7 @@ clearChuteButton?.addEventListener("click", async () => {
     });
     if (!response.ok) throw new Error(`Local bridge returned ${response.status}`);
     if (typeof resetHistory === "function") await resetHistory();
-    chrome.runtime.sendMessage({ type: "badge-refresh" });
+    chrome.runtime.sendMessage({ type: 'chute-count-changed' });
     clearChuteButton.textContent = "Chute cleared ✓";
   } catch (error) {
     clearChuteButton.textContent = "Could not clear Chute";

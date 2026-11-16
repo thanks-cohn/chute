@@ -19,6 +19,7 @@
   let supportActive = false;
   let dragActive = false;
   let contextActive = false;
+  let intakeActive = false;
   let hideTimer = null;
   let initialTimer = null;
   let edgeHoldTimer = null;
@@ -66,7 +67,8 @@
       !pointerNearZone &&
       !supportActive &&
       !dragActive &&
-      !contextActive
+      !contextActive &&
+      !intakeActive
     );
   }
 
@@ -75,12 +77,14 @@
     clearHideTimer();
     hidden = false;
     host.style.transform = "translateX(0)";
+    if (host.dataset) host.dataset.chuteVisibility=intakeActive ? "saving":"visible";
   }
 
   function hide() {
     if (!canHide()) return;
     hidden = true;
     host.style.transform = HIDDEN_TRANSFORM;
+    if (host.dataset) host.dataset.chuteVisibility="auto-hidden";
   }
 
   function scheduleHide(delay = LEAVE_HIDE_DELAY_MS) {
@@ -178,6 +182,11 @@
   function attachHost(nextHost) {
     if (!nextHost || host === nextHost) return;
     host = nextHost;
+    host.addEventListener('chute-intake-state',event=>{
+      intakeActive=Boolean(event.detail?.active);
+      if (intakeActive) { clearInitialTimer();clearHideTimer();reveal(); }
+      else beginInitialWindow();
+    });
     host.addEventListener("chute-context-active", event => {
       if (event.detail?.active === false) { releaseContext(); return; }
       contextActive = true; clearInitialTimer(); clearHideTimer(); reveal();

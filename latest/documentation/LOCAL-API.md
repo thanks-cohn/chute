@@ -204,3 +204,9 @@ Linux fixture success is not that evidence.
 ## Development 1 repair acceptance
 
 See [Development 1 results and Windows gate](../../codex-11.16.2026/DEVELOPMENT1-IMPLEMENTATION-AND-VALIDATION.md). The new Windows-specific tests are unrun on Linux. Do not treat mock Shell calls as real Windows application/reveal evidence.
+
+## Development 1 count and recovery update
+
+GET `/api/status` returns `{ "service": "chute", "count": N }` with the existing basket CORS policy. It does not grant filesystem access or replace scoped Explorer authentication. The extension background worker shares/cache-coalesces count reads for 30 seconds and uses mutation events for immediate refresh. Old servers without this route use the existing list endpoint at the shared fallback rate.
+
+Native `get_native_capabilities` now advertises `safe_recovery:1`. Automatic ensure/resume on an unavailable bridge requires that capability; old helpers may kill by image name and are not automatically invoked. A healthy old pairing remains supported. Candidate recovery never terminates live/unknown processes and rate-limits exact-target launches. Browser `chute-diagnostics` returns bounded recovery reason/timing and count counters, not tokens, paths or browsing data. No arbitrary process control API was introduced. See [final repair handoff](../../codex-11.16.2026/DEVELOPMENT1-FINAL-REPAIR-HANDOFF.md).

@@ -21,9 +21,11 @@ async function chuteUploadCustomThumbnail(blob, name, source = "browser-drop") {
       const payload = await response.json();
       if (payload.error) message = payload.error;
     } catch {}
-    throw new Error(message);
+    const error=new Error(message); error.status=response.status; throw error;
   }
-  return response.json();
+  const receipt=await response.json();
+  if (!/^[a-f0-9]{32}$/.test(receipt?.file?.id||"") || receipt.file.size!==blob.size) throw Error("Incomplete save receipt");
+  return receipt;
 }
 
 uploadBlob = async function(blob, name, source = "browser-drop") {
@@ -35,6 +37,7 @@ uploadBlob = async function(blob, name, source = "browser-drop") {
     try {
       result = await chuteUploadCustomThumbnail(blob, name, source);
     } catch (error) {
+      if (![404,405,501].includes(error.status)) throw error;
       // Updating the extension before the localhost runtime must never break
       // intake. Older servers do not have /api/custom-thumbnails yet, so keep
       // the custom derivative as an ordinary preserved file for this capture.
@@ -158,7 +161,9 @@ async function chuteFinalizeImageCapture(payloads, uploads) {
 }
 
 consumePayloadsNow = async function(payloadPromise, expected) {
-  const payloads = await payloadPromise;
+  let payloads;
+  try { payloads = await payloadPromise; }
+  catch (error) { return chuteBaseConsumePayloadsNowForProvenance(Promise.reject(error),expected); }
   const tracked = payloads.filter((payload) => payload?.chuteProvenance);
   if (!tracked.length) {
     return chuteBaseConsumePayloadsNowForProvenance(Promise.resolve(payloads), expected);

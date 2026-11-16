@@ -15,6 +15,7 @@ let pendingSignals = 0;
 let optimisticFloor = 0;
 let lastSyncOkay = false;
 let intakeQueue = Promise.resolve();
+let countRefresh = null, countTimer = null, lastIntakeProblem = null;
 
 function safeName(value, fallback) {
   const cleaned = String(value || "")
@@ -78,9 +79,13 @@ async function uploadBlob(blob, name, source = "browser-drop") {
       const payload = await response.json();
       if (payload.error) message = payload.error;
     } catch {}
-    throw new Error(message);
+    const error=new Error(message);error.status=response.status;throw error;
   }
-  return response.json();
+  const receipt = await response.json();
+  if (!/^[a-f0-9]{32}$/.test(receipt?.file?.id || '') || receipt.file.size !== blob.size) {
+    throw new Error('Save receipt is incomplete. Check the basket before retrying.');
+  }
+  return receipt;
 }
 
 function firstUriText(value) {
@@ -263,28 +268,45 @@ function finishOptimisticIntake(expected = 1, succeeded = true) {
   renderCount();
 }
 
-async function refreshCount() {
-  try {
-    const response = await fetch(`${BASE_URL}/api/files`, { cache: "no-store" });
-    if (!response.ok) throw new Error();
-    const payload = await response.json();
-    serverCount = payload.files?.length || 0;
-    lastSyncOkay = true;
-    renderCount();
-    if (!busy && pendingSignals === 0 && !successFeedbackTimer) {
-      label.textContent = "CHUTE";
-      face.textContent = "•ᴗ•";
-    }
-  } catch {
-    lastSyncOkay = false;
-    renderCount();
-    if (!busy && pendingSignals === 0 && !successFeedbackTimer) {
-      count.hidden = true;
-      label.textContent = "OFF";
-      face.textContent = "•︵•";
-    }
+function applyCount(snapshot) {
+  if (!snapshot || !Number.isSafeInteger(snapshot.count)) return;
+  serverCount = snapshot.count; lastSyncOkay = snapshot.connected === true;
+  renderCount();
+  if (!busy && pendingSignals === 0 && !successFeedbackTimer) {
+    label.textContent = lastSyncOkay ? (lastIntakeProblem === "uncertain" ? "CHECK" : lastIntakeProblem === "failed" ? "FAILED" : "CHUTE"):"OFF";
+    face.textContent = lastSyncOkay ? "•ᴗ•":"•︵•";
   }
+  if (!lastSyncOkay) bin.title = ({
+    legacy_helper_requires_user_action:'Start the existing companion normally. Safe automatic recovery requires the matching isolated test helper.',
+    native_forbidden:'The native helper is not authorized for this extension. Check the matching test pair and enrollment.',
+    live_process_unresponsive:'The companion is alive but not responding. Chutey has not stopped it or replayed a save.',
+    process_identity_unknown:'Recovery paused because the companion process identity could not be verified.',
+    circuit_cooldown:'Automatic reconnect is cooling down after repeated failures. Check the companion and available resources.'
+  })[snapshot.reason] || "Companion unavailable. Chutey will retry while this tab is active.";
+  else bin.title = lastIntakeProblem ? "Save was not confirmed. Check the basket before retrying; no automatic resubmission was made." : "Drop files here to send them to Chute";
 }
+async function refreshCount(changed = false) {
+  if (countRefresh && !changed) return countRefresh;
+  const operation = chrome.runtime.sendMessage({type:changed ? 'chute-count-changed':'chute-count-status'})
+    .then(applyCount).catch(() => {
+      lastSyncOkay = false; renderCount();
+      bin.title = 'Extension connection unavailable. Check that Chutey is enabled, then reload this page.';
+    });
+  if (changed) return operation;
+  countRefresh=operation.finally(()=>{countRefresh=null;});return countRefresh;
+}
+function scheduleCount() {
+  clearTimeout(countTimer); countTimer=null;
+  if (document.hidden) return;
+  countTimer=setTimeout(async()=>{await refreshCount();scheduleCount();},30000);
+}
+document.addEventListener('visibilitychange',()=>{
+  if (!document.hidden) void refreshCount();
+  scheduleCount();
+});
+chrome.storage.onChanged.addListener((changes,area)=>{
+  if (area==='session' && changes.chuteyCountStatus?.newValue) applyCount(changes.chuteyCountStatus.newValue);
+});
 
 function setSupportHover(next) {
   if (!supportCard) return;
@@ -349,7 +371,8 @@ supportCard?.addEventListener("pointerleave", () => scheduleSupportClose());
 supportCard?.addEventListener("click", (event) => event.stopPropagation());
 
 async function consumePayloadsNow(payloadPromise, expected) {
-  busy = true;
+  busy = true;lastIntakeProblem=null;
+  if (successFeedbackTimer) {clearTimeout(successFeedbackTimer);successFeedbackTimer=null;}
   setDragVisual(false);
   cancelSupportClose();
   setSupportHover(false);
@@ -369,26 +392,32 @@ async function consumePayloadsNow(payloadPromise, expected) {
       if (payloads.length > 1) label.textContent = `${completed}/${payloads.length}`;
     }
 
-    await refreshCount();
+    // A count request must never delay the original receipt reaction.
     succeeded = true;
     showSuccessFeedback();
-    chrome.runtime.sendMessage({ type: "badge-refresh" });
+    window.parent.postMessage({type:"chute-intake-state",active:true,outcome:"saved"},"*");
+    void refreshCount(true);
+    await new Promise(resolve=>setTimeout(resolve,420));
   } catch (error) {
+    lastIntakeProblem=error.status>=400 && error.status<500 ? "failed":"uncertain";
     animate("failure");
     label.textContent = "FAILED";
     face.textContent = "×︵×";
-    console.error("Chute drop failed:", error);
+    bin.title = "Save was not confirmed. Check the basket before retrying; no automatic resubmission was made.";
+    console.error("Chute drop was not confirmed.");
   } finally {
     finishOptimisticIntake(expected, succeeded);
     busy = false;
     pageDragSource = null;
-    await refreshCount();
+    window.parent.postMessage({type:"chute-intake-state",active:pendingSignals>0,outcome:succeeded?"saved":"unconfirmed"},"*");
+    if (!succeeded) { void refreshCount(true); void window.ChuteNativeWake?.wake(); }
   }
 }
 
 function enqueuePayloads(payloadPromise, expected = 1) {
   const amount = Math.max(1, Math.trunc(Number(expected) || 1));
   beginOptimisticIntake(amount);
+  window.parent.postMessage({type:"chute-intake-state",active:true},"*");
   intakeQueue = intakeQueue.then(
     () => consumePayloadsNow(payloadPromise, amount),
     () => consumePayloadsNow(payloadPromise, amount)
@@ -455,4 +484,4 @@ window.addEventListener("message", (event) => {
 
 window.parent.postMessage({ type: "chute-request-drag-source" }, "*");
 refreshCount();
-setInterval(refreshCount, 1200);
+scheduleCount();

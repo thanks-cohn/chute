@@ -40,6 +40,7 @@
   shadow.append(frame);
 
   let supportHover = false;
+  let intakeActive = false, lastMount = 0, mountAttempts = [], mountTimer = null, pendingLossReported=false;
   let accessMode = "floating";
   let autoHide = true;
   let pageDragSource = null;
@@ -67,6 +68,7 @@
     // If the user explicitly selected Always visible, reveal Chutey even
     // when a stale right-click-only access preference is present.
     host.style.display = (!autoHide || floatingEnabled(accessMode)) ? "block" : "none";
+    host.dataset.chuteAccess=host.style.display === "none" ? "floating-disabled":"floating-enabled";
   }
 
   function renderSize() {
@@ -382,6 +384,11 @@
 
   window.addEventListener("message", (event) => {
     if (event.source !== frame.contentWindow) return;
+    if (event.data?.type === "chute-intake-state") {
+      intakeActive=Boolean(event.data.active);
+      host.dispatchEvent(new CustomEvent('chute-intake-state',{detail:{active:intakeActive,outcome:event.data.outcome}}));
+      if (!intakeActive) mount();
+    }
     if (event.data?.type === "chute-mascot-context") {
       // Only messages from this mascot frame reach this boundary.
       host.dispatchEvent(new CustomEvent("chute-context-active",{detail:{active:event.data.active !== false}}));
@@ -421,11 +428,43 @@
 
   function mount() {
     const root = document.documentElement || document.body;
-    if (root && !host.isConnected) root.append(host);
+    if (!root || host.isConnected || document.getElementById('__chute_sticky_host')) return;
+    // Reuse this one host/frame; never reload the tab or re-submit file data.
+    // A detached intake is uncertain: do not reset its frame while it is busy.
+    if (intakeActive) {
+      if (!pendingLossReported) {pendingLossReported=true;void chrome.runtime.sendMessage({type:'chute-ui-diagnostic',reason:'pending_intake_detached'}).catch(()=>{});}
+      return;
+    }
+    const now=Date.now(); mountAttempts=mountAttempts.filter(at=>now-at<60000);
+    if (mountAttempts.length>=3) {
+      if (!mountTimer) {
+        mountTimer=setTimeout(()=>{mountTimer=null;mount();},120000);
+        void chrome.runtime.sendMessage({type:'chute-ui-diagnostic',reason:'remount_cooldown'}).catch(()=>{});
+      }
+      return;
+    }
+    if (lastMount && now-lastMount<1000) {
+      if (!mountTimer) mountTimer=setTimeout(()=>{mountTimer=null;mount();},1000);return;
+    }
+    mountAttempts.push(now);lastMount=now;pendingLossReported=false;root.append(host);
+    if (mountAttempts.length>1) void chrome.runtime.sendMessage({type:'chute-ui-diagnostic',reason:'host_remounted'}).catch(()=>{});
   }
-
   mount();
-  if (document.documentElement) {
-    new MutationObserver(mount).observe(document.documentElement, { childList: true });
-  }
+  let watchedRoot=document.documentElement;
+  const observer=new MutationObserver(()=>{
+    if (watchedRoot!==document.documentElement) {
+      watchedRoot=document.documentElement;observer.disconnect();observer.observe(document,{childList:true});
+      if (watchedRoot) observer.observe(watchedRoot,{childList:true});
+    }
+    mount();
+  });
+  observer.observe(document,{childList:true});
+  if (watchedRoot) observer.observe(watchedRoot,{childList:true});
+  chrome.runtime.onMessage?.addListener((message,_sender,reply)=>{
+    if (message?.type==='chute-ui-state') reply({hostPresent:host.isConnected,access:host.dataset.chuteAccess,
+      visibility:host.dataset.chuteVisibility,pendingIntake:intakeActive,backgroundTab:document.hidden});
+  });
+  window.addEventListener('pageshow',mount);
+  document.addEventListener('visibilitychange',()=>{if (!document.hidden) mount();});
+
 })();
