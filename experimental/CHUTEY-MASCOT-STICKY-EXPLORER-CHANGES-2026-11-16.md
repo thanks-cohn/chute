@@ -1,20 +1,24 @@
 # EXPERIMENTAL — Changes to existing Chutey mascot (2026-11-16)
 **Scope:** Owner's proposed changes to the existing mascot and its File Explorer. This is NOT an instruction to implement during Phase 1 repair. Keep artwork and existing mascot logic; do not create a replacement character or introduce unrelated speculative features.
 
-## Existing mascot: right-click and Expand
-- Fix immediate current defect: RIGHT-CLICK makes mascot disappear. Mascot must remain visible during a menu interaction and active drag/drop.
-- Add right-click menu action **Expand**. It turns/opens this **same existing Chutey** into its own persistent **native Windows always-on-top sticky File Explorer**, remaining available regardless of website or application. Chrome's ordinary action popup is not sufficient for cross-app always-on-top.
-- Collapse/minimize returns to mascot; re-expand resumes same Explorer context, without duplicate windows.
-- Expanded Explorer should allow drag/drop of supported webpage content or local files onto a folder visible inside it. Destination is that chosen folder; save must be verified and errors honest.
+## Existing mascot: modular right-click menu and sticky Explorer
+- Fix immediate defect: right-click currently hides the mascot. The mascot must remain visible while the menu is open and during drag/drop.
+- Create a **separate reusable mascot context-menu module**, not tangled with current gallery/worker logic. Style: **little brown background with gold menu cards**. Initial options: **Expand**, **Assign**, **Pick Me Up** / **Drop Off** (state-dependent). Further choices only after owner approval.
+- **Expand:** turn/open this same mascot into a movable, **permanent native always-on-top File Explorer / gallery / lightbox window** that stays above ordinary applications and websites. User can move window, collapse to the mascot and expand it again. Don't duplicate windows or replace the mascot.
+- **Assign:** open compact Chutey File Explorer/folder chooser and select the location where files dropped onto THIS mascot are saved. Default prior to assignment remains the mascot's **existing working destination**.
+- **Make Chutey Location!:** add this exact action to folders' right-click menu inside Chutey File Explorer, assigning the chosen folder to the current mascot (with appropriate authorization). It must not be an arbitrary global path grant.
+- **Pick Me Up:** initiate deliberate repositioning of this mascot; **Drop Off** completes placement and saves resting position. Distinguish deliberate mascot movement from dragging a file onto it. The user may use the shortcut and menu; don't invent a new gesture that breaks current drop interactions.
+- Expanded Explorer supports dropping supported webpage content/local files **onto a directory to save in that directory**. If a **large image preview is open**, dropping an image onto that preview saves the dropped image as a **sibling file in the same directory as the previewed image**, not as a replacement or nested child; preserve unique filenames and verify completion.
+- Opening a destination respects permissions; unsuccessful drops are surfaced and do not trigger false success.
 
 ## Remember exactly where the user was
 - Default on re-expansion during same session: open last visited directory with the last opened/previewed file selected (do NOT automatically launch/play it).
 - Optional setting: persist this location, selected file and useful Explorer state across Chutey/Windows restarts, subject to renewed permission when needed.
-- User-requested Reveal preference is in immediate owner requirements: keep Windows Explorer default and offer Chutey Explorer alternative at containing directory/file selection.
+- User-requested Reveal preference: **Chutey Explorer is default**, with **the current working Windows Reveal/GO TO retained as a Settings alternative** and repaired if any part is incomplete. Opening a file defaults to Chutey, with system application selectable in Settings. Preview remains distinct.
 
 ## Mascot location, hide/reveal and interactions
 - Mascot currently at bottom left; requested initial activation hotspot is **bottom right**.
-- Let user drag existing mascot into preferred on-screen resting/dock position and remember it.
+- Let user deliberately relocate the existing mascot using **Pick Me Up** and **Drop Off**, save chosen resting/dock position, and maintain a clear distinction from a file drop.
 - Collapsed mascot hides after **10 seconds of inactivity**, and is intentionally revealed by hover over **bottom-right hotspot**; random hovering elsewhere on a webpage must not trigger it.
 - Auto-hide is suspended during right-click menu, active drag/drop, ongoing interaction; expanded sticky Explorer does not disappear due to mascot timer.
 
@@ -33,11 +37,11 @@
 
 ## Codex boundaries / execution order
 1. Fix the current right-click hiding regression in Phase 1.
-2. Prototype existing mascot -> Expand -> single sticky Explorer -> Collapse, as separately approved work.
-3. Implement safe destination drops and last-directory/last-selected file behavior, and optional restart persistence.
-4. Implement customizable hotspot/drag placement and 10s hide without interfering with interaction.
+2. Prototype modular brown/gold right-click menu for the EXISTING mascot, then Expand -> single movable sticky Explorer -> Collapse, as separately approved work.
+3. Implement Assign picker, folder menu **Make Chutey Location!**, safe destination drops including sibling-image drop, and last-directory/last-selected file behavior with optional restart persistence.
+4. Implement **Pick Me Up / Drop Off** relocation, configurable activation/hotspot and 10s idle hide without interrupting interaction.
 5. Add multiple destination-linked Chuteys only after single instance is stable and resource-bounded.
 6. Add requested tongue-out/laugh and stealth-reaching social interactions later via Mascot API.
 7. Provide test evidence and owner approval gates. Never alter installed protected worker in place.
 
-No unrequested Open action, new mascots or speculative extra behaviors.
+Do not create new mascot artwork or multiple mascots now; do not add unspecified context-menu options or unrelated features. Preserve the existing mascot and functioning Windows Reveal. The owner's specified Open setting (Chutey default, system optional) is approved, but broader system integration is not.
