@@ -39,6 +39,6 @@ Collect **read-only** Windows Reliability Monitor/Event Viewer/Chrome crash time
 3. Trace drop-to-success animation and restore **the original visual reaction**, with observed real drop test.
 4. Improve recovery in an independent, bounded, process-safe way; do not introduce self-reloading crash loops.
 5. Run isolated Windows acceptance for old Phase 1 features plus these three issues, report precise evidence and unresolved cases.
-6. Only after completed Development 1 is owner-reviewed, create Development 2 from its **final repaired and validated commit**. The always-on-top portable Explorer, its controls, folder drops, and nostalgic yellow legal-pad appearance belong to Development 2; do not start them yet.
+6. **STOP after Development 1 handoff.** The owner must PERSONALLY validate Development 1 on Windows and later explicitly authorize a **separate Development 2 request**. Passing tests or completing Development 1 is NOT permission to create the second branch. The always-on-top portable Explorer, folder drops and nostalgic yellow legal-pad appearance are NOT part of this phase.
 
 **Protect:** original installed `Chute.exe` (SHA-256 `C193FE77CC3E7DB9FA1B661F98FC3416AD42067B9B86BD496E2F00ED0CC4944B`), existing extension/data, history, files, Chrome profiles and archived baseline. No data deletion or installed-binary replacement as an audit side effect.
