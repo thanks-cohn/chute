@@ -8,7 +8,7 @@ Within Shelf Settings add a clean **History Export** section, with three selecta
 2. **Today:** one complete day according to the user's **local timezone**, not current live basket alone.
 3. **Selected date range:** inclusive From/To date pickers, timezone-labeled, validation (start <= end), defined empty-result behavior.
 
-Action button: **Export History**. User picks at least CSV or JSON. File name should identify Chutey, scope, date range and export timestamp, e.g. `chutey-history-2026-11-01_to_2026-11-16.csv`.
+Action button: **Export History**. **Every export always produces EXACTLY ONE downloadable .zip archive, regardless of how large the history is.** Never generate multiple ZIP volumes, multiple ZIP downloads, parts, shards, segmented archives, or separate CSV/JSON downloads to work around memory limits. Include **both CSV and JSON** history data *inside the same single ZIP* (plus an optional compact manifest with scope, UTC/local timezone, range, count, schema and snapshot cutoff). File name identifies Chutey, scope, date range and export timestamp, e.g. `chutey-history-2026-11-01_to_2026-11-16.zip`. The selected period determines the ZIP contents, not the number of ZIPs.
 
 ## Actual Chutey data/source code
 - `src/chute/store.py` records append-only daily events in `<Chute data>/history/YYYY-MM-DD.tsv` using UTC timestamps, with add/remove/clear/recall history events.
@@ -20,13 +20,15 @@ Action button: **Export History**. User picks at least CSV or JSON. File name sh
 
 ## Engineering and safety
 - Read-only and copy-only. **Never mutate, truncate, delete, migrate or rewrite the original history logs** during export. Export must not alter queue, live-state flags or files; should not automatically trigger `clear` or `remove`.
-- For potentially thousands/millions of events, use bounded server-side streaming or bounded cursor-based pagination/temporary export and response download; avoid full-history JavaScript JSON blobs or memory exhaustion on 4 GB Windows. Make progress/cancel/error behavior clear and don't confuse incomplete files with complete successful exports.
+- **SINGLE-ZIP SIZE RULE:** For potentially thousands/millions of events, use ZIP64-capable archive creation and bounded server-side/chunked processing so one ZIP can exceed classic ZIP's 4-GiB limits if storage allows. Stream individual CSV and JSON members into the archive using constant/bounded buffers; never build the full export or entire ZIP in JavaScript memory. Protect the ~4 GB RAM host through streaming/backpressure, not splitting into many ZIP files.
+- A single ZIP may be constructed as one bounded on-disk temporary file and downloaded only after final ZIP integrity checks, or streamed as a single ZIP response with a reliable completion protocol. **One output ZIP only**. Do not leave completed shards/parts or partial downloads named as successes; remove safely scoped temporary artifacts after success/cancel/failure, without touching source history.
+- If the destination has insufficient free space, filesystem size limits, access failures, or other unavoidable constraints, clearly report **the single export could not complete**; never quietly split into multiple archives or truncate history to make it fit. Offer retry/save elsewhere without changing the chosen scope. Make progress/cancel/error behavior clear; verify archive central directory and expected member count before declaring completion.
 - Concurrent ongoing file saves/history append should remain safe; define consistent snapshot or cutoff time, and handle partial last lines. Path traversal and untrusted metadata must never become a filesystem read vector.
 - Show a summary after successful completion with scope, count and destination or download, without claiming success before actually ready.
 
 ## Acceptance
-- All time, Today, inclusive custom range (including spanning months and local/UTC midnight) produce correct events/counts. Test empty history, malformed date input, duplicates, removed/cleared/recall items and long chronology.
-- Round-trip UTF-8, quotes, newlines; CSV injection resistance; no secrets or out-of-root reads; no source-history mutation.
+- All time, Today, inclusive custom range (including spanning months and local/UTC midnight) produce correct events/counts **in exactly one .zip each**, containing both CSV and JSON metadata representations. Test empty history, malformed date input, duplicates, removed/cleared/recall items and long chronology.
+- Round-trip UTF-8, quotes, newlines; CSV injection resistance; no secrets or out-of-root reads; no source-history mutation. Test ZIP64 and archive integrity, growing histories and low-memory stress: no multiple ZIP outputs, no failed partial output masquerading as success.
 - No regressions to Shelf History view/navigation, popup Settings or popup gallery, YUMMY feedback, live transfers and memory usage.
 - Native implementation only if needed; produce separately tested matching candidate and opt-in steps. Preserve installed worker and owner archive until approval.
 
