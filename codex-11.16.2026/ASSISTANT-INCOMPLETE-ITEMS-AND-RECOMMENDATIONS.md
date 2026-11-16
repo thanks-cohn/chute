@@ -3,10 +3,9 @@
 
 ## Open versus Preview versus Reveal/GO TO — especially important
 - **Preview** displays file *inside Chutey*. Owner explicitly requested Left/Right preview navigation, with Up/Down scrolling within documents.
-- **Reveal / GO TO** navigates to the location of a file. Owner likes an EXISTING working feature that opens the Windows location; this MUST be preserved as the default. Owner explicitly requested a Settings alternative: open **Chutey File Explorer** at containing directory with file selected. Verify which current UI/actions already do this, including History/Shelf GO TO, rather than replacing or renaming working behavior casually.
-- **Open** (launch in default Windows app, e.g. MP3 in player, TXT in editor) is a *different* possible native action. **The assistant suggested adding/completing this; the owner did not ask for it.**
-- Phase 1 handoff notes the candidate Explorer's new native **Open/Reveal** dispatcher and consent/API support were incomplete. This does NOT mean the owner's existing Reveal/GO TO feature is absent or should be removed. Review actual action paths and offer a scoped proposal *before* adding a new Open behavior.
-- If future Open is approved: explicit action and consent, default app launch, correct file identity, error handling and distinguish from Preview/Reveal; otherwise defer.
+- **Reveal / GO TO (updated owner requirement):** Default is **Chutey File Explorer**, navigating to the file's containing directory with the file selected. Settings must offer **Windows File Explorer** as an alternative. Crucially **retain existing, currently working Windows Reveal/GO TO behavior and repair it if incomplete**; do not throw away the working implementation. Audit History/Shelf/File Explorer routes individually.
+- **Open (updated owner requirement):** Default opens supported files **within Chutey**; a separate Settings option switches to the **system's default application**. This optional system Open is now specifically requested by the owner, not merely an assistant idea. Preview remains a separate, already specified gallery action.
+- Phase 1 handoff lists incompleteness in candidate native Open/Reveal dispatcher. This does not prove the existing Windows Reveal/GO TO behavior is broken. Identify what already works, preserve it, and repair only demonstrated gaps. Require explicit authorization and actionable errors for system actions.
 
 ## Current Phase 1 test and compatibility gaps
 - Handoff reported 84 Python tests passed, 9 skipped, 37 subtests passed and Chromium fixtures, but real Windows/Chrome acceptance incomplete. Skips are not successes. Original Windows installation must remain protected.
@@ -20,7 +19,7 @@
 - For large audio/video: distinguish container, codec and file size; range 206/HEAD, seeking, bounded buffers, cleanup, cancellation, graceful unsupported codec response, no false "played" claims.
 - Webpage drag/drop may provide URL, HTML or bytes; validate sources and URLs, keep destination confined to approved root, verify completed saves before celebrating. Cloud provider transfers need explicit auth, progress, rollback/retry and cost/quotas.
 - Preserve API-first parity as an existing project principle, but don't rewrite unrelated APIs merely to fix the immediate popup regression.
-- Potential UX additions NOT asked for: new "Open in default app" command, new context-menu commands, new debug overlays, new character artwork, generalized media-library features and more advanced window options. Seek approval before any such development.
+- Other NOT-requested UX additions: unrelated new commands beyond the owner's specified Open/Reveal preferences and mascot menu, new debug overlays, replacement character artwork, generalized media-library features and extra window options. Seek approval before development.
 
 ## Suggested audit checklist — no automatic implementation
 1. Inventory working old Reveal and History/Shelf GO TO behavior and check which should use Windows versus Chutey destination setting.
