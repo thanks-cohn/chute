@@ -31,33 +31,30 @@ Proposed boundaries (names are illustrative; inspect code before deciding paths)
 
 **Acceptance:** Images that should open through Windows File Explorer do so using a valid authorized file identity/handle; invalid or stale handles have explicit, actionable recovery. Opening, revealing, or selecting must not confuse one operation with another. Automated API and Windows integration regression tests cover this exact error.
 
-## C. CRITICAL: Replace inline previews with a bottom-docked Shelf preview pane
+## C. CRITICAL: Bottom-anchored OVERLAY preview — NEVER resize the file list
 
-**Observed behavior confirmed by owner:** Preview is being inserted **between files** in the File Explorer. It changes shape/size when moving through entries. Remove this inline expansion model entirely for Explorer previews.
+**Latest owner clarification overrides previous dock/split-pane language.** The preview currently appears between file entries, causing reflow and apparent size changes. Remove that behavior entirely.
 
-**Required geometry and interaction:**
-- The preview is a dedicated bottom-docked pane in the Shelf's working region, **outside** the file-list DOM/grid. Never render it as an inserted file row, card, overlay between entries, or expansion that changes the list's layout.
-- On first opening, the pane takes approximately **one third of the available Shelf working area height**. The file list remains independently scrollable above it.
-- A visible horizontal **top divider/drag handle** adjusts pane height by vertical pointer dragging; persist user-adjusted size if appropriate.
-- Dragging the divider toward the top may expand the pane to the **maximum remaining working area**, while keeping the permanent top controls visible.
-- **Expand** moves immediately to that maximum size; **X** closes the pane. A collapse / restore affordance returns it to the previous docked height. Closing returns space to the file list.
-- The preview size **must never depend on selected file, image dimensions, video dimensions, aspect ratio, metadata, thumbnail readiness, or navigation**.
-- Contain image or video content inside the fixed preview bounds using letterboxing rather than resizing the pane.
-- The slider / existing size options must integrate coherently with this **resizable divider design**, rather than competing with it. If the old preview-size slider conflicts, map it to the pane-height preset and keep the divider as the authoritative direct manipulation control.
-- Ensure keyboard accessibility for pane resizing and close/expand; respect reduced-motion settings.
+**The preview is a bottom-anchored, topmost overlay ON TOP OF the existing File Explorer content. It is not an in-flow pane and must not resize, shrink, move, repartition, or remeasure the directory list, file cards, scroll container, tab strip or navigation controls.** Its geometry and visibility are independent of the content beneath it.
 
-## D. Expanded preview keeps the Shelf's main controls
+- Initially show the preview at approximately **one third of the Shelf's available height**, anchored flush to the bottom and overlaying the file content beneath. The file list itself retains **exactly the same layout and dimensions** whether the preview is open, resized, expanded, or closed.
+- Position the preview outside the file row/grid, in its own fixed/absolute overlay layer associated with the Shelf viewport. It must never be inserted between list entries.
+- The **top edge is a draggable horizontal resizing handle**. Drag it upwards to grow the overlay; drag it downward to shrink. This changes only preview overlay geometry and **never changes the layout of any other element**.
+- Allow dragging the top edge **all the way up to the workspace tabs**. The **History** and **File Explorer** tabs must remain visible, accessible and unobscured at maximum height.
+- Preserve the top-left Chutey branding and any persistent navigation toolbar controls (Back, Forward, Up directory, Refresh, Home) that occupy the protected header region; the preview may overlay file content below but not cover the protected controls.
+- **Expand** instantly grows to the maximum allowed overlay height; a restore action returns to the previously selected overlay height; **X** closes the preview, revealing file content already underneath with **no reflow**.
+- Keep the last user-selected divider height as appropriate. Any existing size slider must be coherent with direct drag-to-resize; it must not also resize the file list.
+- Selected image/video aspect ratio, decoding, selection changes, arrow-key navigation, playback and metadata must **never change the preview's height, width, or shape**. Contain media within the overlay (letterbox using object-fit:contain).
+- The preview is visually topmost relative to file entries, with deliberate layering. Its own controls remain clickable without blocking the persistent tabs/navigation above it.
+- Support keyboard-accessible resize and reduced motion; no entrance animation in this Codex run.
 
-At maximum height, the preview occupies all available **working content area**, but the following stay visible and usable:
-- top-left Chutey icon / branding;
-- **History** and **File Explorer** tabs;
-- **Back**, **Forward**, **Up one directory**, **Refresh**, and **Home**.
+## D. Expanded overlay — stops at the persistent tabs/header
 
-Do not obscure or displace those controls. Do not open a browser-level fullscreen modal. Directory and navigation state are maintained when expanding or restoring.
+At full height the preview overlays nearly the whole Shelf content region **without resizing anything beneath it**. The top boundary stops at the History/File Explorer tabs (and must preserve all persistent header/navigation controls above or alongside the protected region). It is NOT a browser fullscreen modal. Expand and drag-to-top are equivalent maximum-height operations.
 
 ## E. Arrow keys always navigate the directory, preview follows
 
-- While docked or fully expanded, **Up/Down should continue moving through the directory as though no preview pane exists**, updating the currently selected file's preview.
+- While the overlay is at one-third height or fully expanded, **Up/Down should continue moving through the directory as though no preview pane exists**, updating the currently selected file's preview.
 - The preview must not hijack folder-list selection, create duplicate arrow-key handlers, insert additional file-list entries, or change ordering.
 - Arrow keys in focused text fields, dropdowns, sliders, resizer handles or video controls should retain their expected control-specific behavior; otherwise keep the directory navigation owner.
 - Navigate quickly among portrait/landscape/square images, videos, PDFs, non-media entries and broken files without preview geometry shifts.
@@ -68,7 +65,7 @@ Do not obscure or displace those controls. Do not open a browser-level fullscree
 **User requirement:** Chutey's local File Explorer must display real media previews. Merely showing a filename, generic icon, or a failing `Open` action is unacceptable.
 
 ### Images
-- Show actual images in the docked pane, preserving proportions using `object-fit: contain` or the native equivalent.
+- Show actual images in the preview overlay, preserving proportions using `object-fit: contain` or the native equivalent.
 - Support common formats that the chosen renderer can decode (at minimum PNG, JPEG, GIF, WebP, and BMP; evaluate SVG, AVIF, HEIC and others with explicit capability reporting).
 - Animated images should animate if supported, with appropriate loading and reduced-motion handling.
 - Use local, authorized file identities/handles and existing local native APIs; avoid converting local paths to unsecured public URLs.
@@ -78,7 +75,7 @@ Do not obscure or displace those controls. Do not open a browser-level fullscree
 ### Videos
 - Show a poster frame or video preview for supported local video files and offer **Play/Pause, seek, time/progress, and mute/volume** when the renderer supports playback.
 - Start video **paused**, not autoplaying on every arrow-key selection.
-- Keep video fitted inside the same fixed pane, with no resizing on metadata load or aspect ratio changes.
+- Keep video fitted inside the same preview overlay, with no resizing on metadata load or aspect ratio changes.
 - Support common browser/native codecs as actually available (for example MP4/H.264 or WebM), and identify unsupported containers/codecs explicitly; never promise universal decoding without a decoder backend.
 - Prefer bounded local streaming/range access instead of loading entire large videos into browser memory. Keep worker and scrolling responsive; stop playback/release resources when navigating away.
 
@@ -89,9 +86,9 @@ Do not obscure or displace those controls. Do not open a browser-level fullscree
 - No destructive changes to the presently identified worker binary; test a separately packaged modified worker if native changes are necessary.
 
 ### Acceptance and regression tests
-1. Open an image: it renders in the bottom third docked pane. Open a video: it has a real poster/playback (if supported), not a generic image fallback.
+1. Open an image: it renders in the bottom-third overlay. Open a video: it has a real poster/playback (if supported), not a generic image fallback.
 2. Up/Down rapidly traverses a mixed folder; previews update to the correct file, the list stays scrollable, and **the pane never changes size**.
-3. Drag divider from approximately 1/3 height toward the top, use Expand, restore, and X; persistent nav controls never disappear.
+3. Drag the overlay's top divider from approximately 1/3 height toward the tabs; use Expand, restore, and X. Verify that neither directory layout, scroll container geometry, nor persistent tabs/nav controls change.
 4. Broken/missing/unsupported media shows a clear local error and keeps layout and navigation intact.
 5. Large media or slow decoding does not freeze the browser popup, Shelf, or Windows worker.
 6. Verify opening/revealing in Windows works separately from previewing, including reproduction and resolution of `Expected a file handle.`.
@@ -115,12 +112,12 @@ Do not obscure or displace those controls. Do not open a browser-level fullscree
 ## Implementation order and safety gates
 
 1. Reproduce and instrument the native `Expected a file handle.` failure in the current pairing without changing the installed worker.
-2. Replace inline Explorer previews with the resizable bottom-docked pane; stabilize geometry, image/video preview, and keyboard selection synchronization.
-3. Implement correctly scoped drag-to-expand / Expand / restore / X preview behavior, preserving navigation controls.
+2. Replace inline Explorer previews with the bottom-anchored overlay, without reflow or resizing any other UI; stabilize image/video preview and keyboard selection synchronization.
+3. Implement overlay-only drag-to-expand / Expand / restore / X behavior, stopping at the workspace tabs and preserving all persistent navigation controls.
 4. Extract the reusable default-images + background-animation presentation module; introduce Options background color, migration, and unit tests.
 5. Run focused Chrome and real Windows Explorer tests on a separate test extension/worker pairing, with existing current working pair left as a rollback.
 6. Preserve verified working binary, Git refs, and local history/Chute data; do not conflate logged success, visible preview and successful native Open.
 
-## Future idea, not part of this bugfix
+## Out of scope for this Codex run: ALL popup entrance animation
 
-A deliberate **four-corners-first** popup entrance animation may be explored later. The current priority is one stable complete popup silhouette, placeholders first, real images loaded asynchronously, and reliable Explorer behavior.
+**DO NOT implement the four-corners-first animation, nor any other new opening animation or staged reveal.** Current requirement: stable, fully laid-out popup shape from first paint; placeholders first; image decode later; zero unintended flicker/jank. The four-corners idea is deferred to an entirely separate future project.
