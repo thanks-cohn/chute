@@ -2,6 +2,8 @@
 
 **Read this document first. Follow the OWNER requirements, not assistant-only recommendations.**
 Repository: `thanks-cohn/chute`.
+
+**Required pre-repair reading:** `codex-11.16.2026/DEVELOPMENT1-SOURCE-AUDIT-CRASHES-POLLING-ANIMATION.md` documents verified source findings for excessive `/api/files` polling, unbounded logs, mascot success-animation code paths, and risky process-wide native restart logic. Use these findings as the starting point for Development 1's outstanding Windows repairs; distinguish source evidence from crash-cause hypotheses.
 Protected source branch: `fix/chutey-popup-stable-first-paint-2026-11-16`.
 Already-created **Development 1** branch: `codex/2026-11-16-phase1-repairs`.
 **Development 2** branch to create LATER, only after Development 1 is complete and owner-validated: `codex/2026-11-16-sticky-mascot`, forked from the **final successful HEAD of the Development 1 branch** (NOT the old reference branch; NOT main).
