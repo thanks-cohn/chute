@@ -8,12 +8,12 @@ Related GitHub issues: [#15](https://github.com/thanks-cohn/chute/issues/15) and
 
 The owner is talking about the **little extension popup that opens from Chrome's toolbar button**: `extension/popup.html`, `extension/popup-gallery.css`, `extension/popup-gallery.js`, `extension/popup.js`, and shared CSS. **Not the Shelf side panel, and not the separate Explorer or native Windows window.**
 
-**Non-negotiable appearance/behavior: one scrollbar vertically, none horizontally.**
-- Popup Settings currently exhibits *lateral/horizontal scrolling* and awkward separated scrolling areas. Arrange **every Settings control vertically in readable rows**; allow labels to wrap and form controls to shrink within 390px. No sideways/horizontal scrollbar, no offscreen controls.
+**Owner-corrected interpretation: ONE vertical scrollbar for the whole small Chrome popup, instead of multiple vertical scrollbars appearing SIDE BY SIDE. The word “lateral” referred to competing scrollbars at the right edges of nested areas—not primarily to left/right scrolling.**
+- Owner observes **multiple separate vertical scrollbar tracks** in the little pop-out, especially when Settings is open; these look like competing side-by-side scrollbars. Arrange **every Settings control in readable, vertically stacked rows**, and make the natural popup/document scroll the only vertical scroller. Do not mistake “lateral scrollbars” for a complaint principally about horizontal movement. Keep labels and controls accessible within 390px.
 - The **whole little popup has one natural top-to-bottom up/down vertical scroll surface** when its content exceeds Chrome's popup viewport. When Settings expands, it must push the gallery down in normal document flow, not overlay it with a separate scrollable 280px popover. Do not leave competing independent scrollbars inside Settings or the gallery.
 - Inspect rules already in `popup-gallery.css`: `.settings-panel[open] .settings {position:absolute;max-height:min(280px,48vh);overflow-y:auto}`, `#files {height:400px;overflow-y:auto}`, and fixed `html/body` 390x590 `overflow:hidden`. Those actively create multiple scrolling/overflow regions. Refactor deliberately; not a cosmetic scrollbar-hiding patch.
 - Maintain 4×4/5×4/5×5/6×5 density, 30-item paging, 120-item regression, gallery tile dimensions, placeholders/skeletons, calendar and navigation, and previews. Do not make tall Settings cause a tiny cropped gallery; scrolling the single popup is fine.
-- For layout, prevent `min-width:auto`/fixed-width control overflow, and keep scrollbar gutter stable. Test at actual 390px popup viewport plus text zoom and long strings; no horizontal scroll (`scrollWidth <= clientWidth`) anywhere. Keep focus and keyboard access, no nested wheel scroll trap.
+- For layout, prevent accidental width overflow as ordinary responsive hygiene; the primary acceptance criterion is **ONE scrollbar**, not merely removing horizontal movement. Test the actual 390px popup with Settings expanded, zoom, long labels and full gallery; wheel/keyboard must smoothly scroll through all sections without separate Settings or gallery tracks.
 - This is **specifically the extension popup Settings**, not Shelf Settings. Shelf Settings gets a different History Export request (3C).
 
 ## B. Small popup thumbnails and expanded image
@@ -33,7 +33,7 @@ In `extension/shelf.html`, `extension/shelf.js` and `extension/shared.css`: acti
 
 ## D. Test/evidence and hard stop
 
-- Browser screenshot/DOM regression for popup Settings **closed and expanded** at 390px, including all controls reachable with **one vertical scrollbar and zero horizontal scrollbars**. Test ScrollHeight/Width, wheel and keyboard, no clipped content.
+- Browser screenshot/DOM regression for popup Settings **closed and expanded** at 390px, showing **ONE visible vertical scrollbar at the popup's right edge, no second/third scrollbar beside Settings or the gallery**. Ensure all controls and images are reachable with that same scroll; test wheel/keyboard and unclipped content. Check incidental horizontal overflow separately, not as the owner's core complaint.
 - Screenshot Shelf History rows in narrow and normal Chrome side-panel sizes; `DRAG ME!` must remain whole, actions reachable, long names/times truncated gracefully.
 - Test popup image click, Escape, click-away, arrow navigation, right-click `Trash It!`, live queue update and dated History recall. Check archive-only behavior never changes history. No X/Expand UI.
 - Preserve original **YUMMY** verified-save reaction, 10-second mascot behavior, thumbnail lazy loading, original media, file contents, logs and transfer receipts. Run all relevant existing JS/Chromium tests; add explicit regressions.
