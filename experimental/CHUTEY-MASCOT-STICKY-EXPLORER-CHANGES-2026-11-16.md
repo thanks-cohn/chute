@@ -3,8 +3,8 @@
 
 ## Existing mascot: modular right-click menu and sticky Explorer
 - Fix immediate defect: right-click currently hides the mascot. The mascot must remain visible while the menu is open and during drag/drop.
-- Create a **separate reusable mascot context-menu module**, not tangled with current gallery/worker logic. Style: **yellow-and-brown notepad / sticky-note appearance** (warm yellow paper and brown accents, rather than generic gold cards). Keep the menu legible and distinct; this is the user's actual desired visual reference. Initial options: **Expand**, **Assign**, **Pick Me Up** / **Drop Off** (state-dependent). Further choices only after owner approval.
-- **Expand:** turn/open this same mascot into a movable, **permanent native always-on-top File Explorer / gallery / lightbox window** that stays above ordinary applications and websites. User can move window, collapse to the mascot and expand it again. Don't duplicate windows or replace the mascot.
+- Create a **separate reusable mascot context-menu module**, not tangled with current gallery/worker logic. Style: **brownish backing panel, yellow note-card menu tiles, black text with a subtle bluish outline**; playful notepad appearance, NOT metallic gold. The menu is its own reusable module. Initial options: **Expand**, **Assign**, **Pick Me Up** / **Drop Off** (state-dependent). Further choices only after owner approval.
+- **Expand:** turn/open this same mascot into a movable, **persistent native Windows always-on-top File Explorer / gallery / lightbox window**, above other websites and normal applications. It must have visible functional **X (close), minimize-to-mascot (–), and expand/maximize/restore (□)** window controls. Users can **grab and drag its edges/corners to resize** it (including height and width), drag its titlebar to reposition it, and the file list and lightbox reflow correctly *within* the window while preserving navigation, scroll, and selection. The topmost property survives ordinary focus changes; close behavior must not destroy user's files, and minimize returns to existing mascot. No duplicate sticky windows and no replacement mascot.
 - **Assign:** open compact Chutey File Explorer/folder chooser and select the location where files dropped onto THIS mascot are saved. Default prior to assignment remains the mascot's **existing working destination**.
 - **Make Chutey Location!:** add this exact action to folders' right-click menu inside Chutey File Explorer, assigning the chosen folder to the current mascot (with appropriate authorization). It must not be an arbitrary global path grant.
 - **Pick Me Up:** initiate deliberate repositioning of this mascot; **Drop Off** completes placement and saves resting position. Distinguish deliberate mascot movement from dragging a file onto it. The user may use the shortcut and menu; don't invent a new gesture that breaks current drop interactions.
@@ -37,7 +37,7 @@
 
 ## Codex boundaries / execution order
 1. Fix the current right-click hiding regression in Phase 1.
-2. Prototype modular yellow-and-brown notepad-style right-click menu for the EXISTING mascot, then Expand -> single movable sticky Explorer -> Collapse, as separately approved work.
+2. Prototype modular brown-backed/yellow-card/black-text/blue-outline right-click menu for the EXISTING mascot, then Expand -> single movable, edge-resizable always-on-top Explorer with X/minimize/expand-restore controls -> Collapse, as separately approved work.
 3. Implement Assign picker, folder menu **Make Chutey Location!**, safe destination drops including sibling-image drop, and last-directory/last-selected file behavior with optional restart persistence.
 4. Implement **Pick Me Up / Drop Off** relocation, configurable activation/hotspot and 10s idle hide without interrupting interaction.
 5. Add multiple destination-linked Chuteys only after single instance is stable and resource-bounded.
