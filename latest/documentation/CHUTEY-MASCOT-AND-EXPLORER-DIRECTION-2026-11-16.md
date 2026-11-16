@@ -127,6 +127,43 @@ At full height the preview overlays nearly the whole Shelf content region **with
 
 **Status:** Required investigation and implementation; not yet fixed. Preserve the current known working installation.
 
+## I. FINAL PHASE — harden the verified native worker for high-throughput local-to-browser streaming
+
+**Owner requirement:** After completing the UI, Grid View, image/video preview, and file-handle repairs in this Codex run, improve the **current established Windows Chute worker implementation** to handle heavy concurrent local-file, image, and video streaming workloads with the greatest *measured sustainable throughput and reliability* achievable on the user's hardware. Symptoms reported under load include popup flicker, failed operations and worker instability; those are reports, not proven root causes.
+
+### Immutable reference / safe development boundary
+- Current installed executable: `C:\Users\jg202\AppData\Local\Programs\Chute\Chute.exe`.
+- Exact SHA-256: `C193FE77CC3E7DB9FA1B661F98FC3416AD42067B9B86BD496E2F00ED0CC4944B`.
+- Matching published binary: https://github.com/thanks-cohn/chute/releases/tag/chute-test-20261104-0529-CST (`Chute-Windows-Explorer-TEST.exe`).
+- Chrome extension source reference: `45dc8f034045c8807f5b712f7e8915c7ba76313a`.
+- Preserve original installer, executable, source commit and archive docs. **Never overwrite the known-working installed worker during development.** Develop the enhanced worker from its identified source lineage on an isolated branch/build; test independently; maintain explicit rollback and data compatibility.
+
+### Architecture and capability targets
+1. **Real local-to-browser byte streaming:** Serve authorized file ranges/chunks from disk to a local loopback browser client; never require reading complete large files or videos into memory. Implement standards-compliant HTTP `Range`, `206 Partial Content`, `Content-Range`, `Accept-Ranges`, `Content-Length`, HEAD and seek behavior where appropriate, including correct rejection of invalid ranges; preserve file integrity and authorization at every request.
+2. **Concurrency without starvation:** Sustain several simultaneous media playback/seek operations, thumbnail requests, directory listings, metadata reads and drag/drop transfers. Separate latency-sensitive control/health traffic from expensive decode and transfer work; use bounded worker pools, concurrency limits, backpressure, cancellation and fair scheduling, rather than unlimited threads or queues.
+3. **Memory and disk discipline:** Limit buffers, cached thumbnails, decode jobs, per-request memory and total memory consumption. Avoid unnecessary copies, file descriptor leaks, Blob/Object URL leaks, temp-file growth and OS paging. Respect the user's historically constrained Windows machine (approximately 4 GiB RAM and sometimes very little free C: space); do not set arbitrary memory/cache budgets without measuring.
+4. **UI isolation:** Heavy native activity must not block or distort popup first paint, Explorer rows, preview overlay, controls or responsiveness. Worker/network stalls should lead to bounded loading/timeout states rather than image flicker, blank panels or misleading completion feedback.
+5. **Resilience and observability:** Separate native process death, browser MV3 sleep, native messaging wake failure, loopback transport error, permission/handle expiration, file read errors, cancellation, media decode limitations and client disconnects. Provide truthful API diagnostics, bounded retries/backoff and recovery without duplicate-launch storms. Do not assume the worker is the source of flicker without instrumented evidence.
+6. **Security:** Keep loopback-only transport, enforce scoped authenticated/authorized file handles, path traversal prevention, URL/token lifecycle, and origin constraints. Do not expose arbitrary filesystem bytes to websites or send local file locations to cloud services.
+7. **Media throughput:** Lazy/priority thumbnail generation and caching with bounded concurrent jobs; responsive full-image viewing; video streaming/seek on supported formats/codecs with range requests and paused-by-default playback; release resources promptly when selection changes or preview closes.
+8. **Integrity and compatibility:** Preserve previously working Chutey functionality, user data/history, exact source file identities, native host registration and extension/native protocol parity. Browser UI and native API must agree on valid file handles and failure states; no fake "success."
+
+### Baseline measurements and mandatory stress suite
+Record the current binary's results **before** optimization, then compare the enhanced worker under exactly the same conditions. At minimum measure:
+- throughput MiB/s, p50/p95/p99 response latency, time-to-first-byte, video startup/seek latency, UI interaction latency;
+- process memory (working set and peak), CPU, open handles, disk/temp usage, timeouts, error rate, dropped/aborted operations, process restarts and recovery duration;
+- 1/4/8/16 (and hardware-appropriate additional) concurrent file/media requests, different file sizes including multi-GiB sparse/test files without duplicating them, cached/cold paths, repeated random seeks, rapid folder scrolling and thumbnail generation;
+- simultaneous local media streaming + Explorer traversal + popup open/close + Shelf usage; native restart, browser restart, Windows sleep/resume and disconnect fault injection;
+- extended soak tests with timestamped evidence, realistic workloads and no file or history loss.
+
+**Acceptance:** No worker crashes, unbounded resource growth, silent data corruption, missing files or unrecoverable stalls in the defined feasible stress scenarios; correct range semantics; truthful errors at resource limits; UI remains usable. Report observed sustainable throughput and concurrency at the user's actual hardware limits; no unsupported claims of unlimited throughput or perfect stability. Regression testing must include the current worker behavior and verify the improved version is **not worse** on core critical paths.
+
+### Completion/promotion protocol
+- Implement user-facing fixes first, and make the native throughput/stability work the **last dedicated stage**; do not mix risky native rewrites into UI regression debugging.
+- Produce separate reproducible Windows build and test artifact with commit, SHA-256, architecture, benchmark results and recovery instructions.
+- Verify actual Chutey functionality, Chrome integration and local history integrity on the test pairing, then repeat stress/soak tests.
+- Do not replace the currently installed worker or alter preserved GitHub Releases/tags as a side effect of Codex development. Promote only after explicit owner approval and evidence-backed comparison.
+
 ## Implementation order and safety gates
 
 1. Reproduce and instrument the native `Expected a file handle.` failure in the current pairing without changing the installed worker.
@@ -134,7 +171,8 @@ At full height the preview overlays nearly the whole Shelf content region **with
 3. Implement overlay-only drag-to-expand / Expand / restore / X behavior, stopping at the workspace tabs and preserving all persistent navigation controls.
 4. Extract the reusable default-images + background-animation presentation module; introduce Options background color, migration, and unit tests.
 5. Run focused Chrome and real Windows Explorer tests on a separate test extension/worker pairing, with existing current working pair left as a rollback.
-6. Preserve verified working binary, Git refs, and local history/Chute data; do not conflate logged success, visible preview and successful native Open.
+6. After UI/media work and initial regressions, run the dedicated native-worker streaming/throughput hardening phase described in section I. Benchmark the exact archived worker first, then optimize isolated test builds and run stress/soak/fault-injection tests.
+7. Preserve verified working binary, Git refs, and local history/Chute data; do not conflate logged success, visible preview and successful native Open. Do not replace the installed worker without an explicit user-approved promotion.
 
 ## Out of scope for this Codex run: ALL popup entrance animation
 
