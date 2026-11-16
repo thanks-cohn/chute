@@ -22,6 +22,24 @@ At source commit `62694d6`:
 6. **Scope**: Keep cloud-provider/REDOWN integration disabled unless already supported; no promise of unlimited files, cross-site drag or 4K Movie Mode. If Chrome/Windows drag protocol cannot carry large files, provide an explicit, reachable safe alternative UI rather than pretending it works.
 7. **Validation**: bounded-memory tests for large sparse files + real bytes and real media on Windows; range HEAD/GET seek; memory/commit/disk/latency instrumentation for 4 GB class system; responsive folder UI while copying or playing. No private file contents in logs.
 
+
+## OWNER-REQUIRED LOCAL MEDIA STREAMING — WORKER IMPLEMENTATION COMES LAST
+
+**Sequencing is mandatory:** Finish Request 3A (small Chrome popup UX + Shelf cards), Request 3C (Shelf History export), and Request 3D (daily text highlights, popup reader, Shelf setting for decoration OFF) and their tests **before making the final large-file/worker streaming implementation** in this Request 3B. It is fine to audit interfaces and prepare compatibility notes earlier, but do not start the worker streaming rewrite or new Windows build first. User wants a working, tested UI and history foundation, then the more invasive media/worker stage at the end.
+
+**Important expanded requirement:** Chutey's worker must stream actual, potentially multi-gigabyte **MP4, WebM, and MP3 from user-authorized local directories**, *without making the user first import the entire file into Chutey or preload it into Chrome memory*, in **BOTH**:
+1. **Shelf → File Explorer preview pane**: directly preview/play/seek local media files in an authorized directory.
+2. **Small Chrome toolbar extension popup → expanded preview**: directly preview/play/seek MP4/WebM/MP3 backed by a permitted local-directory file. The popup currently represents stored live/history items; explicitly design a scoped handoff or discoverable local-directory browsing/selection route to bring permissioned files into the popup. Do not pretend a live-store file and an external authorized local file are interchangeable, and do not grant arbitrary path access just because the popup opens.
+
+**Media architecture acceptance:**
+- Native Windows worker holds an approved/guarded handle for the original local file, with identity checks, scoped short-lived media capability/ticket and revocation; serve actual bytes via efficient HTTP byte-range `GET` and `HEAD` to the two extension viewers, support `206 Content-Range`, `Accept-Ranges`, honest `Content-Length`, and `416` on invalid ranges. Secure Origin/auth/ticket handling, no leaking access to arbitrary webpages or long-lived public files.
+- Chrome `<video>` / `<audio>` uses the streaming URL with `preload="metadata"` and browser range/seek handling, not `fetch(...).blob()`, `arrayBuffer()`, base64, massive `File` copies, or giant IPC messages. Stream only bounded blocks, cap concurrent reads, clean up and cancel on switching, closing, navigation, expiry, revoked access and worker restart.
+- Validate genuine local MP4 (H.264/AAC baseline where available), WebM (VP8/VP9/Opus), and MP3 test assets of several sizes. Display useful unsupported-codec feedback instead of claiming all codecs supported or silently transcoding; plain recognized extension does not count as playable.
+- On the owner's ~4 GB RAM Windows machine, measure worker/Chrome memory and responsive behavior while a large local movie is playing/seeking and a directory is browsed. Do not monopolize worker locks, starve UI, lose receipts or require a large temporary disk copy. Handle missing/replaced/locked files and no-space conditions gracefully.
+- **Two explicit real-Chrome acceptance tests**: open and seek each format from an authorized local directory in **Shelf preview**; then repeat in the **little extension popup expanded preview**. Report both as distinct pass/fail results. Synthetic 3 GiB sparse test and MIME classification alone do not satisfy this requirement.
+
+**Phase separation:** This is the **LAST Development 1 implementation task**, followed by the last build/test/report. It is **not Development 2** and does not authorize the future sticky mascot/native always-on-top Explorer project.
+
 ## Deliverables and gate
 Confirmed root cause(s) vs unresolved guesses, exact changed code, tests/evidence for every tested media format and file size, known unsupported modes, safe cancellation/disk failures, source SHA. If native changes needed: build and upload a **matching isolated test Windows companion + native host + Chrome extension**, identify `Chutey-Setup` clearly, provide checksums and explicit opt-in install steps. Do not silently replace running installed worker or modify archived worker, stored files/history, production Chrome profiles or snapshots.
 
