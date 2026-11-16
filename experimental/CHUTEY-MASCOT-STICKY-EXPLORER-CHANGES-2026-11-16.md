@@ -22,26 +22,11 @@
 - Collapsed mascot hides after **10 seconds of inactivity**, including after minimizing the sticky Explorer back to the mascot's last saved Drop Off position. **Only hovering the bottom-right activation hotspot summons it again**, even if the mascot's saved on-screen position is elsewhere; hovering casually anywhere else must not summon it. An active mascot menu/drop interaction pauses the countdown.
 - Auto-hide is suspended during right-click menu, active drag/drop, ongoing interaction; expanded sticky Explorer does not disappear due to mascot timer.
 
-## Multiple destination-linked mascots (later stage)
-- Eventually allow user to set the number of active Chutey mascots, each with distinct assigned destination and remembered placement.
-- Drop a file ON a particular mascot: it is saved to THAT mascot's assigned folder/cloud destination (once supported). Expanding it opens Chutey File Explorer at that assigned location.
-- Each instance independent; shared native services where possible. Decide precedence between assigned default folder and last-opened directory before implementation, rather than guessing.
-- This extends existing Chutey mascot identities; no redesign.
-
-## Optional Mascot API interactions requested for future
-- Two neighboring mascots can playfully notice each other and reach/touch.
-- **New interaction:** one Chutey sticks its tongue out at a neighboring Chutey, and the other Chutey laughs/reacts.
-- Earlier requested stealth interaction: one reaches toward its neighbor, but when the mouse approaches, it hides its hand and pretends it was not doing anything.
-- These are **owner-requested future interaction examples**, not instructions to build a full personality simulator now.
-- Animations must be optional and must not interrupt file dropping, menu clicks or the primary File Explorer.
-
 ## Codex boundaries / execution order
 1. Fix the current right-click hiding regression in Phase 1.
 2. Prototype modular brown-backed/yellow-card/black-text/blue-outline right-click menu for the EXISTING mascot, then Expand -> single movable, edge-resizable always-on-top Explorer with X/minimize/expand-restore controls -> Collapse, as separately approved work.
 3. Implement Assign picker, folder menu **Make Chutey Location!**, safe destination drops including sibling-image drop, and last-directory/last-selected file behavior with optional restart persistence.
 4. Implement **Pick Me Up / Drop Off** relocation, configurable activation/hotspot and 10s idle hide without interrupting interaction.
-5. Add multiple destination-linked Chuteys only after single instance is stable and resource-bounded.
-6. Add requested tongue-out/laugh and stealth-reaching social interactions later via Mascot API.
-7. Provide test evidence and owner approval gates. Never alter installed protected worker in place.
+5. Provide test evidence and owner approval gates. Never alter installed protected worker in place.
 
-Do not create new mascot artwork or multiple mascots now; do not add unspecified context-menu options or unrelated features. Preserve the existing mascot and functioning Windows Reveal. The owner's specified Open setting (Chutey default, system optional) is approved, but broader system integration is not.
+Do not create new mascot artwork; do not add unspecified context-menu options or unrelated features. Preserve the existing mascot and functioning Windows Reveal. The owner's specified Open setting (Chutey default, system optional) is approved, but broader system integration is not.
