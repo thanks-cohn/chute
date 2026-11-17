@@ -185,3 +185,8 @@ truncate, spending ~20–30 seconds allocating/zeroing 3 GiB per case. It now ma
 only its newly created disposable fixture with FSCTL_SET_SPARSE before extension.
 This changes no product/owner file, keeps the same logical 3-GiB range checks,
 and makes the resource test genuinely sparse on Windows as well as POSIX.
+
+The native-to-Live GUI copy now emits the shared count-change event after
+COMMITTED, just like other verified saves. A transport regression exercises
+accepted→running→COMMITTED and verifies failed/uncertain jobs never broadcast
+success. This prevents waiting for the broker's bounded fallback polling interval.

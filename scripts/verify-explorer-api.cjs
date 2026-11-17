@@ -64,3 +64,21 @@ function api(host,bridge){
   assert.deepEqual(actions,['get_native_capabilities']);
   console.log('PASS: unavailable legacy helper never receives an automatic resume/wake');
 })().catch(error=>{console.error(error);process.exitCode=1;});
+
+(async()=>{
+  async function run(states){
+    const window={},saved={},events=[];let index=0;
+    vm.runInNewContext(source,{window,crypto:require('node:crypto').webcrypto,Date,setTimeout:fn=>queueMicrotask(fn),chrome:{storage:{session:{get:async d=>({...d,...saved}),set:async x=>Object.assign(saved,x),remove:async k=>{delete saved[k];}}},runtime:{sendMessage:async m=>events.push(m.type)}},fetch:async(_url,options)=>{
+      const {command}=JSON.parse(options.body);events.push(command);
+      const result=command==='transfer_dismiss'?{dismissed:true}:{id:'a'.repeat(32),state:states[Math.min(index++,states.length-1)],size:5,bytes:5,receipt:{state:'COMMITTED',file:{id:'b'.repeat(32),size:5}}};
+      return {ok:true,json:async()=>({state:'completed',result})};
+    }});
+    try{await window.ChuteyExplorerAPI.transfer({id:'a'.repeat(32),kind:'local_to_live',handle:'source',identity:'identity'});}catch{}
+    return events;
+  }
+  const completed=await run(['accepted','running','COMMITTED']);
+  assert.deepEqual(completed,['transfer_start','transfer_status','transfer_status','chute-count-changed','transfer_dismiss']);
+  assert(!(await run(['failed'])).includes('chute-count-changed'));
+  assert(!(await run(['UNCERTAIN'])).includes('chute-count-changed'));
+  console.log('PASS: native-to-Live copy broadcasts count only after COMMITTED; failed/uncertain jobs never report success');
+})().catch(error=>{console.error(error);process.exitCode=1;});

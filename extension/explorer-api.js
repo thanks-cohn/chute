@@ -96,6 +96,7 @@
         job=await window.ChuteyExplorerAPI.command('transfer_status',{id});
       }
       if(job.state!=='COMMITTED')throw Error(job.error || 'Transfer did not commit. Check its retained job ID before retrying.');
+      if(args.kind==='local_to_live')void chrome.runtime.sendMessage?.({type:'chute-count-changed'})?.catch(()=>{});
       await chrome.storage.session.set({chuteyLastTransferReceipt:{id,state:job.state,receipt:job.receipt}});
       await chrome.storage.session.remove('chuteyPendingTransfer');
       await window.ChuteyExplorerAPI.command('transfer_dismiss',{id}).catch(()=>{});return job.receipt;
