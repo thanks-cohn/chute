@@ -4,7 +4,7 @@
 **Repository:** `thanks-cohn/chute`  
 **Status:** Implementation specification only — **not coded, merged, built or user-tested**  
 **Pinned user-tested candidate:** Development 1 Request 3, source `1cca0406c9a81c658feabc0d7aa57aad4028247f`, Actions run `43996443418`. Confirm the checked-out code and installed exact worker + Chrome extension before diagnosing.
-**Issues:** [#20 Open/Reveal onboarding](https://github.com/thanks-cohn/chute/issues/20), [#21 obsolete preview warning](https://github.com/thanks-cohn/chute/issues/21), [#22 P0 media 403](https://github.com/thanks-cohn/chute/issues/22), [#23 Settings/toolbar](https://github.com/thanks-cohn/chute/issues/23), [#24 Folder Access stacking](https://github.com/thanks-cohn/chute/issues/24), [#25 preview arrow-key focus](https://github.com/thanks-cohn/chute/issues/25), [#26 native clipboard](https://github.com/thanks-cohn/chute/issues/26).
+**Issues:** [#20 Open/Reveal onboarding](https://github.com/thanks-cohn/chute/issues/20), [#21 obsolete preview warning](https://github.com/thanks-cohn/chute/issues/21), [#22 P0 media 403](https://github.com/thanks-cohn/chute/issues/22), [#23 Settings/toolbar](https://github.com/thanks-cohn/chute/issues/23), [#24 Folder Access stacking](https://github.com/thanks-cohn/chute/issues/24), [#25 preview arrow-key focus](https://github.com/thanks-cohn/chute/issues/25), [#26 native clipboard](https://github.com/thanks-cohn/chute/issues/26), [#27 P0 stuck internal copy](https://github.com/thanks-cohn/chute/issues/27), [#28 P0 worker overload/stalls](https://github.com/thanks-cohn/chute/issues/28).
 
 ## Release goal
 
@@ -103,6 +103,44 @@ Required:
 5. Implement **separate native Windows Clipboard module** without breaking Chutey-internal copy. Test image pixel paste into Paint and file paste into Explorer.
 6. Run automated tests + actual paired Windows/Chrome acceptance: **30-minute active playback while browsing**, user-visible error fidelity, no flicker, bounded memory/CPU, keyboard image navigation, overlay order, setting migration, native clipboard paste, and existing History/save/reconnect. Record videos/logs/redacted diagnostics.
 7. Produce tested Windows installer + matching unpacked Chrome ZIP + SHA256SUMS + source SHA + safe install/rollback steps; request user verification before calling it a released GOLD baseline.
+
+
+## OWNER PRIORITY UPDATE — Real Windows Clipboard and stuck internal copy (P0, #26 / #27)
+
+**This supersedes any earlier tentative suggestion that internal Chutey Copy/Paste is already working or that a native Windows file clipboard is just an optional second command.**
+
+**Normal right-click Copy / Ctrl+C from Chutey File Explorer must use the real Windows clipboard**, enabling:
+- **Chutey → Windows File Explorer:** select an approved file, Copy, Paste into Windows, with byte-identical verified result.
+- **Chutey → Chutey:** the very same Copy followed by Paste into a separately approved writable location in Chutey, with verified transfer receipt.
+- **Windows File Explorer → Chutey:** ordinary Windows Copy followed by Paste into an approved writable Chutey destination.
+- **Copy image pixels** stays a separate explicit command for Paste into Paint/image editors; copy-the-file and copy-the-image-content are different formats. The Win32 Clipboard adapter should be a separately testable module with versioned API, correct OS clipboard ownership/lifetime and format conversion, no untrusted raw path commands from browser, no giant in-memory browser Blobs.
+- The existing internal `clipboardFile` + `local_copy` code is an implementation detail/fallback, not a convincing default Windows Copy. Preserve anything proven useful while integrating a real file-list clipboard. Advertise each operation truthfully.
+
+**User reproduction:** Chutey in-app Paste says `Check the previous transfer 897645a0d7944e0085569d0eabc62901 before starting another copy.` This is an additional P0 bug: `extension/explorer-api.js:86-102` sees `chrome.storage.session.chuteyPendingTransfer` from an older request and rejects a new ID without first reconciling it. The marker clears only upon a normal COMMITTED path.
+
+Fix by querying the **same pending job ID** and reconciling persisted durable receipt before blocking; show active/progress, verified COMMITTED, failed/cancelled, UNCERTAIN or missing/worker-down distinctly. For COMMITTED, verify result and safely clear stale marker; failed/cancelled, present an explainable dismissal; UNCERTAIN, retain all original bytes/job evidence and have user review destination before any retry. Do not automatically delete markers, clear journals, replay uncertain jobs or overwrite a file. Make **Review previous copy / Verify destination / Cancel / Dismiss after review** discoverable beside Paste, not buried in Folder Access. Test crash, abort-before-acceptance, lost response, worker restart, Chrome restart, and two intentional copies back-to-back.
+
+## OWNER PRIORITY UPDATE — Turbo worker must handle mixed workloads without stalling (P0, #28)
+
+**Direct user observation:** rapid commands overload the Request 3 worker, freeze its responses, then work again in a burst. This breaks the objective of a competitive, near-native Chutey Explorer.
+
+### Verified architectural limits in pinned Request 3
+`src/chute/server.py` uses `ThreadingHTTPServer`, so the HTTP server is not inherently single-threaded. `src/chute/explorer/api.py:20-22,55-63` implements separate `BoundedSemaphore(4)` for ordinary Explorer routes, `BoundedSemaphore(2)` for media, `BoundedSemaphore(1)` for inbound file transfer, with immediate HTTP 429 BUSY when slots exhausted. `src/chute/explorer/jobs.py` allows one active copy; `extension/explorer-view.js` can dispatch thumbnail requests and list/search and preview commands. **Four is our configured resource cap—not Chrome's or Windows' hard ceiling.** It may contribute but is not proven as the root cause of the stall.
+
+### Design target — a bounded, adaptive high-performance engine
+1. **Separate lanes and scheduling:** reserve guaranteed fast capacity for health, authentication renewal, navigation, directory listing/stat, copy status/cancel and lightweight controls; use independent bounded worker/IO pools for media byte-range streaming, thumbnails/decode and large file transfers. A video must not own the control lane and a thumbnail burst must not block click-to-browse.
+2. **Adaptive concurrency rather than a single fixed `4`:** benchmark per device and workload, apply safe hard caps based on RAM, available CPU, disk bandwidth and actual Python/Windows overhead; low-memory devices need a responsive conservative mode, capable devices may use more simultaneous work. Expose configuration/presets (Efficiency / Balanced / Turbo) only if justified by measurable behavior. Avoid unbounded threads, CPU oversubscription and RAM/disk exhaustion.
+3. **Fast, predictable user actions:** deduplicate/coalesce obsolete search/list/thumbnail/health requests; cancel stale requests with generation IDs; prioritize explicit clicks, media playback deadlines, and cancellation; avoid giant queues that execute stale clicks after the UI has moved on. Fairness and admission control should avoid starvation. Return actionable BUSY/backpressure where appropriate rather than hanging or initiating reconnect storms.
+4. **Streaming and transfer architecture:** maintain small fixed-size streaming buffers, read-ahead/OS zero-copy where reliable, actual HTTP Range 206 seek/resume and safe cancellation; cache only bounded metadata/thumbnails, never whole 30-minute videos in browser/worker RAM. Copies stream with verifies/receipts while media and navigation remain responsive.
+5. **Identify measured bottlenecks first:** instrument p50/p95/p99 and worst-case request latency, queue occupancy, number of live requests/threads, lock contention, 429 rates, file IO, fsync stalls, media throughput/buffering, worker CPU/RSS, native messaging and Chrome MV3 reconnect, UI main-thread long tasks. Logs must **not** contain private filenames, paths, tokens, tickets, file bytes or user content.
+6. **Compare native Windows Explorer** on the same device/data for directory open, back/forward, scrolling thumbnails and copying; report actual observed performance and explain unavoidable overhead. "Near-native" is an engineering goal, not a claimed speed.
+7. **Prove with sustained and burst tests:** 1, 4, 10 and 30+ mixed requests (navigation/list/search/thumbnail/status), 2 simultaneously playing videos where supported, and concurrent file copy. Require **30 minutes of continuously playable MP4/WebM while actively traversing the selected D: directory** without stalling video, losing player focus, blocking preview controls, or emitting false 403. Verify seek, pause/resume, canceled request, worker restart/recovery, low-disk, ~4-GB RAM. Record before/after metrics and explain any remaining capacity limit.
+8. **Lifecycle and GUI stability:** no visual flicker, no reset of the Explorer/tree/history/active media when a cheap control request times out, and no repeated root picker. Health/readiness is not assumed from `/health` alone.
+
+### Revised release gate / priority
+**Block declaring Chutey finished until:** (a) 30-minute MP4/WebM playback alongside active folder browsing and seeking passes on a real paired Windows+Chrome test, (b) command-burst stress does not induce prolonged GUI freezes, (c) normal file Copy/Paste works both inside Chutey and to/from Windows, (d) old pending transfer can be safely reconciled without corrupting or duplicating data, (e) Folder Access overlay and preview left/right focus defects pass real UI tests.
+
+Codex must investigate/prove root causes, use a dedicated repair branch based on the correct Request 3 candidate lineage, preserve GOLD tags and existing user data, deliver exact paired hashes/artifacts and measured results. The existence of this request is **not evidence these bugs are fixed**.
 
 ## Final report to owner
 
