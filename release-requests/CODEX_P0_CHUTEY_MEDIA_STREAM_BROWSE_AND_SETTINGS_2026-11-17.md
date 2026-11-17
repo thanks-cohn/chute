@@ -129,7 +129,7 @@ Fix by querying the **same pending job ID** and reconciling persisted durable re
 
 ### Design target — a bounded, adaptive high-performance engine
 1. **Separate lanes and scheduling:** reserve guaranteed fast capacity for health, authentication renewal, navigation, directory listing/stat, copy status/cancel and lightweight controls; use independent bounded worker/IO pools for media byte-range streaming, thumbnails/decode and large file transfers. A video must not own the control lane and a thumbnail burst must not block click-to-browse.
-2. **Adaptive concurrency rather than a single fixed `4`:** benchmark per device and workload, apply safe hard caps based on RAM, available CPU, disk bandwidth and actual Python/Windows overhead; low-memory devices need a responsive conservative mode, capable devices may use more simultaneous work. Expose configuration/presets (Efficiency / Balanced / Turbo) only if justified by measurable behavior. Avoid unbounded threads, CPU oversubscription and RAM/disk exhaustion.
+2. **Adaptive concurrency rather than a single fixed `4`:** benchmark per device and workload, apply safe hard caps based on RAM, available CPU, disk bandwidth and actual Python/Windows overhead; low-memory devices need a responsive conservative mode, capable devices may use more simultaneous work. The NEXT paired test build **must expose the three user-selectable settings presets Efficiency / Balanced / Turbo**; implement distinctly measurable, safe budgets and prove their effects in diagnostics/benchmarks. Avoid unbounded threads, CPU oversubscription and RAM/disk exhaustion.
 3. **Fast, predictable user actions:** deduplicate/coalesce obsolete search/list/thumbnail/health requests; cancel stale requests with generation IDs; prioritize explicit clicks, media playback deadlines, and cancellation; avoid giant queues that execute stale clicks after the UI has moved on. Fairness and admission control should avoid starvation. Return actionable BUSY/backpressure where appropriate rather than hanging or initiating reconnect storms.
 4. **Streaming and transfer architecture:** maintain small fixed-size streaming buffers, read-ahead/OS zero-copy where reliable, actual HTTP Range 206 seek/resume and safe cancellation; cache only bounded metadata/thumbnails, never whole 30-minute videos in browser/worker RAM. Copies stream with verifies/receipts while media and navigation remain responsive.
 5. **Identify measured bottlenecks first:** instrument p50/p95/p99 and worst-case request latency, queue occupancy, number of live requests/threads, lock contention, 429 rates, file IO, fsync stalls, media throughput/buffering, worker CPU/RSS, native messaging and Chrome MV3 reconnect, UI main-thread long tasks. Logs must **not** contain private filenames, paths, tokens, tickets, file bytes or user content.
@@ -141,6 +141,23 @@ Fix by querying the **same pending job ID** and reconciling persisted durable re
 **Block declaring Chutey finished until:** (a) 30-minute MP4/WebM playback alongside active folder browsing and seeking passes on a real paired Windows+Chrome test, (b) command-burst stress does not induce prolonged GUI freezes, (c) normal file Copy/Paste works both inside Chutey and to/from Windows, (d) old pending transfer can be safely reconciled without corrupting or duplicating data, (e) Folder Access overlay and preview left/right focus defects pass real UI tests.
 
 Codex must investigate/prove root causes, use a dedicated repair branch based on the correct Request 3 candidate lineage, preserve GOLD tags and existing user data, deliver exact paired hashes/artifacts and measured results. The existence of this request is **not evidence these bugs are fixed**.
+
+
+## MANDATORY for next test build — Settings → Performance mode
+
+**Owner confirmation (2026-11-17):** The NEXT Codex repair/test result should visibly include **Efficiency**, **Balanced**, and **Turbo** under a clearly discoverable **Settings → Performance** section in both relevant surfaces (popup and Shelf, sharing one persisted preference). These are no longer merely speculative future mode names. **Balanced is the default** for new users; migrate existing users without unwanted resets.
+
+| Mode | User-facing intent | Behavioral contract |
+|---|---|---|
+| **Efficiency** | Lower CPU, RAM, disk contention and background activity | Conservative resource budgets and thumbnail prefetch, protect responsiveness and preserve correctness |
+| **Balanced (default)** | Best everyday tradeoff | Adaptive allocation for common browsing, previews and copying without starving user-facing controls |
+| **Turbo** | Use available resources aggressively for responsive navigation, indexing/thumbnail work and transfers | Higher but **bounded** and hardware-aware concurrency where benchmarks support it; explicit video + control priority so heavy work cannot freeze browsing |
+
+- All three modes are real worker/API configurations rather than cosmetic labels; return an acknowledged applied mode and effective limits through the API, persist choice, apply safely while ongoing video/copy activity continues, and restore after worker/Chrome restart.
+- No blind magic numbers or unlimited threads. Codex must measure and tune each mode on constrained ~4 GB RAM hardware and, if available, stronger machines. A mode can adapt dynamically to actual memory, CPU, open streams, device load, low disk and queue depth.
+- **Turbo is not permission to exceed safe resource ceilings**; video streaming and lightweight UI commands remain responsive under load. Efficiency must not unnecessarily prevent a supported video from playing or change file integrity/permissions.
+- UI displays concise descriptions of tradeoffs and the currently active setting. If a worker cannot apply a mode, show accurate fallback/unsupported state rather than pretending Turbo is active.
+- **Acceptance tests:** switch Efficiency → Balanced → Turbo while browsing and playing an MP4/WebM; verify worker acknowledges effective mode, response latencies/CPU/RSS/queue depth reflect meaningful safe differences, selected mode persists, existing D: grants/history/clipboard unchanged, and 30-minute playback + navigation remains stable across modes. Include regression tests of permission and copy-receipt integrity under each mode.
 
 ## Final report to owner
 
