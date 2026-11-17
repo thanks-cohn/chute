@@ -2,8 +2,8 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Chutey scoped local Explorer API",
-    "version": "1.0-development1-request3",
-    "description": "Implemented Development 1 scoped engine. See LOCAL-API.md, HISTORY-EXPORT-API.md, DAILY-HIGHLIGHTS-API.md and DEVELOPMENT1-TRANSFER-MEDIA-API.md. Independent automation enrollment, resumable bulk jobs and Movie Mode adapter registry are future gated work."
+    "version": "1.0-p0-2026-11-17",
+    "description": "Implemented scoped Development 1 and P0 repair candidate; see P0-NATIVE-API-2026-11-17.md. Independent automation enrollment, resumable bulk jobs and Movie Mode adapter registry remain gated future work."
   },
   "servers": [
     {
@@ -65,7 +65,19 @@
                       "transfer_status",
                       "transfer_cancel",
                       "transfer_dismiss",
-                      "upload_receipt"
+                      "upload_receipt",
+                      "renew_media",
+                      "media_status",
+                      "media_diagnostics",
+                      "media_policy_get",
+                      "media_policy_set",
+                      "performance_get",
+                      "performance_set",
+                      "transfer_verify",
+                      "clipboard_copy_files",
+                      "clipboard_copy_image",
+                      "clipboard_read_files",
+                      "clipboard_release"
                     ]
                   },
                   "args": {
@@ -118,7 +130,8 @@
               }
             }
           }
-        }
+        },
+        "description": "Exact Origin and authenticated session required; JSON <=16 KiB. See P0-NATIVE-API-2026-11-17.md for command argument contracts. Dispatch state completed does not imply inner transfer job COMMITTED. Capacity returns 429 BUSY with independent lanes."
       }
     },
     "/api/explorer/v1/content": {
@@ -323,9 +336,9 @@
     },
     "/api/explorer/v1/media/{ticket}": {
       "get": {
-        "summary": "Origin-bound optional Phase 1 test-worker media stream",
+        "summary": "Authorized file-specific media bytes with single HTTP range support",
         "security": [],
-        "description": "The opaque single-file read ticket is minted with authenticated media_source; exact enrolled Origin is still required. No general bearer token in URL. Not available on archived installed worker.",
+        "description": "The opaque single-file read ticket is minted with authenticated media_source. Exact enrolled Origin and loopback Host remain mandatory. Lease lasts 120 seconds; authenticated renew_media extends it without replacing the URL. General session expiry does not revoke a continuing lease; explicit grant revocation, release, identity change and lease expiry stop reads. No general bearer token in URL. Archived workers do not implement continuation.",
         "parameters": [
           {
             "$ref": "#/components/parameters/Origin"
@@ -386,13 +399,16 @@
                 }
               }
             }
+          },
+          "503": {
+            "description": "Global bounded HTTP thread admission exhausted; retry after brief backoff, do not reconnect or select a new folder."
           }
         }
       },
       "head": {
-        "summary": "Media metadata without response body; Range ignored",
+        "summary": "Authorized file-specific media metadata without response body; Range ignored",
         "security": [],
-        "description": "The opaque single-file read ticket is minted with authenticated media_source; exact enrolled Origin is still required. No general bearer token in URL. Not available on archived installed worker.",
+        "description": "The opaque single-file read ticket is minted with authenticated media_source. Exact enrolled Origin and loopback Host remain mandatory. Lease lasts 120 seconds; authenticated renew_media extends it without replacing the URL. General session expiry does not revoke a continuing lease; explicit grant revocation, release, identity change and lease expiry stop reads. No general bearer token in URL. Archived workers do not implement continuation.",
         "parameters": [
           {
             "$ref": "#/components/parameters/Origin"
@@ -453,6 +469,9 @@
                 }
               }
             }
+          },
+          "503": {
+            "description": "Global bounded HTTP thread admission exhausted; retry after brief backoff, do not reconnect or select a new folder."
           }
         }
       }
@@ -871,6 +890,88 @@
           "file": {
             "type": "object",
             "description": "Immutable QueueItem public metadata; capture ID distinct from daily document ID."
+          }
+        }
+      },
+      "PerformanceState": {
+        "type": "object",
+        "required": [
+          "mode",
+          "effective_limits",
+          "hardware",
+          "resources",
+          "metrics"
+        ],
+        "properties": {
+          "mode": {
+            "type": "string",
+            "enum": [
+              "efficiency",
+              "balanced",
+              "turbo"
+            ]
+          },
+          "effective_limits": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "integer",
+              "minimum": 0
+            }
+          },
+          "hardware": {
+            "type": "object"
+          },
+          "resources": {
+            "type": "object",
+            "description": "Current worker numeric memory/CPU/thread counters; no environment, paths or tokens"
+          },
+          "metrics": {
+            "type": "object",
+            "description": "Bounded per-lane active/completed/BUSY counters and last-512 request latency percentiles"
+          }
+        }
+      },
+      "MediaPolicy": {
+        "type": "object",
+        "required": [
+          "allowed",
+          "scope"
+        ],
+        "properties": {
+          "allowed": {
+            "type": "boolean"
+          },
+          "scope": {
+            "type": "string",
+            "enum": [
+              "approved_folder",
+              "saved_store"
+            ]
+          },
+          "migrated": {
+            "type": "boolean"
+          }
+        }
+      },
+      "ClipboardSnapshot": {
+        "type": "object",
+        "description": "Version 1 native clipboard response; files carry metadata and indexes, never local paths. 5-minute scope is paste-only, not browsable. See WINDOWS-CLIPBOARD-API.md.",
+        "properties": {
+          "version": {
+            "const": 1
+          },
+          "snapshot": {
+            "type": "string"
+          },
+          "files": {
+            "type": "array",
+            "maxItems": 128,
+            "items": {
+              "type": "object"
+            }
+          },
+          "expires_in": {
+            "type": "integer"
           }
         }
       }

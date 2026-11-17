@@ -506,6 +506,10 @@ def _header_name(name: str) -> str:
 class ChuteServer(ThreadingHTTPServer):
     daemon_threads = True
     allow_reuse_address = True
+    # Python 3.12 defaults to a listen backlog of five. Simultaneous clients
+    # otherwise wait for TCP retransmission before bounded lane admission.
+    # This queues connections only; the 32-request thread ceiling still applies.
+    request_queue_size = 64
 
     def process_request(self,request,address):
         # Bound accepted worker threads even when many clients send slow bodies.

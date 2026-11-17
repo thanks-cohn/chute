@@ -147,9 +147,14 @@ class InstalledWorker:
             with socket.create_connection(('127.0.0.1',17891),timeout=.3):raise RuntimeError('Existing listener on17891: refusing to touch it')
         except (ConnectionRefusedError,TimeoutError,OSError) as e:
             if isinstance(e,RuntimeError):raise
-        env={'USERPROFILE':str(self.root/'home'),'LOCALAPPDATA':str(self.root/'local'),'APPDATA':str(self.root/'roaming'),'CHUTE_HOME':str(self.root/'store')}
-        for value in env.values():Path(value).mkdir(parents=True,exist_ok=True)
-        self.environment=patch.dict(os.environ,env);self.environment.start();self.target=Path(env['LOCALAPPDATA'])/'Programs'/'Chute'/'Chute.exe'
+        # Chrome uses Windows Known Folders as well as environment variables;
+        # spoofing LOCALAPPDATA/USERPROFILE makes Chrome reject remote debugging.
+        # Install only into a verified-empty ephemeral CI account instead.
+        local=Path(os.environ['LOCALAPPDATA'])
+        self.owned_directories=[local/'Programs'/'Chute',local/'Chute',Path.home()/'Chute']
+        if any(path.exists() for path in self.owned_directories):raise RuntimeError('Existing Chutey files: refusing CI installation')
+        env={'CHUTE_HOME':str(self.root/'store')};Path(env['CHUTE_HOME']).mkdir(parents=True,exist_ok=True)
+        self.environment=patch.dict(os.environ,env);self.environment.start();self.target=self.owned_directories[0]/'Chute.exe'
     def start(self,origin,approved):
         from chute.explorer.security import RootGrant
         from chute.explorer.grant_store import GrantStore,describe
@@ -202,6 +207,8 @@ class InstalledWorker:
             with winreg.OpenKey(winreg.HKEY_CURRENT_USER,r'Software\Microsoft\Windows\CurrentVersion\Run',0,winreg.KEY_SET_VALUE) as key:winreg.DeleteValue(key,'Chute')
         except FileNotFoundError:pass
         self.environment.stop()
+        for directory in self.owned_directories:
+            if directory.exists():shutil.rmtree(directory)
 
 def run(args):
     out=Path(args.output).resolve();out.mkdir(parents=True,exist_ok=True)

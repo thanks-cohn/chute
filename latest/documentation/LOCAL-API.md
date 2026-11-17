@@ -1,4 +1,6 @@
-# Local Explorer API — implemented Phase 1 interface
+# Local Explorer API — implemented Development 1 interface
+
+Current P0 repair additions and overrides: [P0 native API](P0-NATIVE-API-2026-11-17.md).
 
 See `local-api.openapi.json` for machine-readable HTTP envelopes. This documents
 implemented behavior, including limitations; proposed batch jobs and the media
@@ -84,8 +86,9 @@ reveal commands remain gated; the authenticated HTTP adapter explicitly owns
 these checked actions. Capabilities advertises them separately. Older workers
 return UNSUPPORTED_COMMAND or NATIVE_CONSENT_REQUIRED truthfully.
 
-The GUI defaults to Chutey for Reveal (containing folder + exact file selected)
-and Open (inside Chutey). Explicit Preview always stays inside Chutey regardless
+First-use GUI preferences default to system Open/Reveal. Existing explicit
+Chutey preferences are preserved; Chutey Reveal selects the containing folder
+and exact file, and Chutey Open previews it inside the extension. Explicit Preview always stays inside Chutey regardless
 of the Open preference. Preferences `chuteyRevealTarget` and `chuteyOpenTarget`
 accept `chutey`/`system` in extension sync storage. Saved-file Windows Reveal
 continues to use the unchanged `/api/reveal/{id}` endpoint, including on the
@@ -123,11 +126,11 @@ worker for image previews or thumbnails.
 `media_source` validates the current authorized audio/video identity and issues one
 origin-bound random read ticket for a single file; no general session token or
 filesystem path is placed in its URL. At most 32 tickets per adapter; lifetime
-is min(600 seconds, session lifetime). GET and HEAD the returned URL using the
+is 120 seconds, with authenticated renew_media every 45 seconds for active players. GET and HEAD the returned URL using the
 exact enrolled Origin; a cross-origin browser `<video crossorigin="anonymous">`
 provides that Origin. The read ticket replaces the Authorization header only
-for that one media URL. Other routes still require the bearer. Session expiry,
-file identity and authority are checked during access. Tickets are redacted in
+for that one media URL. Other routes still require the bearer. File identity, lease expiry and explicit
+revocation are checked during access; ordinary bearer expiry does not revoke a lease. Tickets are redacted in
 server request logs. Do not print returned media URLs in application logs.
 
 GET: 200 full body or 206 single range, correct Content-Length, Content-Range
@@ -135,11 +138,12 @@ and Accept-Ranges: bytes. Suffix/open-ended ranges are supported; invalid or
 multiple ranges yield 416 and `Content-Range: bytes */size`. HEAD returns full
 metadata without bytes and ignores Range. Reads are 256 KiB chunks and are not
 whole-file Blobs. release_media is idempotent and stops active reads at chunk
-boundaries; disconnects close file contexts. Session expiry also stops reads.
+boundaries; disconnects close file contexts. Authenticated renewal preserves
+playing media across normal broad-session expiry, without another folder picker.
 
-This is an Explorer preview interface, with the existing four-request adapter
-limit. It is not yet the format-independent Phase 2 media engine, has no codec
-probe/adapter registry, and cannot claim fair sustained movie workloads. A
+This is an Explorer preview interface with independent bounded admission lanes
+and hardware-aware Efficiency/Balanced/Turbo presets. It has no codec
+probe/adapter registry; sustained performance is measured in the paired tests. A
 future Phase 2 registry will use shared scoped source/output abstractions.
 The old worker returns UNSUPPORTED_COMMAND for media_source: previously supported small video clips use a
 bounded 32 MiB fallback; large files report the required separate test worker.

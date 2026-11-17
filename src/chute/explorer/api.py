@@ -100,6 +100,10 @@ class ExplorerAPI:
         with self._performance(handler).enter(lane) as admitted:
             if not admitted:
                 handler.close_connection=True
+                if lane=='media' and handler.command=='GET':
+                    with self.media_lock:
+                        source=self.media.get(path.rsplit('/',1)[-1])
+                        if source:source['last_get']={'status':429,'code':'BUSY','origin_present':bool(handler.headers.get('Origin'))}
                 self.json(handler,{'state':'failed','error':{'code':'BUSY','message':'This resource lane is busy. Wait briefly; browsing and playback have separate capacity.'}},429)
                 return True
             return self._route(handler)
@@ -248,7 +252,7 @@ class ExplorerAPI:
                     args=body.get('args',{})
                     if set(args)!={'ticket'}:raise ExplorerError('INVALID_ARGUMENT','Media ticket required.')
                     with self.media_lock:source=self.media.get(args['ticket'])
-                    result={'state':'completed','result':{'available':bool(source and not source['revoked'] and not self.media_context['revoked']),'original_get':source.get('last_get') if source else None,'lease_seconds':max(0,source['expires']-time.monotonic()) if source else 0}}
+                    result={'state':'completed','result':{'available':bool(source and source['expires']>time.monotonic() and not source['revoked'] and not self.media_context['revoked']),'original_get':source.get('last_get') if source else None,'lease_seconds':max(0,source['expires']-time.monotonic()) if source else 0}}
                 elif body['command']=='media_diagnostics':
                     result={'state':'completed','result':{'events':list(self.media_events),'active_leases':len(self.media)}}
                 elif body['command']=='renew_media':

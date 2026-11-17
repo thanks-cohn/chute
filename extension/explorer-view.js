@@ -139,8 +139,11 @@
     }catch(error){if(id===pinnedId)body.textContent=error.message;}
   }
   function isMedia(row){return /^(video|audio)\//.test(row.mime||'')||/\.(mp4|webm|mp3|m4a|wav|flac|oga)$/i.test(row.name||'');}
-  async function showPreview(row) {
-    if(isMedia(row))return showPinned(row);
+  async function showPreview(row, {intentionalMedia = false} = {}) {
+    if(isMedia(row)){
+      if(pinnedRow && pinnedRow.identity!==row.identity && !intentionalMedia){say('Playback continues. Use Preview or Open inside Chutey to replace the active media.');return;}
+      return showPinned(row);
+    }
     closePreview(); const id = previewId; previewRow = row; preview.hidden = false;preview.tabIndex=-1;preview.focus({preventScroll:true});
     if (!selected.has(row.handle)) select(row); updateGalleryButtons();
     resizePreview();
@@ -324,11 +327,11 @@
   }
   copyBar.querySelector('[data-copy=copy]').onclick=safe(copySelection);
   copyBar.querySelector('[data-copy=paste]').onclick=safe(()=>pasteSelection());
-  for(const name of ['review','verify'])copyBar.querySelector('[data-copy='+name+']').onclick=safe(async()=>{const result=await api.reviewPending({destination:current,onProgress:transferProgress});say(result.message||result.state);});
-  copyBar.querySelector('[data-copy=cancel]').onclick=safe(async()=>{const result=await api.cancelPending();say(result.state);});
+  for(const name of ['review','verify'])copyBar.querySelector('[data-copy='+name+']').onclick=safe(async()=>{const result=await api.reviewPending({destination:current,onProgress:transferProgress});say(result?.error||result?.message||result?.state||'No previous copy needs review.');});
+  copyBar.querySelector('[data-copy=cancel]').onclick=safe(async()=>{const result=await api.cancelPending();say(result?.state||'No previous copy to cancel.');});
   copyBar.querySelector('[data-copy=dismiss]').onclick=safe(async()=>{if(confirm('Review the destination first. Dismiss this warning without changing files or repeating any copy?')){await api.dismissPending({reviewed:true});say('Reviewed warning dismissed; job evidence retained.');}});
   let listAbort=null,thumbnailConcurrency=2;
-  document.addEventListener('chutey-performance-changed',event=>{thumbnailConcurrency=event.detail?.effective_limits?.thumbnail||2;void pump();});
+  document.addEventListener('chutey-performance-changed',event=>applyThumbnailBudget(event.detail));
   document.addEventListener('chutey-folder-access-changed',()=>void safe(connect)());
   async function load(handle, {remember = true, append = false, recovery = true} = {}) {
     clearTimeout(timer); // A delayed old-folder search must not cancel an explicit navigation.
@@ -442,7 +445,8 @@
       void pump();
     }
   }
-  const observer = new IntersectionObserver(entries => {
+  let observer;
+  const observeEntries = entries => {
     for (const entry of entries) {
       const node = entry.target;
       if (!entry.isIntersecting) { visibleThumbnails.delete(node); activeThumbnails.get(node)?.abort(); continue; }
@@ -450,7 +454,18 @@
       if (!node.querySelector('.ex-icon img') && node.dataset.thumbnail !== 'failed' && !activeThumbnails.has(node) && !queue.includes(node)) queue.push(node);
     }
     void pump(); void pump(); void pump();
-  }, {root:list});
+  };
+  function applyThumbnailBudget(result){
+    const limits=result?.effective_limits;
+    thumbnailConcurrency=Math.max(1,Math.min(3,limits?.thumbnail||2));
+    observer?.disconnect();visibleThumbnails.clear();
+    observer=new IntersectionObserver(observeEntries,{root:list,rootMargin:(Math.max(0,Math.min(3,limits?.thumbnail_prefetch??2))*80)+'px 0px'});
+    if(showExplorerThumbnails)for(const node of list.querySelectorAll('.ex-row')){
+      const row=rows.find(r=>r.handle===node.dataset.handle);if(row&&isImage(row))observer.observe(node);
+    }
+    void pump();void pump();void pump();
+  }
+  applyThumbnailBudget(null);
   async function branch(row, container) {
     const item = document.createElement("div"); item.className = "ex-branch"; item.dataset.destination = row.handle;
     const children = document.createElement("div"); children.className = "ex-children"; children.hidden = true;
@@ -466,6 +481,7 @@
     if (data.next_offset !== null) { const more = button("More folders", "···", async () => { await treePage(handle, children, data.next_offset); more.remove(); }); children.append(more); }
   }
   async function connect(recovery = true) {
+    try{applyThumbnailBudget(await api.command('performance_get'));}catch{} // Old workers retain bounded compatibility defaults.
     const data = await api.command("roots"); roots = data.roots; tree.replaceChildren();
     for (const root of roots) await branch(root, tree);
     $(".ex-connect").hidden = true;
@@ -499,7 +515,7 @@
     const target = window.ChuteyFileActions.get()[action === 'open' ? 'chuteyOpenTarget':'chuteyRevealTarget'];
     if (target === 'system') return api.command(action,{handle:row.handle,identity:row.identity});
     if (action === 'reveal') return revealHere(row);
-    return showPreview(row); // Open inside Chutey, separate from explicit Preview.
+    return showPreview(row,{intentionalMedia:true}); // Open inside Chutey, separate from explicit Preview.
   }
   async function savedAction(file,action) {
     const meta = await api.command('locate_saved',{id:file.id});
@@ -522,10 +538,10 @@
   void chrome.storage.session.get({chuteyFileActionIntent:null}).then(value => safe(consumeAction)(value.chuteyFileActionIntent));
   function showMenu(x, y, row) {
     menu.replaceChildren();
-    const actions = row ? [[row.kind === "directory" ? "Open folder" : "Preview", () => row.kind === "directory" ? load(row.handle) : showPreview(row)], ["Properties", async () => { const meta = await api.command("stat", {handle: row.handle}); say(`${meta.name} · ${meta.size.toLocaleString()} bytes · ${new Date(meta.modified_ns / 1e6).toLocaleString()}`); }]] : [["Refresh", () => current && load(current, {remember: false})]];
+    const actions = row ? [[row.kind === "directory" ? "Open folder" : "Preview", () => row.kind === "directory" ? load(row.handle) : showPreview(row,{intentionalMedia:true})], ["Properties", async () => { const meta = await api.command("stat", {handle: row.handle}); say(`${meta.name} · ${meta.size.toLocaleString()} bytes · ${new Date(meta.modified_ns / 1e6).toLocaleString()}`); }]] : [["Refresh", () => current && load(current, {remember: false})]];
     if (row?.kind === 'file') actions.push(['Open',() => fileAction(row,'open')],['Reveal / GO TO',() => fileAction(row,'reveal')]);
     if(row?.kind==='file')actions.push(['Copy',copySelection],['Copy inside Chutey',copyInside],['Copy image pixels to Windows clipboard',async()=>{const result=await api.command('clipboard_copy_image',{handle:row.handle,identity:row.identity,user_gesture:true});say('Copied image pixels to Windows clipboard · '+result.width+' × '+result.height);}]);
-    actions.push(['Paste',()=>pasteSelection()],['Paste inside Chutey',()=>pasteSelection(current,true)],['Review previous copy',async()=>{const result=await api.reviewPending({destination:current});say(result.message||result.state);}],['Verify destination',async()=>{const result=await api.reviewPending({destination:current});say(result.message||result.state);}],['Cancel previous copy',async()=>{const result=await api.cancelPending();say(result.state);}],['Dismiss after review',async()=>{if(confirm('Have you reviewed the destination? This changes no files and never repeats a copy.'))await api.dismissPending({reviewed:true});}]);
+    actions.push(['Paste',()=>pasteSelection()],['Paste inside Chutey',()=>pasteSelection(current,true)],['Review previous copy',async()=>{const result=await api.reviewPending({destination:current});say(result?.error||result?.message||result?.state||'No previous copy needs review.');}],['Verify destination',async()=>{const result=await api.reviewPending({destination:current});say(result?.error||result?.message||result?.state||'No previous copy needs review.');}],['Cancel previous copy',async()=>{const result=await api.cancelPending();say(result?.state||'No previous copy to cancel.');}],['Dismiss after review',async()=>{if(confirm('Have you reviewed the destination? This changes no files and never repeats a copy.'))await api.dismissPending({reviewed:true});}]);
 
     for (const [name, fn] of actions) { const node = button(name, name, async () => { menu.hidden = true; await fn(); }); node.role = "menuitem"; menu.append(node); }
     for (const [label, fn] of [["Copy",copySelection],["Paste",() => pasteSelection(row?.kind === "directory" ? row.handle : current)]]) {

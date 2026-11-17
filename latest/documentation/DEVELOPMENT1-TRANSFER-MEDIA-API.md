@@ -1,6 +1,6 @@
 # Development 1 transfer and media API extensions
 
-Status: implemented Request 3B repair candidate; owner acceptance pending.
+Status: Request 3B contract with [P0 repair updates](P0-NATIVE-API-2026-11-17.md); owner acceptance pending.
 Uses the SAME guarded RootGrant/Transfers/Store engine as Shelf and popup.
 No Movie Mode tab, transcoding, independent server, public automation enrollment,
 cloud/REDOWN authority, move/delete operation or premium bulk feature was added.
@@ -88,7 +88,7 @@ are not Store IDs and don't import/copy original bytes. Saved media resolves
 through locate_saved. Local-original preview has no Trash It! or silent import.
 
 `media_source` → `{url,ticket,mime,size,range,expires_in}`. Short-lived ticket is
-scoped to exact extension Origin, current authenticated session, guarded handle
+scoped to exact extension Origin, renewable file-specific authority, guarded handle
 and canonical file identity. GET/HEAD preserve existing 206, Content-Range,
 Content-Length, Accept-Ranges and 416 semantics. Shared format-independent byte
 transport reads at most 256 KiB per block; codec decoding belongs to Chrome.
@@ -97,14 +97,16 @@ transcoding or claim of support for every MP4/WebM codec. Current eligible MP4,
 WebM and MP3 are exercised with actual decoders. `canPlayType` is a hint; decoder,
 network and expired-session errors remain possible and visible.
 
-Players use `<video>`/`<audio>`, preload=metadata, normal browser seek, paused
-initially. Close/switch/navigation pauses, removes src and releases the ticket;
-release keepalive covers popup unload. Ticket max ten minutes/session max fifteen
-minutes, revocation/session expiry stops future reads. **Automatic lease renewal
-for full-length movie sessions belongs to the later worker/Movie Mode work and
-is not claimed here**; reselect after expiry. Two concurrent streams, four control
-requests and one browser receive limit active I/O; socket writes time out after
-15s so stalled readers don't hold resources forever.
+Players use `<video>`/`<audio>`, preload=metadata and normal browser seek. Shelf
+playback is pinned independently of ordinary folder navigation and image/text
+previews. Stop/Close or deliberately replacing media releases its lease; popup
+unload also releases. Each lease lasts 120 seconds and authenticated renewal
+occurs every 45 seconds. Ordinary broad-session expiry preserves a continuing
+file-specific lease; explicit revocation or lease expiry stops reads. The same
+Origin/Host/guarded-file rules remain enforced. Two bounded media reads have
+independent control, navigation, preview, thumbnail and intake lanes. Writes time
+out after 15 seconds; no whole-movie Blob is created. See the P0 API document for
+actual limits, diagnostics, mode persistence and verification boundaries.
 
 ## Gesture matrix and explicit boundaries
 
