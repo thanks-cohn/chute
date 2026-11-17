@@ -153,7 +153,7 @@
       const started=await admission(async()=>{
         const previous=await inspectPending({onProgress});
         if(previous && !previous.reconciled)throw issue(previous.error||'A previous copy is '+previous.state+'. Use Review previous copy beside Paste.','TRANSFER_'+previous.state.toUpperCase(),previous);
-        if(previous?.id===args.id)return {job:previous,id:previous.id,reconciled:true};
+        if(previous && previous.id===args.id)return {job:previous,id:previous.id,reconciled:true};
         const id=args.id || crypto.randomUUID().replaceAll('-','');
         await savePending({id,kind:args.kind,issuedAt:Date.now()});
         try{return {id,job:await window.ChuteyExplorerAPI.command('transfer_start',{...args,id})};}

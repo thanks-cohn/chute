@@ -25,6 +25,12 @@ function setup(handler,pending={id}){
  fixture=setup((command,args)=>command==='transfer_dismiss'?{dismissed:true}:command==='transfer_start'?{...committed,id:args.id}:committed);
  await fixture.api.transfer({id:other,kind:'local_copy',handle:'source',identity:'identity',destination:'write-approved'});
  assert.equal(fixture.calls.filter(c=>c.command==='transfer_start').length,1);
+ // Normal GUI clients omit an ID; each deliberate copy gets a fresh durable ID.
+ fixture=setup((command,args)=>command==='transfer_dismiss'?{dismissed:true}:{...committed,id:args.id},null);
+ for(let i=0;i<2;i++)await fixture.api.transfer({kind:'local_copy',handle:'source',identity:'identity',destination:'write-approved'});
+ const starts=fixture.calls.filter(c=>c.command==='transfer_start');
+ assert.equal(starts.length,2);assert.match(starts[0].args.id,/^[a-f0-9]{32}$/);assert.notEqual(starts[0].args.id,starts[1].args.id);
+ assert(!fixture.saved.chuteyPendingTransfer&&!fixture.durable.chuteyPendingTransfer);
  for(const state of ['accepted','running','failed','cancelled','UNCERTAIN']){
   const job={...committed,state,verification:{state:'REVIEW_REQUIRED',verified:false}};
   fixture=setup(()=>job);
