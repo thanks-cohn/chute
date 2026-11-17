@@ -5,6 +5,7 @@
 This folder records owner-directed experiments without changing the current Chrome extension, Windows worker, historical GOLD tags, saved files, or active release.
 
 - [Chutey Experimental Roadmap — November 17, 2026](CHUTEY_EXPERIMENTAL_ROADMAP_2026-11-17.md): Scientist Chutey skin; optional GraphMarks-style New Tab home; user-created tags, collections and graph relationships; export/import; Screenshot API without dependence on explorer.exe; persistent floating window; cross-extension integrations and concurrency safety.
+- [Adaptive Icon Renditions & Smart Cache](ADAPTIVE_ICON_RENDITIONS.md): opt-in quality small icons from landing-page candidates displayed for over 60 seconds; batch-size options of 16 or 25, bounded caching and Settings-based deletion of generated renditions only.
 
 ## Experiment rules
 
