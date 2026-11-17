@@ -3,29 +3,14 @@ body.chutey-gallery-popup { width:390px; max-height:600px; overflow-y:auto; over
 .chutey-gallery-popup .gallery-density-control { display:flex; justify-content:flex-end; align-items:center; gap:8px; }
 .chutey-gallery-popup #gallery-density { width:116px; min-width:0; accent-color:#d7ff3f; cursor:ew-resize; }
 .chutey-gallery-popup #gallery-density-value { color:#e3f0d6; font-size:11px; min-width:40px; text-align:right; font-variant-numeric:tabular-nums; }
-/* Settings is a compact, opaque popover above the ONE independent gallery.
-   Its content scrolls internally and never contains/reflows History. */
-.chutey-gallery-popup .settings-panel {
-  position:relative;
-  z-index:40;
-  isolation:isolate;
-}
-.chutey-gallery-popup .settings-panel[open] { overflow:visible; }
-.chutey-gallery-popup .settings-panel[open] .settings {
-  position:absolute;
-  top:100%;
-  left:0;
-  right:0;
-  z-index:41;
-  max-height:min(280px, 48vh);
-  overflow-y:auto;
-  overscroll-behavior:contain;
-  padding-top:12px;
-  background:#151a13;
-  border:1px solid #46533c;
-  border-radius:0 0 12px 12px;
-  box-shadow:0 12px 24px #000c;
-}
+/* Settings participates in the same document flow as the gallery. */
+.chutey-gallery-popup .settings { grid-template-columns:minmax(0,1fr); }
+.chutey-gallery-popup .settings > *,
+.chutey-gallery-popup .settings fieldset { min-width:0; max-width:100%; }
+.chutey-gallery-popup .settings label { display:flex; flex-wrap:wrap; align-items:center; gap:8px; }
+.chutey-gallery-popup .settings label span { flex:1; }
+.chutey-gallery-popup .settings select { width:100%; max-width:100%; }
+.chutey-gallery-popup [data-file-action-settings] label { display:grid; gap:6px; margin-bottom:10px; }
 .chutey-gallery-popup #chutey-popup-gallery {
   position:relative;
   isolation:isolate;
@@ -36,9 +21,7 @@ body.chutey-gallery-popup { width:390px; max-height:600px; overflow-y:auto; over
 .chutey-gallery-popup #files {
   display:grid; grid-template-columns:repeat(var(--chutey-gallery-columns,4),minmax(0,1fr));
   align-content:start; align-items:start; gap:6px; padding:8px 10px;
-  width:100%; height:386px; min-height:0; max-height:386px;
-  overflow-y:auto; overflow-x:hidden; overscroll-behavior:contain;
-  scrollbar-gutter:stable;
+  width:100%; min-height:400px; overflow:visible;
 }
 .chutey-gallery-popup #files .chutey-gallery-tile {
   position:relative; display:block; aspect-ratio:1 / 1; height:auto; width:100%;
@@ -187,8 +170,9 @@ body.chutey-gallery-popup { width:390px; max-height:600px; overflow-y:auto; over
 .chutey-gallery-popup #files .chutey-gallery-tile .file-icon.has-thumbnail .chutey-shortcut-kind { display:none; }
 
 /* November 10: deliberately minimal popup ONLY (not the Shelf). */
-html:has(body.chutey-gallery-popup) { width:390px; min-width:390px; max-width:390px; height:590px; min-height:590px; max-height:590px; overflow:hidden; }
-body.chutey-gallery-popup { width:390px; min-width:390px; max-width:390px; height:590px; min-height:590px; max-height:590px; overflow:hidden; background:#111610; }
+html:has(body.chutey-gallery-popup) { width:390px; height:590px; overflow-y:scroll; overflow-x:hidden; scrollbar-gutter:stable; }
+html:has(body.chutey-gallery-popup)::-webkit-scrollbar { width:12px; }
+body.chutey-gallery-popup { width:100%; min-width:0; min-height:590px; height:auto; max-height:none; overflow:visible; background:#111610; }
 .chutey-gallery-popup .topbar { min-height:56px; padding:11px 14px; background:linear-gradient(180deg,#1c2419,#141a13); }
 .chutey-gallery-popup .topbar .subtitle { display:block; color:#a8b59d; font-size:11px; line-height:1.35; letter-spacing:.025em; }
 .chutey-gallery-popup .topbar .title { letter-spacing:.04em; font-size:14px; }
@@ -201,7 +185,7 @@ body.chutey-gallery-popup { width:390px; min-width:390px; max-width:390px; heigh
 .chutey-gallery-popup .history-calendar-hint { display:none; }
 /* Keep status readable to assistive technology, never display debug prose on the popup. */
 .chutey-gallery-popup #status { position:absolute!important; width:1px!important; height:1px!important; padding:0!important; margin:-1px!important; overflow:hidden!important; clip:rect(0,0,0,0)!important; clip-path:inset(50%)!important; white-space:nowrap!important; border:0!important; }
-.chutey-gallery-popup #files { grid-auto-flow:row; grid-auto-rows:var(--chutey-gallery-cell,80px); height:400px; min-height:400px; max-height:400px; padding:10px; gap:7px; background:#111610; }
+.chutey-gallery-popup #files { grid-auto-flow:row; grid-auto-rows:var(--chutey-gallery-cell,80px); height:auto; min-height:400px; max-height:none; padding:10px; gap:7px; background:#111610; }
 .chutey-gallery-popup #files .chutey-gallery-tile { grid-column:auto!important; grid-row:auto!important; aspect-ratio:1!important; border:1px solid #394a34; border-radius:11px; background:#1e281d; box-shadow:0 1px 4px #0005; transition:border-color .12s ease,box-shadow .12s ease; }
 .chutey-gallery-popup #files .chutey-gallery-tile:hover { border-color:#8bac68; box-shadow:0 3px 11px #0009; }
 .chutey-gallery-popup #files .chutey-gallery-tile:focus-visible { outline:2px solid #d7ff3f; outline-offset:-2px; }
@@ -272,7 +256,18 @@ body.chutey-gallery-popup { width:390px; min-width:390px; max-width:390px; heigh
 /* Every row, including offscreen implicit rows, uses the same square track.
    cqw measures the gallery wrapper; scrollbar width is reserved from first paint. */
 .chutey-gallery-popup #chutey-popup-gallery { container-type:inline-size; }
-.chutey-gallery-popup #files { --chutey-gallery-cell:calc((100cqw - 32px - (var(--chutey-gallery-columns,4) - 1)*7px)/var(--chutey-gallery-columns,4)); grid-template-rows:none; grid-auto-rows:var(--chutey-gallery-cell); }
-.chutey-gallery-popup #files::-webkit-scrollbar { width:12px; }
+.chutey-gallery-popup #files { --chutey-gallery-cell:calc((100cqw - 20px - (var(--chutey-gallery-columns,4) - 1)*7px)/var(--chutey-gallery-columns,4)); grid-template-rows:none; grid-auto-rows:var(--chutey-gallery-cell); }
+
 .chutey-gallery-popup #files .chutey-popup-placeholder,
 .chutey-gallery-popup #files .chutey-gallery-tile { aspect-ratio:auto!important; height:100%; }
+
+.chutey-gallery-popup #files .chutey-gallery-tile[hidden] { display:none!important; }
+.chutey-gallery-popup .chutey-lightbox { width:100vw; height:100vh; max-height:100vh; }
+.chutey-gallery-popup .chutey-lightbox-image { cursor:zoom-out; }
+.chutey-lightbox-open { touch-action:none; }
+html:has(.chutey-lightbox-open) { overflow:hidden; }
+.chutey-popup-menu { position:fixed; z-index:300; width:218px; padding:5px; border:1px solid #68755b; border-radius:8px; background:#20291d; box-shadow:0 4px 16px #0009; font-size:12px; }
+.chutey-popup-menu[hidden] { display:none; }
+.chutey-popup-menu button { width:100%; padding:8px; text-align:left; border:0; border-radius:4px; background:transparent; color:#f4f5ee; cursor:pointer; }
+.chutey-popup-menu button:hover,.chutey-popup-menu button:focus { background:#394a30; }
+.chutey-popup-menu small { display:block; padding:5px 8px; color:#c4cdbb; }

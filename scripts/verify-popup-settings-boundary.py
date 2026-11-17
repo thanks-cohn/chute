@@ -52,8 +52,7 @@ for name in ("gallery-density", "shelf-viewer-size"):
     positions = parsed.found.get(name, [])
     assert len(positions) == 1
     assert "settings-panel" in positions[0], f"{name} must be a setting"
-assert ".settings-panel[open] .settings" in CSS
-assert "position:absolute" in CSS
-assert "background:#151a13" in CSS
+assert ".settings-panel[open] .settings" not in CSS
+assert "height:auto; min-height:400px; max-height:none" in CSS
 assert "#chutey-popup-gallery" in CSS
-print("PASS: one independent History/gallery, isolated Settings popover, density/viewer controls in Settings")
+print("PASS: one independent History/gallery, normal-flow Settings, density/viewer controls in Settings")

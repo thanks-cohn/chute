@@ -87,7 +87,7 @@ class Element {
   const intent=sessionWrites[0].chuteyPopupOpenItem;
   assert.equal(intent.id,file.id);assert.equal(intent.windowId,19);assert.equal(intent.day,"2026-11-04");
   assert.equal(intent.index,0);assert.equal(intent.scope,"live");
-  lightbox.querySelector(".chutey-lightbox-close").handlers.click();assert.equal(lightbox.hidden,true);
+  lightbox.handlers.click({target:lightbox.querySelector(".chutey-lightbox-image")});assert.equal(lightbox.hidden,true);
   const expanded=row.classList.contains("chutey-gallery-expanded");
   row.handlers.click({...event,target:{closest:()=>({})}});
   assert.equal(row.classList.contains("chutey-gallery-expanded"),expanded,"Action buttons remain isolated");

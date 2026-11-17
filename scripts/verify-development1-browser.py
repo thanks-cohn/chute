@@ -58,7 +58,7 @@ def main():
                 page=context.new_page();errors=[];page.on('pageerror',lambda error:errors.append(str(error)))
                 page.goto('http://127.0.0.1:17891/popup.html')
                 expect(page.locator('.chutey-gallery-tile')).to_have_count(120)
-                old_css=page.add_style_tag(content=".chutey-gallery-popup #files {grid-auto-rows:auto;grid-template-rows:repeat(4,min-content)} .chutey-gallery-popup #files .chutey-gallery-tile {aspect-ratio:1!important;height:auto}")
+                old_css=page.add_style_tag(content=".chutey-gallery-popup #files {height:400px;max-height:400px;overflow-y:auto;grid-auto-rows:auto;grid-template-rows:repeat(4,min-content)} .chutey-gallery-popup #files .chutey-gallery-tile {aspect-ratio:1!important;height:auto}")
                 broken=page.locator('.chutey-gallery-tile').evaluate_all('nodes=>nodes.map(node=>node.getBoundingClientRect().height)')
                 assert min(broken)<20,'The prior CSS must reproduce collapsed implicit rows'
                 old_css.evaluate('node=>node.remove()')
@@ -68,7 +68,7 @@ def main():
                     boxes=page.locator('.chutey-gallery-tile').evaluate_all('nodes=>nodes.map(node=>{let r=node.getBoundingClientRect();return {w:r.width,h:r.height}})')
                     assert all(box['h']>45 and abs(box['w']-box['h'])<1 for box in boxes),(step,boxes)
                     assert max(box['h'] for box in boxes)-min(box['h'] for box in boxes)<1
-                    page.locator('#files').evaluate('node=>node.scrollTop=node.scrollHeight')
+                    page.evaluate('document.scrollingElement.scrollTop=document.scrollingElement.scrollHeight')
                     last=page.locator('.chutey-gallery-tile').last
                     expect(last.locator('.file-thumb')).to_have_js_property('naturalWidth',320)
                     measurements.append({'density':step,'cards':len(boxes),'min_height':min(box['h'] for box in boxes)})

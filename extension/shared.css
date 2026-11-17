@@ -371,3 +371,12 @@ code { color: #d7ff3f; }
   font-weight: 700;
   font-variant-numeric: tabular-nums;
 }
+
+/* History state is a whole phrase, independent of metadata and action width. */
+.file-drag-label { margin-top:4px; line-height:1.4; }
+.file-state { display:inline-block; white-space:nowrap; }
+body:not(.chutey-gallery-popup) .file-tools { flex-wrap:wrap; }
+@media (max-width:480px) {
+  body:not(.chutey-gallery-popup) .file-row { grid-template-columns:42px minmax(0,1fr); }
+  body:not(.chutey-gallery-popup) .file-tools { grid-column:2; }
+}

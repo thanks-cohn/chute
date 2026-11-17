@@ -53,7 +53,7 @@
   lightbox.setAttribute("aria-modal","true");
   lightbox.setAttribute("aria-label","Image preview");
   lightbox.innerHTML = `
-    <header><strong class="chutey-lightbox-title"></strong><button class="chutey-lightbox-close" type="button" aria-label="Close preview">×</button></header>
+    <header><strong class="chutey-lightbox-title"></strong></header>
     <div class="chutey-lightbox-stage">
       <button type="button" class="chutey-lightbox-prev" aria-label="Previous image">‹</button>
       <img class="chutey-lightbox-image" alt="">
@@ -69,7 +69,7 @@
   let activeId = null, returnFocus = null, serial = 0;
   function imageTiles() {
     return Array.from(document.querySelectorAll("#files .chutey-gallery-tile"))
-      .filter(tile => tile.__galleryFile && isPreviewableImage(tile.__galleryFile));
+      .filter(tile => !tile.hidden && tile.__galleryFile && isPreviewableImage(tile.__galleryFile));
   }
   function activeFile() {
     return imageTiles().find(tile => tile.__galleryFile.id === activeId)?.__galleryFile;
@@ -102,7 +102,7 @@
     lightbox.hidden = false;
     document.body.classList.add("chutey-lightbox-open");
     showImage(file.id);
-    lightbox.querySelector(".chutey-lightbox-close").focus();
+    lightbox.tabIndex = -1; lightbox.focus();
   }
   function closePreview() {
     if (lightbox.hidden) return;
@@ -119,7 +119,9 @@
     const index = tiles.findIndex(tile => tile.__galleryFile.id === activeId);
     if (index + delta >= 0 && index + delta < tiles.length) showImage(tiles[index + delta].__galleryFile.id);
   }
-  lightbox.querySelector(".chutey-lightbox-close").addEventListener("click",closePreview);
+  lightbox.addEventListener("click",event => {
+    if (event.target === lightbox || event.target === preview || event.target.classList.contains("chutey-lightbox-stage")) closePreview();
+  });
   prev.addEventListener("click",() => move(-1));
   next.addEventListener("click",() => move(1));
   document.addEventListener("keydown",event => {
@@ -172,9 +174,56 @@
     if (!lightbox.hidden && !activeFile()) closePreview();
   }).observe(document.querySelector("#files"),{childList:true});
 
+  // Live removal reuses the authoritative API. Archive-only hiding is presentation
+  // state for this popup session, never a history/file mutation.
+  const hiddenArchive = new Set();
+  const menu = document.createElement("div");
+  menu.className = "chutey-popup-menu"; menu.hidden = true;
+  menu.setAttribute("role","menu"); menu.setAttribute("aria-label","Item actions");
+  menu.innerHTML = '<button type="button" role="menuitem"><span aria-hidden="true">♜</span> Trash It!</button><small></small>';
+  menu.querySelector("span").textContent = "🗑";
+  document.body.append(menu);
+  let menuFile = null, menuReturn = null;
+  function dismissMenu() { menu.hidden = true; if (menuReturn?.isConnected) menuReturn.focus({preventScroll:true}); }
+  function openMenu(event,file,row) {
+    event.preventDefault(); event.stopPropagation();
+    menuFile = file; menuReturn = row; menu.hidden = false;
+    menu.querySelector("small").textContent = file.active ? "Live only · kept in dated History" : "Hide here only · History unchanged";
+    const box = row.getBoundingClientRect();
+    menu.style.left = Math.max(4,Math.min(innerWidth-226,event.clientX || box.left)) + "px";
+    menu.style.top = Math.max(4,Math.min(innerHeight-95,event.clientY || box.top)) + "px";
+    menu.querySelector("button").focus();
+  }
+  lightbox.addEventListener("contextmenu",event => {
+    const file = activeFile(), row = imageTiles().find(tile => tile.__galleryFile.id === activeId);
+    if (file && row) openMenu(event,file,row);
+  });
+  document.addEventListener("pointerdown",event => { if (!menu.hidden && !menu.contains(event.target)) dismissMenu(); },true);
+  document.addEventListener("keydown",event => { if (event.key === "Escape" && !menu.hidden) { event.preventDefault(); event.stopImmediatePropagation(); dismissMenu(); } },true);
+  menu.querySelector("button").addEventListener("click",async () => {
+    const file = menuFile; if (!file) return;
+    const button = menu.querySelector("button"); button.disabled = true;
+    try {
+      if (file.active) {
+        await api("/api/files/"+encodeURIComponent(file.id),{method:"DELETE"});
+        await chrome.runtime.sendMessage({type:"chute-count-changed"}).catch(() => {});
+      } else { hiddenArchive.add(file.id); if (menuReturn) menuReturn.hidden = true; }
+      dismissMenu(); closePreview();
+      await resetHistory();
+      imageTiles()[0]?.focus({preventScroll:true});
+    } catch (error) { menu.querySelector("small").textContent = error.message || "Could not remove. Retry."; }
+    finally { button.disabled = false; }
+  });
+
   const original = createRow;
   createRow = function galleryRow(file,index) {
     const row = original(file,index);
+    row.hidden = hiddenArchive.has(file.id);
+    row.querySelector(".file-tools .remove")?.remove();
+    row.addEventListener("contextmenu",event => openMenu(event,file,row));
+    row.addEventListener("keydown",event => {
+      if (event.key === "ContextMenu" || (event.shiftKey && event.key === "F10")) openMenu(event,file,row);
+    });
     row.__galleryFile = file;
     row.classList.add("chutey-gallery-tile");
     row.tabIndex = 0;

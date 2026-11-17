@@ -306,7 +306,7 @@ function createRow(file, index) {
     </div>
     <div class="file-info">
       <div class="file-name" title="${escapeHtml(file.name)}">${escapeHtml(file.name)}</div>
-      <div class="file-meta">${formatSize(file.size)} · ${formatWhen(file.created_at)} · <span class="file-state">${state}</span></div>
+      <div class="file-meta">${formatSize(file.size)} · ${formatWhen(file.created_at)}</div><div class="file-drag-label"><span class="file-state">${state}</span></div>
     </div>
     <div class="file-tools"></div>`;
 
