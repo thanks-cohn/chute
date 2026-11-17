@@ -26,6 +26,25 @@ In Settings > Folder Access the UI shows:
 - src/chute/explorer/performance.py defines Efficiency/Balanced/Turbo as different navigation/thumbnail/prefetch admissions, but preserves **control capacity of four** and **media capacity of two** across modes. Turbo does not intentionally disable media-policy permission. Turbo allows more thumbnail/navigation work and might increase contention on constrained hardware, but this is a **hypothesis**, not established causation.
 - Existing media approval state for an explicitly approved folder should persist independently of mode; saved_store scope intentionally disables external-folder playback choice. Owner switching to Balanced and then succeeding suggests a transient mode/load/timing issue, not evidence that a new folder grant was intended.
 
+## OWNER PRODUCT DIRECTION — Turbo is the maximum-performance profile
+
+The owner further clarified:
+
+> "turbo btw should be the MOST powerful, it shouldn't care and JUST LUNGE and assume you got all the power in the world"
+>
+> "this is for people with powerful computers, to maximally enjoy"
+
+**Non-negotiable intent:** Turbo is NOT simply Balanced with an incrementally higher small semaphore count. It is the **maximum-performance / aggressively prefetching / high-throughput** mode designed for users with powerful PCs. It should use available CPU cores, RAM bandwidth, fast disks, GPU/video decode when browser APIs permit, parallel thumbnail/image work and richer caching to make the Explorer and player feel close to native Windows speed. Minimize latency and favor instant interactions.
+
+**Performance mode contract:**
+- **Efficiency:** Conserve RAM, CPU and background I/O, particularly on weaker PCs.
+- **Balanced:** Smooth, adaptive everyday default.
+- **Turbo:** Actively optimize for highest real-world throughput and lowest latency on high-end machines, using a hardware-aware, benchmark-driven concurrency/prefetch strategy, rather than a token multiplier (the current static Turbo nav/thumbnail/prefetch triple is 6/3/3 vs Balanced 4/2/2).
+
+Turbo **must not** compromise correctness, playback consent, privacy, user data, verified copies, or application responsiveness. "Assume power" is a performance goal, **not an instruction to allocate unbounded memory, create unlimited threads or let background work starve user input**. Use bounded adaptive limits that exploit generous resources, cancellation/backpressure for obsolete requests and a fast priority control/UI path. Measure throughput and latency on a genuinely powerful Windows host and compare to Balanced; no vague "fastest" claim without evidence. Preserve explicit Turbo selection even when less-than-ideal resources are detected; warn/scale to avert crashes rather than silently reclassifying it as Balanced.
+
+**Turbo acceptance tests:** show materially higher throughput or lower interaction latency where the hardware enables it, alongside 4K/high-bitrate media, 1 video + image + directory browsing, sustained scroll/search and rapid previews. Verify control-plane operations and the **Allow movie media playback** checkbox remain promptly usable under heavy Turbo workload, including on a 4-GB constrained device. No infinite spinner, unbounded memory growth or systematic BUSY starvation.
+
 ## Required diagnosis
 
 1. Capture the exact state on Turbo: checkbox DOM disabled/checked, folderStatus, movieStatus, session.scope, media_policy_get/set receipt and completion/latency, and whether any request is pending indefinitely. No secret bearer, folder path, file name or consent token in shared logs.
