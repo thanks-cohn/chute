@@ -1,6 +1,8 @@
 # NECESSARY FIX — File Explorer click PREVIEWS; History click OPENS saved local location
 
-**Owner clarification:** November 17, 2026  
+**Owner clarification:** November 17, 2026
+
+**LATEST CLARIFICATION SUPERSEDES HISTORY-IMAGE-CLICK WORDING BELOW:** A **History image thumbnail/card click enlarges the image in Chutey**, and the **Shelf Open button** defaults to revealing the actual saved file location in Windows Explorer (unless the user changes the Shelf Open setting). The earlier short statement "History click reveals the location" applies to the dedicated **Open/location action**, not clicking the image itself. Copy image pixels must be available from popup/Shelf image right-click and enlarged/half/full previews. See [new necessary fix](POPUP_SHELF_COPY_IMAGE_AND_SHELF_OPEN_DEFAULT_2026-11-17.md).  
 **Priority:** Critical interaction/UX correctness; owner-device regression  
 **Repository/working branch:** `thanks-cohn/chute` / `fix/chutey-media-worker-2026-11-17`  
 **Related preview-layout issue:** [#30](https://github.com/thanks-cohn/chute/issues/30).  
@@ -15,7 +17,7 @@ There are **two distinct contexts** and their actions MUST NOT be inherited blin
 | Context | Default click/tap on image or file | Default double-click / Enter | Separate explicit actions |
 |---|---|---|---|
 | **File Explorer** (user is already browsing their local filesystem in Chutey) | **Select and open/update the in-Chutey preview pane** on the FIRST click, even if the preview pane is currently closed | **Preview/open inside Chutey**, not Windows File Explorer or the associated system app; Enter should have the same intended result | Context menu may offer **Preview**, **Open in Windows associated application**, **Reveal / GO TO in Windows Explorer** as clearly different, explicitly labeled commands |
-| **History** (saved Chutey items) | **Open/reveal the saved file's local directory in Windows File Explorer, selecting/highlighting that file where supported**; do not confuse this with navigating an already open Chutey File Explorer | Same local-location behavior unless an explicitly labeled alternate action is used | Keep explicit **Preview in Chutey** if desired, **Open saved file with app**, and **Reveal location**; unambiguous labels rather than an overloaded generic Open |
+| **History** (saved Chutey items) | **Clicking an image enlarges/previews it inside Chutey.** The dedicated **Shelf Open button** instead **reveals the saved image in its Windows Explorer location by default**, selecting/highlighting where supported; explicit Shelf Settings may override Open behavior | Image double-click/Enter should remain coherent with in-Chutey preview; Shelf **Open** separately reveals local location by default | Support **Copy image** in right-click and enlarged/full image previews, preserve Trash, and explicit Reveal/GO TO. Do not conflate image clicks with Open button |
 | **Folder row in Chutey File Explorer** | Select; double-click/Enter navigates into that folder; a convenient single-click navigation can be evaluated separately | Navigate into folder, not file preview | Explicit Windows location action if desired |
 
 **Crucial usability constraints:**
@@ -23,8 +25,8 @@ There are **two distinct contexts** and their actions MUST NOT be inherited blin
 - Clicking a second image updates the **same** image/document preview without spawning Windows Explorer, launching Paint/Photos/another app, or opening a second independent image pane.
 - Selecting an MP4/MP3/WebM launches or updates the intentional **pinned media preview** within the established Chutey media surface, rather than opening Windows Explorer. Respect original media authorization, playback leases, Stop/Close and existing user-selected playback settings; do not regress streaming.
 - Browser-standard multi-select modifiers (Ctrl, Shift) must NOT inadvertently open many previews; when selecting ranges, maintain selection without unnecessarily streaming/previewing every item. Single click without modifiers previews.
-- **History location** is the authoritative saved-file directory, not a reconstructed guessed path, arbitrary folder grant, or History's date/category view. If a saved file was deleted/moved, report an explicit missing-file result; no arbitrary directory access.
-- The History rule applies to the item action explicitly requested by owner; if existing thumbnails have intentional lightbox behavior, separate the visual preview affordance from the primary local-location affordance and make it obvious. Do not unintentionally remove gallery functionality or saved-history retention while implementing the owner's desired default.
+- **Shelf History Open/Reveal location** is the authoritative saved-file directory, not a reconstructed guessed path, arbitrary folder grant, or History's date/category view. If a saved file was deleted/moved, report an explicit missing-file result; no arbitrary directory access.
+- The latest History rule distinguishes **click thumbnail = enlarge image** from **Shelf Open = reveal local folder by default** (settings may override Open only). Keep thumbnail/lightbox behavior and add Copy image alongside Trash in popup and Shelf image previews. Do not remove gallery functionality or saved-history retention.
 - A system Open and system Reveal must **never** share one ambiguous default in File Explorer. Preferences may configure explicit commands, but the File Explorer primary click/Enter remains internal preview under this clarified product rule.
 
 ## Inspected source showing why this mistake happened (exact TEST source `1e2b2bc6d5da0119e87bcbc0c52b86abe55dd122`)
@@ -42,7 +44,7 @@ There are **two distinct contexts** and their actions MUST NOT be inherited blin
 2. With image preview visible: click next JPEG/PNG → same preview updates; no stale image. Double-click/Enter on file → in-Chutey preview, not Windows location or system app.
 3. Click MP4/WebM/MP3 → pinned playback surface inside Chutey; selecting image while video is pinned displays the image alongside player, according to [#30](https://github.com/thanks-cohn/chute/issues/30), without involuntary video stop.
 4. Explicit File Explorer context **Reveal / GO TO** → opens actual location in Windows Explorer; explicitly labeled **Open with system application** → uses system app; explicit **Preview** → in-Chutey pane.
-5. In History, primary **location action** for a saved file opens the actual local containing folder with file highlighted if feasible. Invalid/missing item yields truthful error; the History image preview/lightbox remains available through its separately labeled action.
+5. In History, **click image = in-Chutey enlarged preview**; separate **Shelf Open = reveal actual local containing folder by default** with file highlighted if feasible, subject to explicit Shelf-specific setting. The preview/lightbox supports Copy image as well as Trash. Invalid/missing item yields truthful error.
 6. Ctrl/Shift multi-select does not cause a preview storm or `BUSY` lane exhaustion.
 7. File Explorer directory navigation, approved-root consent and saved History are unaffected; no storage deletion, no extra folder-picker consent if existing grant remains valid.
 8. Tests must cover FIRST click vs double-click/Enter, context menu, both History/Explorer tabs, settings defaults, Chrome restart, and existing saved History items.
