@@ -98,3 +98,36 @@ class NativeConsentTests(unittest.TestCase):
             self.assertEqual(native_main(),0)
         self.assertEqual(send.call_args.args[0]['code'],'BRIDGE_UNAVAILABLE')
         self.assertNotIn('Select',send.call_args.args[0]['error'])
+
+    def test_new_media_consent_defaults_off_and_legacy_migration_preserves_scope(self):
+        class ConsentStore:
+            directory=self.root/'private-consent'
+            value=None
+            def save(store,origin,descriptor):store.value=json.loads(json.dumps(descriptor))
+            def load(store,origin):return json.loads(json.dumps(store.value))
+        consent=ConsentStore();self.controller.store=consent
+        with patch('chute.explorer.native.choose_folder',return_value=str(self.root)):
+            response=self.controller.action(ORIGIN,select=True)
+        adapter=self.controller.adapter(ORIGIN);original_grant=next(iter(adapter.engine.grants))
+        self.assertTrue(response['read_only'])
+        self.assertFalse(self.controller.state(ORIGIN,'media_policy_get',{})['allowed'])
+        self.assertFalse(consent.value['media_allowed'])
+        for bad in (1,'true',None):
+            with self.assertRaises(ExplorerError):self.controller.state(ORIGIN,'media_policy_set',{'allowed':bad})
+        self.controller.state(ORIGIN,'media_policy_set',{'allowed':True})
+        self.assertTrue(consent.value['media_allowed'])
+        adapter.media['synthetic']={'revoked':False}
+        self.controller.state(ORIGIN,'media_policy_set',{'allowed':False})
+        self.assertTrue(adapter.media['synthetic']['revoked'])
+        self.assertEqual(next(iter(adapter.engine.grants)),original_grant)
+        self.assertFalse(next(iter(adapter.engine.grants.values())).writable)
+        # Restart with an actual pre-policy descriptor. Preserve its existing
+        # read scope and previous playback, recording an explicit migration.
+        adapter.engine.close();consent.value.pop('media_allowed');consent.value.pop('media_policy_version')
+        self.controller=NativeExplorer(store=consent)
+        with patch('chute.explorer.native.choose_folder',side_effect=AssertionError('repeated picker')):
+            restored=self.controller.action(ORIGIN,select=False)
+        policy=self.controller.state(ORIGIN,'media_policy_get',{})
+        self.assertTrue(policy['allowed'] and policy['migrated'])
+        self.assertTrue(consent.value['media_policy_migrated'])
+        self.assertTrue(restored['read_only'])

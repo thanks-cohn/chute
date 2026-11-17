@@ -233,15 +233,12 @@ def run(args):
                 chrome=os.environ.get('CHUTE_TEST_BROWSER') or shutil.which('chromium') or shutil.which('chrome') or r'C:\Program Files\Google\Chrome\Application\chrome.exe'
                 flags=['--no-sandbox','--disable-background-timer-throttling','--disable-backgrounding-occluded-windows','--disable-renderer-backgrounding']
                 if args.transport in {'extension','installed'}:
-                    context=p.chromium.launch_persistent_context(str(root/'profile'),executable_path=chrome,headless=True,ignore_default_args=['--disable-extensions'],args=[*flags,'--enable-unsafe-extension-debugging',f'--disable-extensions-except={ROOT/"extension"}',f'--load-extension={ROOT/"extension"}'])
-                    if context.service_workers:
-                        server.test_origin=context.service_workers[0].url.split('/background-entry.js')[0]
-                    else:
-                        # CDP registration can complete before an idle MV3
-                        # worker starts. Use the registered extension identity;
-                        # an actual extension message below must wake its worker.
-                        registered=context.browser.new_browser_cdp_session().send('Extensions.loadUnpacked',{'path':str(ROOT/'extension')})
-                        server.test_origin='chrome-extension://'+registered['id']
+                    # Current Chrome supports explicit CDP unpacked registration.
+                    # The obsolete --load-extension/--disable-extensions-except
+                    # combination blocked this registration in the paired CI.
+                    context=p.chromium.launch_persistent_context(str(root/'profile'),executable_path=chrome,headless=True,ignore_default_args=['--disable-extensions'],args=[*flags,'--enable-unsafe-extension-debugging'])
+                    registered=context.browser.new_browser_cdp_session().send('Extensions.loadUnpacked',{'path':str(ROOT/'extension')})
+                    server.test_origin='chrome-extension://'+registered['id']
                     entry=server.test_origin
                     if not installed:context.add_init_script(NATIVE_SHIM)
                 else:
