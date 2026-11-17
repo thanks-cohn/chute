@@ -51,3 +51,30 @@ Screenshot `/tmp/chutey-request3c/shelf-export.png`. Native enrollment simulated
 Actual >4-GiB ZIP, Windows destination filesystem limits and installed Chrome
 Save As remain owner acceptance checks; the size rule uses Python ZIP64 rather
 than an arbitrary split limit. See HISTORY-EXPORT-API.md for implemented contracts.
+
+## 3D — completed after 3C, before 3B implementation
+
+Implemented native authenticated daily capture API with durable ID/digest intent,
+per-capture immutable originals, worker-local received-at timestamp and exact two
+empty lines between entries. Original chronological add events remain intact.
+Recovery finishes known partial writes without truncating unexpected originals;
+a damaged aggregate cannot prevent ordinary Store startup. Bounded 64-KiB text
+pages serve popup reader and capture-position GO TO. Archived cards now offer
+GO TO without Recall. Default decoration migrates OFF; Shelf-only explicit switch
+persists across tabs/restarts and respects reduced motion. YUMMY source preserved.
+
+`test_highlights.py` plus `test_explorer_media.py`: 16 passed, including concurrent
+captures, DST repeated hour/day rollover, exact Unicode/newline bytes, stable
+receipts and no implicit recall, restart/partial daily file/capture/history
+recovery, changed-original fail-closed behavior, strict session/origin and no path
+arguments. `verify-highlights-browser.py` passed: actual background capture
+operation to real worker, daily file bytes, several-screen literal scroll reader,
+long-word wrapping, paging, injection inertness, Trash/archived GO TO, inherited
+true → OFF, Shelf-only opt-in/storage updates/reduced motion. Screenshot
+`/tmp/chutey-request3d/popup-text-reader.png`. No installed Windows claims.
+
+Repeated `verify-request3a-browser.py`, `verify-phase1-browser.py`, popup JS,
+worker boot, thumbnail/icons, tabs/mascot, Explorer API/drag checks passed.
+Windows native picker/shell, power-loss filesystem behavior and production Chrome
+remain owner checks. Daily selection maximum 4 MiB; growing documents use bounded
+pages rather than a full-memory read. See DAILY-HIGHLIGHTS-API.md for limitations.

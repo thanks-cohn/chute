@@ -10,12 +10,12 @@ syncContextMenu = function(mode) {
       await chrome.contextMenus.removeAll();
       const contexts = mode === "context" || mode === "both"
         ? ["image", "link", "selection", "page"]
-        : ["image"];
+        : ["image", "selection"];
 
       await new Promise((resolve, reject) => {
         chrome.contextMenus.create({
           id: "chute-send",
-          title: "Feed Chutey!",
+          title: "Chutey",
           contexts
         }, () => {
           const error = chrome.runtime.lastError;

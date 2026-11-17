@@ -154,13 +154,7 @@ async function sendImageBytesToChute(blob, name, sourceUrl) {
 
 async function sendContextToChute(info, tab) {
   if (info.selectionText) {
-    const text = `${info.selectionText}\n`;
-    const stamp = new Date().toISOString().replace(/[:.]/g, "-");
-    await uploadBlob(
-      new Blob([text], { type: "text/plain;charset=utf-8" }),
-      `selection-${stamp}.txt`,
-      tab?.url || "browser-selection"
-    );
+    await ChuteyHighlights.capture(info.selectionText,tab?.url || 'browser-selection');
     return;
   }
 

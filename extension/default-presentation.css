@@ -11,8 +11,8 @@
 .file-icon.chutey-mascot-fallback::after { inset:27%; border-radius:50%; animation-direction:reverse; }
 @keyframes chutey-default-orbit { to { transform:rotate(360deg); } }
 .file-icon.chutey-mascot-fallback.has-thumbnail::before, .file-icon.chutey-mascot-fallback.has-thumbnail::after { visibility:hidden!important; animation:none!important; }
-html[data-chutey-background-animation=false] .file-icon::before,
-html[data-chutey-background-animation=false] .file-icon::after { animation:none!important; }
+html:not([data-chutey-background-animation=true]) .file-icon::before,
+html:not([data-chutey-background-animation=true]) .file-icon::after { animation:none!important; }
 .chutey-presentation-sample { position:relative; display:grid; place-items:center; width:80px; height:80px; overflow:hidden; border:1px solid #657258; border-radius:8px; }
 .chutey-presentation-sample .file-fallback { width:42%; height:42%; }
 [data-presentation-settings] { display:grid; gap:9px; margin:8px; border:1px solid #46533c; border-radius:8px; }

@@ -90,6 +90,19 @@
     const body = $(".ex-preview-body"); body.textContent = "Loading preview…";
     abort = new AbortController(); const signal = abort.signal;
     try {
+      if(row.highlight){
+        const page=await api.command('saved_text_page',{id:row.highlight.capture_id,offset:row.highlight.entry_offset,limit:65536});
+        if(id!==previewId)return;
+        const text=document.createElement('pre');text.textContent=page.text;
+        body.replaceChildren(text);body.scrollTop=0;
+        if(page.next!==null){
+          const more=button('Continue reading','Continue reading',async()=>{
+            const next=await api.command('saved_text_page',{id:row.highlight.capture_id,offset:page.next,limit:65536});
+            if(id===previewId){text.textContent=next.text;body.scrollTop=0;page.next=next.next;more.disabled=next.next===null;}
+          });body.append(more);
+        }
+        return;
+      }
       const meta = await api.command("preview", {handle: row.handle});
       if (meta.handle !== row.handle || (row.identity && meta.identity !== row.identity)) {
         throw new Error("The file changed. Refresh the folder before previewing it.");
@@ -436,6 +449,7 @@
     document.querySelector('#chutey-tab-explorer')?.click();
     await revealHere(meta);
     if (action === 'open') await fileAction(meta,'open');
+    else if(meta.highlight) await showPreview(meta);
   }
   window.ChuteyExplorerNavigation = Object.freeze({saved:savedAction});
   async function consumeAction(intent) {

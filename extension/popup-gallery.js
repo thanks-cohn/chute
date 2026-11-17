@@ -57,6 +57,7 @@
     <div class="chutey-lightbox-stage">
       <button type="button" class="chutey-lightbox-prev" aria-label="Previous image">‹</button>
       <img class="chutey-lightbox-image" alt="">
+      <div class="chutey-lightbox-reader" hidden><pre tabindex="0" aria-label="Saved text"></pre><nav><button type="button" data-text-back>Previous text page</button><button type="button" data-text-next>Next text page</button></nav><span data-text-position></span></div>
       <button type="button" class="chutey-lightbox-next" aria-label="Next image">›</button>
       <p class="chutey-lightbox-error" hidden>Image unavailable. The History entry is preserved.</p>
     </div>
@@ -69,11 +70,28 @@
   let activeId = null, returnFocus = null, serial = 0;
   function imageTiles() {
     return Array.from(document.querySelectorAll("#files .chutey-gallery-tile"))
-      .filter(tile => !tile.hidden && tile.__galleryFile && isPreviewableImage(tile.__galleryFile));
+      .filter(tile => !tile.hidden && tile.__galleryFile && (isPreviewableImage(tile.__galleryFile) || fileKind(tile.__galleryFile) === "text"));
   }
   function activeFile() {
     return imageTiles().find(tile => tile.__galleryFile.id === activeId)?.__galleryFile;
   }
+  const reader = lightbox.querySelector('.chutey-lightbox-reader');
+  let textFile=null,textNext=null,textOffsets=[0];
+  async function textPage(offset,token) {
+    reader.querySelector('pre').textContent='Loading saved text…';
+    try {
+      await window.ChuteyExplorerAPI.nativeSession(false);
+      const page=await window.ChuteyExplorerAPI.command('saved_text_page',{id:textFile.id,offset,limit:65536});
+      if(token!==serial)return;
+      reader.querySelector('pre').textContent=page.text;reader.querySelector('pre').scrollTop=0;
+      textNext=page.next;
+      reader.querySelector('[data-text-next]').disabled=textNext===null;
+      reader.querySelector('[data-text-back]').disabled=textOffsets.length<2;
+      reader.querySelector('[data-text-position]').textContent='Bytes '+offset+'–'+(page.next??page.size)+' of '+page.size+' · Escape or click outside to close';
+    }catch(error){if(token===serial)reader.querySelector('pre').textContent=error.message || 'Saved text unavailable.';}
+  }
+  reader.querySelector('[data-text-next]').onclick=()=>{if(textNext!==null){textOffsets.push(textNext);void textPage(textNext,serial);}};
+  reader.querySelector('[data-text-back]').onclick=()=>{if(textOffsets.length>1){textOffsets.pop();void textPage(textOffsets.at(-1),serial);}};
   function showImage(id) {
     const tiles = imageTiles();
     const index = tiles.findIndex(tile => tile.__galleryFile.id === id);
@@ -83,6 +101,7 @@
     const token = ++serial;
     errorText.hidden = true;
     errorText.textContent = "Image unavailable. The History entry is preserved.";
+    reader.hidden = true;
     preview.hidden = false;
     preview.removeAttribute("src");
     preview.alt = file.name || "Saved image";
@@ -94,15 +113,19 @@
       if (token !== serial) return;
       preview.hidden = true; errorText.hidden = false;
     };
-    preview.src = fileUrl(file);
+    if(fileKind(file)==='text'){
+      preview.hidden=true;reader.hidden=false;textFile=file;textOffsets=[0];textNext=null;
+      void textPage(0,token);
+    }else preview.src = fileUrl(file);
   }
   function openPreview(file, source) {
-    if (!isPreviewableImage(file)) return;
+    if (!isPreviewableImage(file) && fileKind(file)!=="text") return;
     returnFocus = source;
     lightbox.hidden = false;
     document.body.classList.add("chutey-lightbox-open");
     showImage(file.id);
     lightbox.tabIndex = -1; lightbox.focus();
+    document.querySelectorAll('body > header,body > details,#chutey-popup-gallery').forEach(node=>{node.inert=true;});
   }
   function closePreview() {
     if (lightbox.hidden) return;
@@ -110,7 +133,8 @@
     document.body.classList.remove("chutey-lightbox-open");
     ++serial;
     preview.removeAttribute("src");
-    activeId = null;
+    activeId = null; textFile=null;reader.querySelector('pre').textContent='';
+    document.querySelectorAll('body > header,body > details,#chutey-popup-gallery').forEach(node=>{node.inert=false;});
     if (returnFocus?.isConnected) returnFocus.focus({preventScroll:true});
     returnFocus = null;
   }
@@ -251,7 +275,7 @@
     }
     // Image clicks have ONE deterministic action: open the popup preview.
     // Grid expansion was the competing, visually inconsistent second action.
-    if (isPreviewableImage(file)) {
+    if (isPreviewableImage(file) || fileKind(file)==="text") {
       row.setAttribute("role", "button");
       row.setAttribute("aria-label", "Preview " + file.name);
       row.removeAttribute("aria-expanded");

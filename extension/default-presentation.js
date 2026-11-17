@@ -1,14 +1,15 @@
 /* Packaged presentation only: this module grants no file or network access. */
 (() => {
   "use strict";
-  const KEY = "chuteyPresentation", VERSION = 1;
-  const defaults = Object.freeze({version:VERSION, color:"#293728", animation:true, speed:13, image:"icons/icon32.png", variedFaces:true});
+  const KEY = "chuteyPresentation", VERSION = 2;
+  const defaults = Object.freeze({version:VERSION, color:"#293728", animation:false, animationOptIn:false, speed:13, image:"icons/icon32.png", variedFaces:true});
   let settings = {...defaults}, revision = 0;
   const validImage = value => value === defaults.image || /^alternate-chuteys\/[a-zA-Z0-9][a-zA-Z0-9_.-]*\.(png|webp|gif|jpe?g)$/i.test(value || "");
   function normalize(value) {
     const source = value && typeof value === "object" ? value : {};
     return {version:VERSION, color:/^#[0-9a-f]{6}$/i.test(source.color || "") ? source.color : defaults.color,
-      animation:typeof source.animation === "boolean" ? source.animation : defaults.animation,
+      animation:source.version === VERSION && source.animationOptIn === true && source.animation === true,
+      animationOptIn:source.version === VERSION && source.animationOptIn === true,
       speed:[8,13,24].includes(source.speed) ? source.speed : defaults.speed,
       image:validImage(source.image) ? source.image : defaults.image,
       variedFaces:typeof source.variedFaces === "boolean" ? source.variedFaces : defaults.variedFaces};
@@ -62,6 +63,7 @@
     document.querySelectorAll("[data-presentation-image]").forEach(node => { node.value = settings.image; });
   }
   async function update(patch) {
+    if (Object.hasOwn(patch,"animation") && !Object.hasOwn(patch,"animationOptIn")) patch={...patch,animationOptIn:true};
     ++revision; apply({...settings,...patch});
     await chrome.storage.sync.set({[KEY]:settings});
   }
@@ -85,8 +87,7 @@
       <label>Default image <select data-presentation-image><option value="icons/icon32.png">Original Chutey</option></select></label>
       <label><input type="checkbox" data-presentation-faces> Vary packaged faces on link cards</label>
       <label>Background color <input type="color" data-presentation-color aria-label="Card background color"></label>
-      <label><input type="checkbox" data-presentation-animation> Animate the decoration behind default images</label>
-      <label>Background animation speed <select data-presentation-speed><option value="8">Fast</option><option value="13">Normal</option><option value="24">Slow</option></select></label>
+      ${location.pathname.endsWith('/shelf.html') ? '<label><input type="checkbox" data-presentation-animation> Animate background behind Chutey images</label><label>Background animation speed <select data-presentation-speed><option value="8">Fast</option><option value="13">Normal</option><option value="24">Slow</option></select></label>' : ''}
       <div class="chutey-presentation-sample file-icon chutey-mascot-fallback"><span class="file-fallback"></span></div>
       <button type="button" data-presentation-reset>Reset image and background</button><span role="status" data-presentation-status></span>`;
     decorate(panel.querySelector(".file-icon"));
@@ -94,8 +95,10 @@
       panel.querySelector('[data-presentation-status]').textContent = "Could not save. Please retry.";
     });
     panel.querySelector('[data-presentation-color]').oninput = event => { void save({color:event.target.value}); };
-    panel.querySelector('[data-presentation-animation]').onchange = event => { void save({animation:event.target.checked}); };
-    panel.querySelector('[data-presentation-speed]').onchange = event => { void save({speed:Number(event.target.value)}); };
+    const animation=panel.querySelector('[data-presentation-animation]');
+    if(animation) animation.onchange = event => { void save({animation:event.target.checked}); };
+    const speed=panel.querySelector('[data-presentation-speed]');
+    if(speed) speed.onchange = event => { void save({speed:Number(event.target.value)}); };
     panel.querySelector('[data-presentation-image]').onchange = event => { void save({image:event.target.value,variedFaces:false}); };
     panel.querySelector('[data-presentation-faces]').onchange = event => { void save({variedFaces:event.target.checked}); };
     panel.querySelector('[data-presentation-reset]').onclick = () => { void save(defaults); };

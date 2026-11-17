@@ -334,7 +334,8 @@ class ChuteHandler(BaseHTTPRequestHandler):
                 self._json({"error": "saved file not found"}, HTTPStatus.NOT_FOUND)
                 return
             try:
-                selection = reveal_file(found[1])
+                capture=self.store.highlights.lookup(item_id) if self.store.highlights else None
+                selection = reveal_file(capture['path'] if capture else found[1])
             except (OSError, ValueError) as exc:
                 self._json({"error": str(exc)}, HTTPStatus.SERVICE_UNAVAILABLE)
                 return

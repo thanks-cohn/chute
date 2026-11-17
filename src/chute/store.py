@@ -58,12 +58,16 @@ class Store:
         self.custom_thumbs_dir = self.root / "custom-thumbnails"
         self.history_dir = self.root / "history"
         self.queue_path = self.root / "queue.json"
+        self.highlights = None
         self.files_dir.mkdir(parents=True, exist_ok=True)
         self.thumbs_dir.mkdir(parents=True, exist_ok=True)
         self.custom_thumbs_dir.mkdir(parents=True, exist_ok=True)
         self.history_dir.mkdir(parents=True, exist_ok=True)
         if not self.queue_path.exists():
             self._write_queue([])
+        if (self.root/'highlights.sqlite3').exists():
+            from .highlights import Highlights
+            self.highlights = Highlights(self)
 
     def _read_queue(self) -> list[dict]:
         try:
@@ -254,10 +258,11 @@ class Store:
     def _find_history_item(self, item_id: str) -> QueueItem | None:
         for day in self.history_dates():
             path = self.history_dir / f"{day}.tsv"
-            for line in path.read_text(encoding="utf-8").splitlines():
-                parsed = self._parse_history_line(line)
-                if parsed and parsed[1] == "add" and parsed[2].id == item_id:
-                    return parsed[2]
+            with path.open(encoding="utf-8") as history:
+                for line in history:
+                    parsed = self._parse_history_line(line) if line.endswith("\n") else None
+                    if parsed and parsed[1] == "add" and parsed[2].id == item_id:
+                        return parsed[2]
         return None
 
     def list(self) -> list[QueueItem]:

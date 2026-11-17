@@ -166,3 +166,21 @@ class MediaAPITests(unittest.TestCase):
         self.assertEqual(json.load(raised.exception)['error']['code'],'BUSY')
         for _ in range(2): self.command('release_media',{'ticket':sources[0]['ticket']})
         self.assertTrue(self.source()['ticket'])
+
+    def test_highlights_authorization_receipts_and_text_pages(self):
+        raw='é😀 actual selection\nline'.encode()
+        def send(headers=None):
+            return self.opener.open(Request(self.base+'/api/explorer/v1/highlights',raw,{'Origin':ORIGIN,'Authorization':'Bearer '+self.session.token,'Content-Type':'text/plain;charset=utf-8','X-Chute-Capture-ID':'a'*32,**(headers or {})}),timeout=5)
+        for headers in ({'Origin':'https://evil.test'},{'Authorization':'Bearer wrong'}):
+            with self.assertRaises(HTTPError):send(headers)
+        self.assertFalse((self.server.store.root/'highlights.sqlite3').exists())
+        with send() as r:first=json.load(r)
+        self.assertEqual(first['state'],'COMMITTED');self.assertEqual(first['input_size'],len(raw))
+        self.server.store.remove('a'*32)
+        with send() as r:repeated=json.load(r)
+        self.assertEqual(first['capture_id'],repeated['capture_id']);self.assertFalse(repeated['file']['active'])
+        page=self.command('saved_text_page',{'id':'a'*32,'offset':0,'limit':65536})
+        self.assertEqual(page['text'],first['received_at']+'\né😀 actual selection\nline')
+        row=self.command('locate_saved',{'id':'a'*32});self.assertEqual(row['highlight']['capture_id'],'a'*32)
+        self.assertNotIn('path',row['highlight'])
+        with self.assertRaises(HTTPError):self.command('saved_text_page',{'id':'a'*32,'path':'/etc/passwd'})

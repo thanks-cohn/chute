@@ -1,6 +1,7 @@
 importScripts(
   "background-native.js",
   "background-status.js",
+  "background-highlights.js",
   "background.js",
   "background-custom-size.js",
   "background-provenance.js",

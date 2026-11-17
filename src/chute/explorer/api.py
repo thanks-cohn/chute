@@ -26,7 +26,7 @@ class ExplorerAPI:
         handler.send_response(status)
         handler.send_header("Access-Control-Allow-Origin", self.session.origin)
         handler.send_header("Vary", "Origin")
-        handler.send_header("Access-Control-Allow-Headers", "Authorization, Content-Type, Range, X-Chute-Destination, X-Chute-Filename, X-Chute-Operation")
+        handler.send_header("Access-Control-Allow-Headers", "Authorization, Content-Type, Range, X-Chute-Destination, X-Chute-Filename, X-Chute-Operation, X-Chute-Capture-ID, X-Chute-Source")
         handler.send_header("Access-Control-Allow-Methods", "POST, GET, HEAD, OPTIONS")
         handler.send_header("Access-Control-Expose-Headers", "Content-Range, Accept-Ranges")
         handler.send_header("Cache-Control", "no-store")
@@ -60,7 +60,7 @@ class ExplorerAPI:
         if not path.startswith("/api/explorer/"):
             return False
         try:
-            for field in ("Host", "Origin", "Authorization", "Content-Length", "Content-Type", "X-Chute-Destination", "X-Chute-Filename", "X-Chute-Operation"):
+            for field in ("Host", "Origin", "Authorization", "Content-Length", "Content-Type", "X-Chute-Destination", "X-Chute-Filename", "X-Chute-Operation", "X-Chute-Capture-ID", "X-Chute-Source"):
                 if len(handler.headers.get_all(field, [])) > 1:
                     raise ExplorerError("INVALID_ARGUMENT", "Duplicate request headers are not allowed.")
             expected_host = f"127.0.0.1:{handler.server.server_port}"
@@ -83,6 +83,22 @@ class ExplorerAPI:
             self.session.authorize(handler.headers.get("Origin", ""), handler.headers.get("Authorization", ""))
             if handler.command != "POST":
                 raise ExplorerError("METHOD_NOT_ALLOWED", "Use an authenticated POST command.")
+            if path == '/api/explorer/v1/highlights':
+                from ..highlights import Highlights,MAX_SELECTION
+                if handler.headers.get('Transfer-Encoding') or handler.headers.get('Content-Type')!='text/plain;charset=utf-8':
+                    raise ExplorerError('INVALID_ARGUMENT','A known-size UTF-8 selection is required.')
+                size=int(handler.headers.get('Content-Length','-1'))
+                if not 0<size<=MAX_SELECTION:raise ExplorerError('INVALID_ARGUMENT','Selections are limited to 4 MiB.')
+                handler.connection.settimeout(30);raw=handler.rfile.read(size)
+                if len(raw)!=size:raise ExplorerError('INVALID_ARGUMENT','Selection ended early.')
+                from ..store import _LOCK
+                with _LOCK:
+                    if handler.server.store.highlights is None:handler.server.store.highlights=Highlights(handler.server.store)
+                    try:receipt=handler.server.store.highlights.accept(handler.headers.get('X-Chute-Capture-ID',''),raw,__import__('urllib.parse',fromlist=['unquote']).unquote(handler.headers.get('X-Chute-Source','browser-selection')))
+                    except (ValueError,UnicodeError) as exc:raise ExplorerError('HIGHLIGHT_FAILED',str(exc))
+                from ..server import public_item
+                receipt['file']=public_item(receipt['file'],active=receipt['capture_id'] in handler.server.store.active_ids())
+                self.json(handler,receipt,201);return True
             if path == "/api/explorer/v1/receive":
                 if handler.headers.get("Transfer-Encoding"):
                     raise ExplorerError("INVALID_ARGUMENT","A known-size file is required.")
@@ -130,7 +146,7 @@ class ExplorerAPI:
                 if body["command"] == "capabilities":
                     from .protocol import catalog
                     capabilities = catalog()
-                    capabilities['commands'] += ['history_export_create','history_export_status','history_export_cancel','locate_saved','open','reveal','media_source','release_media']
+                    capabilities['commands'] += ['saved_text_page','history_export_create','history_export_status','history_export_cancel','locate_saved','open','reveal','media_source','release_media']
                     capabilities['blocked'] = {key:value for key,value in capabilities['blocked'].items() if key not in {'open','reveal'}}
                     result={"state":"completed","result":{**capabilities,"transfer":{
                         "source_kind":"local_explorer","maximum_chunk_bytes":262144,
@@ -153,6 +169,13 @@ class ExplorerAPI:
                             value=exports.status(args['id'],owner) if body['command']=='history_export_status' else exports.cancel(args['id'],owner)
                     except ExportError as exc:raise ExplorerError('EXPORT_FAILED',str(exc))
                     result={'state':'completed','result':value}
+                elif body['command']=='saved_text_page':
+                    from ..highlights import saved_text_page
+                    args=body.get('args',{})
+                    if 'id' not in args or set(args)-{'id','offset','limit'}:raise ExplorerError('INVALID_ARGUMENT','Invalid text page parameters.')
+                    try:page=saved_text_page(handler.server.store,args["id"],**{k:v for k,v in args.items() if k!="id"})
+                    except (ValueError,TypeError) as exc:raise ExplorerError('TEXT_UNAVAILABLE',str(exc))
+                    result={'state':'completed','result':page}
                 elif body["command"] == "locate_saved":
                     from .security import RootGrant
                     import re
@@ -162,6 +185,8 @@ class ExplorerAPI:
                     found = handler.server.store.get(args['id'])
                     if not found: raise ExplorerError('NOT_FOUND','The saved item no longer exists.')
                     _, path = found
+                    capture=handler.server.store.highlights.lookup(args['id']) if handler.server.store.highlights else None
+                    if capture:path=capture['path']
                     # Store, never client input, supplies this directory. It is
                     # already readable through the existing saved-file interface.
                     directory = path.parent
@@ -177,6 +202,8 @@ class ExplorerAPI:
                         handle = grant.handle(parts)
                         receipt = self.engine.execute('stat',handle=handle)
                     result = receipt
+                    if capture:
+                        result['result']['highlight']={k:v for k,v in capture.items() if k!='path'}
                 elif body["command"] in {"open", "reveal"}:
                     from .file_actions import external_action
                     args = body.get('args',{})

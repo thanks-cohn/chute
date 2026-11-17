@@ -406,7 +406,10 @@ function createRow(file, index) {
     recall.className = "secondary-button recall";
     recall.title = "Put this item back into the live Chute";
     recall.textContent = "Recall";
-    tools.append(recall);
+    const goTo=document.createElement('button');goTo.className='secondary-button open';goTo.textContent='GO TO';
+    goTo.title='Locate the preserved file using the location preference in Settings';
+    goTo.onclick=async()=>{try{await window.ChuteyFileActions.saved(file,'reveal');}catch(error){setStatus(error.message,true);}};
+    tools.append(goTo,recall);
     recall.addEventListener("click", async () => {
       try {
         await api(`/api/recall/${encodeURIComponent(file.id)}`, { method: "POST" });

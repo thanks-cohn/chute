@@ -25,11 +25,12 @@ from playwright.sync_api import sync_playwright, expect
 ORIGIN='chrome-extension://abcdefghijklmnopabcdefghijklmnop'
 INIT=r"""(() => {
  const listeners=[];
+ window.addEventListener('storage',event=>{if(!event.key?.startsWith('test-'))return;const before=JSON.parse(event.oldValue||'{}'),after=JSON.parse(event.newValue||'{}');const changes=Object.fromEntries([...new Set([...Object.keys(before),...Object.keys(after)])].filter(k=>JSON.stringify(before[k])!==JSON.stringify(after[k])).map(k=>[k,{oldValue:before[k],newValue:after[k]}]));for(const fn of listeners)fn(changes,event.key.slice(5));});
  const store=(area)=>({get:async defaults=>Object.assign({},defaults,JSON.parse(localStorage.getItem('test-'+area)||'{}')),
- set:async patch=>{const prior=JSON.parse(localStorage.getItem('test-'+area)||'{}');localStorage.setItem('test-'+area,JSON.stringify({...prior,...patch}));for(const fn of listeners)fn(Object.fromEntries(Object.entries(patch).map(([key,newValue])=>[key,{newValue,oldValue:prior[key]}])),area);},remove:async()=>{}});
+ set:async patch=>{const prior=JSON.parse(localStorage.getItem('test-'+area)||'{}');localStorage.setItem('test-'+area,JSON.stringify({...prior,...patch}));for(const fn of listeners)fn(Object.fromEntries(Object.entries(patch).map(([key,newValue])=>[key,{newValue,oldValue:prior[key]}])),area);},remove:async keys=>{const prior=JSON.parse(localStorage.getItem("test-"+area)||"{}");for(const key of (Array.isArray(keys)?keys:[keys]))delete prior[key];localStorage.setItem("test-"+area,JSON.stringify(prior));}});
  window.chrome={storage:{local:store('local'),sync:store('sync'),session:store('session'),onChanged:{addListener:fn=>listeners.push(fn)}},
  runtime:{getURL:path=>new URL(path,location.href).href,sendMessage:async()=>({}),onMessage:{addListener(){}},connectNative(){throw Error('fixture only')},
- sendNativeMessage:async()=>({ok:true,explorer_protocol:'1.1',protocol:'1.1',read_only:true,token:window.__nativeSessionToken})}};
+ sendNativeMessage:async()=>({ok:true,safe_recovery:1,explorer_protocol:'1.1',protocol:'1.1',read_only:true,token:window.__nativeSessionToken})}};
 })();"""
 
 class QuietHandler(fixture.FixtureHandler):
@@ -75,7 +76,7 @@ def main():
                 expect(page.locator('#files')).not_to_have_attribute('aria-busy','true')
                 page.locator('.settings-panel summary').click()
                 page.locator('[data-presentation-color]').fill('#654321')
-                page.locator('[data-presentation-animation]').uncheck()
+                assert page.locator('[data-presentation-animation]').count()==0
                 expect(page.locator('[data-presentation-status]')).to_have_text('Saved')
                 page.reload()
                 expect(page.locator('html')).to_have_attribute('data-chutey-background-animation','false')
