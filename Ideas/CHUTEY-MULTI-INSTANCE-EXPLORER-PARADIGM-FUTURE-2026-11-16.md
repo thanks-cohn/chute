@@ -9,11 +9,22 @@
 
 - On first install, **Original / Primary Chutey** is paired with the established default save destination; its Expanded Explorer opens there initially (or honors last-browsed location separately once chosen).
 - Chutey itself is the compact collapsed view; **Expand** reveals a real persistent Explorer for that Chutey; minimize returns it to its own mascot. Drop on collapsed mascot saves to **assigned destination**, not an arbitrary last-browsed folder.
-- Inside Chutey Explorer, user right-clicks a *folder* and selects **"Make Me Chutey!"**. This *spawns a NEW independent Chutey visual instance with its own small, always-on-top Explorer window* bound to that chosen, explicitly authorized folder. The original remains present with its unchanged default destination, while the newly summoned Chutey appears as well; both Explorers can remain open and receive drops simultaneously.
+- Inside Chutey Explorer, user right-clicks a *folder* and selects **"Make Me Chutey!"**. Alternatively, right-click an existing **Chutey mascot itself** and choose the same action to create a new Chutey initially assigned to that mascot's default destination. This *spawns a NEW independent Chutey visual instance with its own small, always-on-top Explorer window* bound to that chosen, explicitly authorized folder. The original remains present with its unchanged default destination, while the newly summoned Chutey appears as well; both Explorers can remain open and receive drops simultaneously.
 - Each summoned Chutey can later be independently expanded, minimized, moved and assigned another destination (when implemented), with its own selected directory, placement and active preview state.
 - Crucial command distinction: old **"Make Chutey Location!"** in the held Development 2 spec changes the destination of the existing Chutey. New **"Make Me Chutey!"** creates an additional mascot. Make these clearly distinct, so normal "Assign" never silently spawns an instance and spawning never silently reassigns the original.
 - A user who never invokes "Make Me Chutey!" retains exactly the simple one-Chutey experience: one mascot, one usual location, one explorer.
 - An initial new Chutey may use the same mascot artwork; different colors/names/skins later are optional presentation, not separate workers.
+
+## OWNER CLARIFICATION — TWO RIGHT-CLICK WAYS TO SUMMON A NEW CHUTEY
+
+**The exact visible action is `Make Me Chutey!`**, available in both these contexts when multi-Chutey support is eventually authorized:
+
+1. **Right-click an actual folder INSIDE Chutey Explorer → `Make Me Chutey!`:** create a **new independent Chutey** assigned to the folder that was clicked, even if the source Explorer was browsing elsewhere. It has its own mini always-on-top Explorer and drop target. Never reassign or collapse the original Chutey.
+2. **Right-click the existing Chutey mascot ITSELF → `Make Me Chutey!`:** summon/duplicate **another independent Chutey** directly from the mascot. This one **starts with the source Chutey's currently assigned default destination**, so the action works instantly without forcing a folder chooser. Its destination can then be **Assign**ed to a different authorized folder, independently of the original. It gets a new `instanceId`, its own placement and Explorer window, not a second worker. **Never copy active transfer jobs** or share mutable navigation/window state.
+
+The original stays visible and functional. Both new and old can be **expanded at once as little independent ALWAYS-ON-TOP File Explorers**, both accepting drag-and-drop. Give the new instance a visible non-overlapping position, clear folder identity and drop-target feedback. Avoid spawning on simple left-click or plain right-click alone: only selecting **`Make Me Chutey!`** creates the new instance. Dismissing/removing a Chutey instance must never delete its folder contents or shared History.
+
+This extends the held one-mascot right-click menu in concept, **but is future multi-instance scope**. Do not execute it or amend already-held Development 2 implementation authority without the owner's subsequent express approval.
 
 ## OWNER CLARIFICATION — MULTIPLE EXPLORER WINDOWS STAY EXPANDED SIMULTANEOUSLY
 
@@ -63,7 +74,7 @@ Service-wide resources are shared:
 ## Proposed user journey
 
 1. User sees only **Primary Chutey**, bound to default location. Expand -> original Explorer.
-2. In its Explorer, user opens another folder, right-clicks folder -> **Make Me Chutey!**.
+2. User can **right-click a folder inside Chutey Explorer → Make Me Chutey!** to spawn a Chutey bound to that folder; OR **right-click the mascot itself → Make Me Chutey!** to spawn an independent Chutey initially using the source mascot's assigned folder.
 3. Chutey #2 appears at a sensible non-overlapping nearby screen position with its own Explorer, while **Chutey #1 and its Explorer can remain visible, expanded and always-on-top**. #2's drop destination is that chosen folder, #1's default destination unchanged. Both receive independent drag-and-drop.
 4. Drop a file onto #1's mascot -> verified save to its assigned primary destination. Drop onto #2's mascot -> verified save to its assigned folder. Drop into either expanded Explorer background -> current browsed folder; on a child folder -> child folder. Copy from one Chutey Explorer to another when both roots are authorized.
 5. Close/minimize one Explorer -> only that Explorer collapses into its mascot. Assign/reposition one -> other unaffected. Hotspot/group-summon semantics (show all vs primary plus chooser) require owner UX approval before implementation.
