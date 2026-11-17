@@ -7,13 +7,23 @@
 
 ## Vision: a Chutey is a named doorway to its own Explorer
 
-- On first install, **Original / Primary Chutey** is paired with the established default save destination; its Expanded Explorer opens there initially (or honors last-browsed location separately once chosen).
-- Chutey itself is the compact collapsed view; **Expand** reveals a real persistent Explorer for that Chutey; minimize returns it to its own mascot. Drop on collapsed mascot saves to **assigned destination**, not an arbitrary last-browsed folder.
+- On first install, **Original / Primary Chutey** is paired with the established default save destination; **every fresh Expand/open of its Explorer begins in that assigned default directory**, not the last visited folder.
+- Chutey itself is the compact collapsed view; **Expand** opens its Explorer at **that Chutey's assigned default directory on every fresh open/restore**. Minimize returns it to its own mascot. Drop on the collapsed mascot saves to its assigned destination, not an arbitrary last-browsed folder. Navigating within an already-open Explorer never changes the assigned default.
 - Inside Chutey Explorer, user right-clicks a *folder* and selects **"Make Me Chutey!"**. Alternatively, right-click an existing **Chutey mascot itself** and choose the same action to create a new Chutey initially assigned to that mascot's default destination. This *spawns a NEW independent Chutey visual instance with its own small, always-on-top Explorer window* bound to that chosen, explicitly authorized folder. The original remains present with its unchanged default destination, while the newly summoned Chutey appears as well; both Explorers can remain open and receive drops simultaneously.
 - Each summoned Chutey can later be independently expanded, minimized, moved and assigned another destination (when implemented), with its own selected directory, placement and active preview state.
 - Crucial command distinction: old **"Make Chutey Location!"** in the held Development 2 spec changes the destination of the existing Chutey. New **"Make Me Chutey!"** creates an additional mascot. Make these clearly distinct, so normal "Assign" never silently spawns an instance and spawning never silently reassigns the original.
 - A user who never invokes "Make Me Chutey!" retains exactly the simple one-Chutey experience: one mascot, one usual location, one explorer.
 - An initial new Chutey may use the same mascot artwork; different colors/names/skins later are optional presentation, not separate workers.
+
+## OWNER RULE — EVERY CHUTEY OPENS IN ITS OWN ASSIGNED DIRECTORY BY DEFAULT
+
+**Mandatory default:** Every Chutey's own miniature Explorer opens directly in **that instance's assigned default location** when expanded, opened anew, or restored from its mascot. **Not** a shared/global directory; **not** another Chutey's folder; **not** a previously browsed folder. This applies to Primary Chutey, clones created by right-clicking an existing Chutey, and new instances created from right-clicking a folder.
+
+- If Chutey #1 is assigned `Pictures` and Chutey #2 is assigned `Music`, opening/expanding #1 shows `Pictures` and opening/expanding #2 shows `Music`, including after restarting the app.
+- Users can browse elsewhere *while an Explorer is already open*, and each window has its own independent navigation. Browsing away must never silently reassign the drop destination.
+- **Assign** or an explicit change of that specific Chutey's default location updates only that instance; its next opening starts at the newly assigned folder. Other Chuteys are unaffected.
+- If a directory was deleted or its access grant expired, show an actionable reconnect/choose-folder error for that particular Chutey; **never silently save/open at an unrelated fallback folder**.
+- The earlier proposal to restore each Explorer's last browsed directory is **superseded** as a default opening rule. Remembering a last-browsed position can be an optional separate convenience in the future, but only if explicitly configured; it must not supersede the assigned folder by default.
 
 ## OWNER CLARIFICATION — TWO RIGHT-CLICK WAYS TO SUMMON A NEW CHUTEY
 
@@ -53,7 +63,7 @@ ChuteyInstance {
   id: stable opaque identifier (primary, later UUIDs)
   displayName: string
   assignedDestination: authorized folder capability reference
-  lastBrowsedFolder: optional guarded folder capability reference
+  lastBrowsedFolder: optional guarded folder capability reference (navigation only; NEVER the default open destination)
   lastSelectedFile: optional guarded file identity
   mascotPosition: per-monitor screen position
   explorerWindowState: collapsed | expanded | minimized
@@ -73,7 +83,7 @@ Service-wide resources are shared:
 
 ## Proposed user journey
 
-1. User sees only **Primary Chutey**, bound to default location. Expand -> original Explorer.
+1. User sees only **Primary Chutey**, bound to its default location. Expand -> its Explorer opens **at that assigned default directory every time**.
 2. User can **right-click a folder inside Chutey Explorer → Make Me Chutey!** to spawn a Chutey bound to that folder; OR **right-click the mascot itself → Make Me Chutey!** to spawn an independent Chutey initially using the source mascot's assigned folder.
 3. Chutey #2 appears at a sensible non-overlapping nearby screen position with its own Explorer, while **Chutey #1 and its Explorer can remain visible, expanded and always-on-top**. #2's drop destination is that chosen folder, #1's default destination unchanged. Both receive independent drag-and-drop.
 4. Drop a file onto #1's mascot -> verified save to its assigned primary destination. Drop onto #2's mascot -> verified save to its assigned folder. Drop into either expanded Explorer background -> current browsed folder; on a child folder -> child folder. Copy from one Chutey Explorer to another when both roots are authorized.
