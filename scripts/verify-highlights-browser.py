@@ -18,7 +18,7 @@ def main():
   try:
    with sync_playwright() as p:
     browser=p.chromium.launch(executable_path=shutil.which('chromium'),headless=True,args=['--no-sandbox']);context=browser.new_context(viewport={'width':390,'height':590})
-    context.add_init_script(f.f.INIT+'\nwindow.__nativeSessionToken='+json.dumps(session.token)+';')
+    context.add_init_script(f.f.INIT+'\nif(location.origin==="http://127.0.0.1:17891")chrome.storage.sync.set({chuteyOpenTarget:"chutey",chuteyRevealTarget:"chutey"});window.__nativeSessionToken='+json.dumps(session.token)+';')
     page=context.new_page();errors=[];page.on('pageerror',lambda e:errors.append(str(e)));page.goto('http://127.0.0.1:17891/popup.html')
     page.evaluate("localStorage.setItem('test-sync',JSON.stringify({chuteyPresentation:{version:1,animation:true,color:'#123456'}}))")
     page.reload();expect(page.locator('html')).to_have_attribute('data-chutey-background-animation','false');assert page.locator('[data-presentation-animation]').count()==0
@@ -42,7 +42,7 @@ def main():
     archived.locator('.open').click();expect(page.get_by_role('tab',name='File Explorer',exact=True)).to_have_attribute('aria-selected','true')
     expect(page.locator('.ex-preview-body pre')).to_contain_text('é😀 first line')
     expect(page.locator('.ex-row[aria-selected=true] .ex-name')).to_contain_text('Chutey Highlights')
-    page.locator('.chutey-presentation-options summary').click();toggle=page.get_by_label('Animate background behind Chutey images',exact=True);expect(toggle).not_to_be_checked();toggle.check()
+    page.locator('.chutey-presentation-options > summary').click();toggle=page.get_by_label('Animate background behind Chutey images',exact=True);expect(toggle).not_to_be_checked();toggle.check()
     expect(page.locator('html')).to_have_attribute('data-chutey-background-animation','true')
     popup=context.new_page();popup.goto('http://127.0.0.1:17891/popup.html');expect(popup.locator('html')).to_have_attribute('data-chutey-background-animation','true')
     toggle.uncheck();expect(popup.locator('html')).to_have_attribute('data-chutey-background-animation','false')

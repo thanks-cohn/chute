@@ -51,7 +51,7 @@ def main():
             with sync_playwright() as p:
                 browser=p.chromium.launch(executable_path=shutil.which('chromium'),headless=True,args=['--no-sandbox'])
                 context=browser.new_context(viewport={'width':390,'height':800})
-                context.add_init_script(f.INIT+'\nwindow.__nativeSessionToken='+json.dumps(session.token)+';')
+                context.add_init_script(f.INIT+'\nif(location.origin==="http://127.0.0.1:17891")chrome.storage.sync.set({chuteyOpenTarget:"chutey",chuteyRevealTarget:"chutey"});window.__nativeSessionToken='+json.dumps(session.token)+';')
                 # Deliberately feed 120 real saved records through the real renderer
                 # in one scrolling page, beyond normal 30-record pagination.
                 context.route('**/api/browse?**',lambda route:route.fulfill(response=route.fetch(url=route.request.url.replace('limit=30','limit=200'))))
@@ -102,12 +102,12 @@ def main():
                 # a media source URL, never a whole-file Blob.
                 for name,tag in [('03-small.mp4','video'),('04-large.mp3','audio')]:
                     print('Checking '+name,flush=True)
-                    page.locator('.ex-row',has_text=name).dblclick();media=page.locator('.ex-preview-body '+tag)
-                    expect(media).to_be_visible();page.wait_for_function('(tag)=>document.querySelector(".ex-preview-body "+tag)?.readyState>=1',arg=tag)
+                    page.locator('.ex-row',has_text=name).dblclick();media=page.locator('.ex-pinned-body '+tag)
+                    expect(media).to_be_visible();page.wait_for_function('(tag)=>document.querySelector(".ex-pinned-body "+tag)?.readyState>=1',arg=tag)
                     assert media.evaluate('node=>node.paused && node.src.includes("/api/explorer/v1/media/")')
-                    media.evaluate('node=>node.play()');page.wait_for_function('(tag)=>document.querySelector(".ex-preview-body "+tag).currentTime>0',arg=tag)
+                    media.evaluate('node=>node.play()');page.wait_for_function('(tag)=>document.querySelector(".ex-pinned-body "+tag).currentTime>0',arg=tag)
                     with page.expect_response(lambda response:'/api/explorer/v1/command' in response.url and response.request.post_data_json.get('command')=='release_media'):
-                        page.get_by_role('button',name='Close preview',exact=True).click()
+                        page.get_by_role('button',name='Stop playback',exact=True).click()
                     assert not server.explorer_api.media
                 # Archived-worker compatibility: lack of media_source must
                 # retain the known-working small MP4 Blob fallback.
@@ -117,14 +117,14 @@ def main():
                     else:route.fallback()
                 page.route('**/api/explorer/v1/command',old_media_command)
                 page.locator('.ex-row',has_text='03-small.mp4').dblclick()
-                expect(page.locator('.ex-preview-body video')).to_be_visible()
-                page.wait_for_function('document.querySelector(".ex-preview-body video")?.readyState>=1')
-                assert page.locator('.ex-preview-body video').evaluate('node=>node.src.startsWith("blob:")')
-                page.locator('.ex-preview-body video').evaluate('node=>node.play()')
-                page.wait_for_function('document.querySelector(".ex-preview-body video").currentTime>0')
-                page.get_by_role('button',name='Close preview',exact=True).click()
+                expect(page.locator('.ex-pinned-body video')).to_be_visible()
+                page.wait_for_function('document.querySelector(".ex-pinned-body video")?.readyState>=1')
+                assert page.locator('.ex-pinned-body video').evaluate('node=>node.src.startsWith("blob:")')
+                page.locator('.ex-pinned-body video').evaluate('node=>node.play()')
+                page.wait_for_function('document.querySelector(".ex-pinned-body video").currentTime>0')
+                page.get_by_role('button',name='Stop playback',exact=True).click()
                 page.unroute('**/api/explorer/v1/command',old_media_command)
-                # Default saved-file Reveal opens its directory in Chutey and
+                # Explicit Chutey saved-file Reveal opens its directory in Chutey and
                 # selects the exact saved file, not Windows or another file.
                 page.get_by_role('tab',name='History',exact=True).click()
                 item=page.locator('#files .file-row').first
@@ -138,16 +138,16 @@ def main():
                 # System Reveal preference keeps the original endpoint and never
                 # silently substitutes the native scoped-file command.
                 page.get_by_role('tab',name='History',exact=True).click()
-                page.locator('.chutey-presentation-options summary').click()
+                page.locator('.chutey-presentation-options > summary').click()
                 page.locator('[data-file-preference=chuteyRevealTarget]').select_option('system')
-                page.locator('.chutey-presentation-options summary').click()
+                page.locator('.chutey-presentation-options > summary').click()
                 revealed=[]
                 page.route('**/api/reveal/*',lambda route:(revealed.append(route.request.url),route.fulfill(json={'ok':True,'action':'selected'})))
                 with page.expect_response(lambda response:'/api/reveal/' in response.url):
                     page.locator('#files .file-row').first.locator('button.open').click()
                 assert len(revealed)==1
                 assert not errors,errors
-                results={'scope':'Linux HTTP fixture, consent simulated; Windows acceptance pending','popup_120_cards':measurements,'thumbnails':'default real miniatures; icon preference persists','gallery':'buttons/Left/Right; Up/Down and wheel scroll documents; Escape; stable overlay/list','media':'real small MP4 and sparse-padded 80 MiB MP3 play paused by default via stream API','saved_reveal':'Chutey default selects containing directory; explicit Windows alternative reuses original endpoint'}
+                results={'scope':'Linux HTTP fixture, consent simulated; Windows acceptance pending','popup_120_cards':measurements,'thumbnails':'default real miniatures; icon preference persists','gallery':'buttons/Left/Right; Up/Down and wheel scroll documents; Escape; stable overlay/list','media':'real small MP4 and sparse-padded 80 MiB MP3 play paused by default via stream API','saved_reveal':'Explicit Chutey preference selects containing directory; explicit Windows alternative reuses original endpoint'}
                 (out/'results.json').write_text(json.dumps(results,indent=2));print(json.dumps(results,indent=2))
                 browser.close()
         finally:server.shutdown();server.server_close();thread.join();engine.close()

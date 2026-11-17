@@ -26,7 +26,7 @@ def main():
      return page.evaluate('''() => ({tracks:[...document.querySelectorAll('*')].filter(n=>n.scrollHeight>n.clientHeight+2 && ['scroll','auto'].includes(getComputedStyle(n).overflowY)).map(n=>n.tagName+'#'+n.id),overflow:document.documentElement.scrollWidth>document.documentElement.clientWidth})''')
     assert scroll_check()=={'tracks':['HTML#'],'overflow':False},scroll_check()
     page.screenshot(path=str(out/'popup-closed.png'))
-    page.locator('.settings-panel summary').click()
+    page.locator('.settings-panel > summary').click()
     assert scroll_check()=={'tracks':['HTML#'],'overflow':False},scroll_check()
     page.screenshot(path=str(out/'popup-settings-open.png'))
     page.set_viewport_size({'width':312,'height':590})
@@ -40,7 +40,7 @@ def main():
      page.locator('#gallery-density').evaluate('(n,v)=>{n.value=v;n.dispatchEvent(new Event("input"))}',str(step))
      boxes=page.locator('.chutey-gallery-tile').evaluate_all('ns=>ns.map(n=>{let r=n.getBoundingClientRect();return [r.width,r.height]})')
      assert all(h>45 and abs(w-h)<1 for w,h in boxes),(step,boxes[-1])
-    page.locator('.settings-panel summary').click()
+    page.locator('.settings-panel > summary').click()
     row=page.locator('.chutey-gallery-tile').first;row.click();expect(page.locator('.chutey-lightbox')).to_be_visible()
     expect(page.locator('.chutey-lightbox-image')).to_have_js_property('naturalWidth',300)
     assert page.locator('.chutey-lightbox-close').count()==0 and page.get_by_role('button',name='Expand',exact=True).count()==0

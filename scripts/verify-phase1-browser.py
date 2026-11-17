@@ -56,7 +56,7 @@ def main():
             with sync_playwright() as p:
                 browser=p.chromium.launch(executable_path=shutil.which('chromium'),headless=True,args=['--no-sandbox'])
                 context=browser.new_context(viewport={'width':390,'height':800})
-                context.add_init_script(INIT+'\nwindow.__nativeSessionToken='+json.dumps(session.token)+';')
+                context.add_init_script(INIT+'\nif(location.origin==="http://127.0.0.1:17891")chrome.storage.sync.set({chuteyOpenTarget:"chutey",chuteyRevealTarget:"chutey"});window.__nativeSessionToken='+json.dumps(session.token)+';')
                 context.route('**/api/explorer/**',lambda route:route.fulfill(response=route.fetch(headers={**route.request.headers,'origin':ORIGIN})))
                 page=context.new_page(); errors=[];page.on('pageerror',lambda error:errors.append(str(error)))
                 pending=[];page.route('**/api/browse?**',lambda route:pending.append(route))
@@ -74,17 +74,17 @@ def main():
                 after=rects('.chutey-gallery-tile')
                 assert before==after,(before,after)
                 expect(page.locator('#files')).not_to_have_attribute('aria-busy','true')
-                page.locator('.settings-panel summary').click()
+                page.locator('.settings-panel > summary').click()
                 page.locator('[data-presentation-color]').fill('#654321')
                 assert page.locator('[data-presentation-animation]').count()==0
                 expect(page.locator('[data-presentation-status]')).to_have_text('Saved')
                 page.reload()
                 expect(page.locator('html')).to_have_attribute('data-chutey-background-animation','false')
                 assert page.evaluate("getComputedStyle(document.documentElement).getPropertyValue('--chutey-card-background').trim()")=='#654321'
-                page.locator('.settings-panel summary').click()
+                page.locator('.settings-panel > summary').click()
                 page.locator('[data-presentation-reset]').click()
                 expect(page.locator('[data-presentation-color]')).to_have_value('#293728')
-                page.locator('.settings-panel summary').click()
+                page.locator('.settings-panel > summary').click()
                 for step,columns in [(1,5),(2,5),(3,6),(0,4)]:
                     page.locator('#gallery-density').evaluate('(node,value)=>{node.value=value;node.dispatchEvent(new Event("input",{bubbles:true}))}',str(step))
                     page.reload()
@@ -114,24 +114,27 @@ def main():
                 expect(page.locator('.ex-row[data-thumbnail=failed]')).to_have_count(1)
                 assert 'Thumbnail unavailable' in page.locator('.ex-row[data-thumbnail=failed]').get_attribute('title')
                 video=page.locator('.ex-row',has_text='c.webm');video.dblclick()
-                expect(page.locator('.ex-preview-body video')).to_be_visible()
-                page.wait_for_function('document.querySelector(".ex-preview-body video")?.readyState>=1')
-                media=page.locator('.ex-preview-body video')
+                expect(page.locator('.ex-pinned-body video')).to_be_visible()
+                page.wait_for_function('document.querySelector(".ex-pinned-body video")?.readyState>=1')
+                media=page.locator('.ex-pinned-body video')
                 assert media.evaluate('node=>node.paused && !node.autoplay && node.src.includes("/api/explorer/v1/media/")')
                 media.evaluate('node=>node.currentTime=3')
-                page.wait_for_function('Math.abs(document.querySelector(".ex-preview-body video").currentTime-3)<.3')
-                geometry=page.locator('.ex-preview').bounding_box()
-                media.evaluate('node=>node.play()');page.wait_for_function('document.querySelector(".ex-preview-body video").currentTime>3.1')
-                assert page.locator('.ex-preview').bounding_box()==geometry
-                # Hiding Explorer is also a cancellation boundary.
+                page.wait_for_function('Math.abs(document.querySelector(".ex-pinned-body video").currentTime-3)<.3')
+                geometry=page.locator('.ex-pinned-player').bounding_box()
+                media.evaluate('node=>node.play()');page.wait_for_function('document.querySelector(".ex-pinned-body video").currentTime>3.1')
+                assert page.locator('.ex-pinned-player').bounding_box()==geometry
+                # Ordinary tab navigation preserves the same pinned player and
+                # authority. Explicit Stop remains the cancellation boundary.
+                player=media.element_handle()
                 page.get_by_role('tab',name='History',exact=True).click()
-                page.wait_for_function('document.querySelector(".ex-preview").hidden')
-                assert not server.explorer_api.media
+                assert player.evaluate('node=>node.isConnected && !node.paused')
+                assert server.explorer_api.media
                 page.get_by_role('tab',name='File Explorer',exact=True).click()
-                video.dblclick();expect(page.locator('.ex-preview-body video')).to_be_visible()
-                page.get_by_role('button',name='Close preview',exact=True).click()
-                page.wait_for_function('document.querySelector(".ex-preview").hidden')
-                assert not server.explorer_api.media,'Closing preview revokes its media authority'
+                assert player.evaluate('node=>node===document.querySelector(".ex-pinned-body video")')
+                page.get_by_role('button',name='Stop playback',exact=True).click()
+                page.wait_for_function('document.querySelector(".ex-pinned-player").hidden')
+                page.wait_for_timeout(200)
+                assert not server.explorer_api.media,'Stop revokes media authority'
                 page.get_by_role('tab',name='History',exact=True).click()
                 expect(page.locator('#clear')).to_be_visible()
                 dialogs=[]

@@ -6,7 +6,7 @@ range readers and a 64-MiB verified copy overlap 1/4/10/32 mixed command bursts.
 not near-native performance or 30-minute acceptance.
 """
 from __future__ import annotations
-import argparse,concurrent.futures,hashlib,json,math,os,statistics,sys,tempfile,threading,time
+import argparse,concurrent.futures,hashlib,json,math,os,statistics,subprocess,sys,tempfile,threading,time
 from pathlib import Path
 from urllib.request import Request,ProxyHandler,build_opener
 from urllib.error import HTTPError
@@ -25,7 +25,7 @@ def stats(values):
     return {'count':len(values),**{k:round(values[min(len(values)-1,math.ceil(len(values)*p)-1)],3) for k,p in [('p50_ms',.5),('p95_ms',.95),('p99_ms',.99),('worst_ms',1)]}} if values else {'count':0}
 
 def run():
-    result={'scope':'In-process guarded HTTP fixture on synthetic files. Two paced byte readers, no browser decoder/native enrollment; not owner-machine or native Windows Explorer acceptance.','profiles':[]}
+    result={'source_commit':subprocess.check_output(['git','-C',str(args.runtime),'rev-parse','HEAD'],text=True).strip(),'platform':sys.platform,'python':sys.version.split()[0],'logical_cpus':os.cpu_count(),'listen_backlog':ChuteServer.request_queue_size,'scope':'In-process guarded HTTP fixture on synthetic files. Two paced byte readers, no browser decoder/native enrollment; not owner-machine or native Windows Explorer acceptance.','profiles':[]}
     with tempfile.TemporaryDirectory(prefix='chutey-lanes-') as temp:
         root=Path(temp);approved=root/'approved';approved.mkdir();destination=approved/'destination';destination.mkdir()
         for i in range(512):(approved/f'entry-{i:04}.txt').write_bytes(b'file metadata fixture')
@@ -59,13 +59,18 @@ def run():
                 streams=[];readers=[];cancel=threading.Event();stream_errors=[]
                 def reader(source):
                     try:
-                        with request(source['url'],extra={'Range':'bytes=0-'}) as r:
-                            while not cancel.is_set() and r.read(262144):time.sleep(.04)
+                        while not cancel.is_set():
+                            with request(source['url'],extra={'Range':'bytes=0-'}) as r:
+                                while not cancel.is_set() and r.read(262144):time.sleep(.04)
                     except Exception as e:stream_errors.append(type(e).__name__)
                 for _ in range(2):
                     source=command('media_source',{k:media[k] for k in ('handle','identity')});streams.append(source)
                     t=threading.Thread(target=reader,args=(source,),daemon=True);t.start();readers.append(t)
                 jid=os.urandom(16).hex();started=time.monotonic();job=command('transfer_start',{'id':jid,'kind':'local_copy','handle':copy['handle'],'identity':copy['identity'],'destination':dest['handle']})
+                copy_end=[]
+                def copy_finished():
+                    api.jobs.jobs[jid]['thread'].join();copy_end.append(time.monotonic())
+                copy_watcher=threading.Thread(target=copy_finished,daemon=True);copy_watcher.start()
                 report={'mode':mode,'ack':ack,'bursts':[]}
                 def operation(i):
                     kind=('list','search','thumbnail','control')[i%4];started=time.monotonic()
@@ -84,7 +89,8 @@ def run():
                 while job['state'] in ('accepted','running'):
                     time.sleep(.05);job=command('transfer_status',{'id':jid})
                 assert job['state']=='COMMITTED' and job['receipt']['sha256']==original,job
-                report['verified_copy']={'bytes':job['bytes'],'sha256':original,'overlap_run_wall_seconds':round(time.monotonic()-started,3)}
+                copy_watcher.join();elapsed=copy_end[0]-started
+                report['verified_copy']={'bytes':job['bytes'],'sha256':original,'verified_elapsed_seconds':round(elapsed,3),'verified_mib_per_second':round(64/elapsed,3),'overlap_run_wall_seconds':round(time.monotonic()-started,3)}
                 command('transfer_dismiss',{'id':jid});cancel.set()
                 for t in readers:t.join(20)
                 for source in streams:command('release_media',{'ticket':source['ticket']})

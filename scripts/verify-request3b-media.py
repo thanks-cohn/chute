@@ -48,7 +48,7 @@ def main():
    with sync_playwright() as p:
     chrome=os.environ.get('CHUTE_TEST_BROWSER') or shutil.which('chromium') or shutil.which('chrome') or r'C:\Program Files\Google\Chrome\Application\chrome.exe'
     browser=p.chromium.launch(executable_path=chrome,headless=True,args=['--no-sandbox']);context=browser.new_context(viewport={'width':390,'height':700})
-    context.add_init_script(f.f.INIT+'\nwindow.__nativeSessionToken='+json.dumps(session.token)+';')
+    context.add_init_script(f.f.INIT+'\nif(location.origin==="http://127.0.0.1:17891")chrome.storage.sync.set({chuteyOpenTarget:"chutey",chuteyRevealTarget:"chutey"});window.__nativeSessionToken='+json.dumps(session.token)+';')
     page=context.new_page();errors=[];page.on('pageerror',lambda e:errors.append(str(e)));page.goto('http://127.0.0.1:17891/shelf.html');page.get_by_role('tab',name='File Explorer',exact=True).click()
     tracemalloc.start();started=time.monotonic();latencies=[]
     for surface in ('Shelf','Popup'):
@@ -56,14 +56,14 @@ def main():
      for item in files:
       print('Playing '+surface+' '+item['name']+' '+str(item['size']),flush=True)
       tag='audio' if item['format']=='mp3' else 'video'
-      if surface=='Shelf':page.locator('.ex-row').filter(has=page.locator('.ex-name',has_text=item['name'])).dblclick();media=page.locator('.ex-preview-body '+tag)
+      if surface=='Shelf':page.locator('.ex-row').filter(has=page.locator('.ex-name',has_text=item['name'])).dblclick();media=page.locator('.ex-pinned-body '+tag)
       else:page.get_by_role('button',name='▶ '+item['name'],exact=True).click();media=page.locator('.chutey-lightbox-player '+tag)
-      expect(media).to_be_visible();media.wait_for(state='attached');page.wait_for_function('(s)=>document.querySelector(s)?.readyState>=1',arg=('.ex-preview-body ' if surface=='Shelf' else '.chutey-lightbox-player ')+tag,timeout=20000)
+      expect(media).to_be_visible();media.wait_for(state='attached');page.wait_for_function('(s)=>document.querySelector(s)?.readyState>=1',arg=('.ex-pinned-body ' if surface=='Shelf' else '.chutey-lightbox-player ')+tag,timeout=20000)
       assert media.evaluate('n=>n.paused && n.preload==="metadata" && n.src.includes("/api/explorer/v1/media/")')
-      media.evaluate('n=>n.play()');page.wait_for_function('(s)=>document.querySelector(s)?.currentTime>.1',arg=('.ex-preview-body ' if surface=='Shelf' else '.chutey-lightbox-player ')+tag)
+      media.evaluate('n=>n.play()');page.wait_for_function('(s)=>document.querySelector(s)?.currentTime>.1',arg=('.ex-pinned-body ' if surface=='Shelf' else '.chutey-lightbox-player ')+tag)
       seek=850 if item['large'] and tag=='audio' else 2
       media.evaluate('(n,t)=>{n.pause();n.currentTime=t}',seek)
-      page.wait_for_function('({s,t})=>{let n=document.querySelector(s);return n&&!n.seeking&&Math.abs(n.currentTime-t)<.4}',arg={'s':('.ex-preview-body ' if surface=='Shelf' else '.chutey-lightbox-player ')+tag,'t':seek},timeout=20000)
+      page.wait_for_function('({s,t})=>{let n=document.querySelector(s);return n&&!n.seeking&&Math.abs(n.currentTime-t)<.4}',arg={'s':('.ex-pinned-body ' if surface=='Shelf' else '.chutey-lightbox-player ')+tag,'t':seek},timeout=20000)
       assert media.evaluate('n=>n.paused')
       # Directory browsing and health stay responsive while source is active.
       for _ in range(3):
@@ -86,7 +86,7 @@ def main():
        media.evaluate('n=>n.pause()')
       page.screenshot(path=str(out/(surface.lower()+'-'+item['name']+'.png')))
       with page.expect_response(lambda response:'/api/explorer/v1/command' in response.url and response.request.post_data_json.get('command')=='release_media'):
-       if surface=='Shelf':page.get_by_role('button',name='Close preview',exact=True).click()
+       if surface=='Shelf':page.get_by_role('button',name='Stop playback',exact=True).click()
        else:page.keyboard.press('Escape')
       page.wait_for_function('()=>true');assert not server.explorer_api.media
       results.append({**item,'surface':surface,'played':True,'paused':True,'seek_seconds':seek,'ticket_released':True})

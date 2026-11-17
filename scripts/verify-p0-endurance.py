@@ -234,9 +234,15 @@ def run(args):
                 flags=['--no-sandbox','--disable-background-timer-throttling','--disable-backgrounding-occluded-windows','--disable-renderer-backgrounding']
                 if args.transport in {'extension','installed'}:
                     context=p.chromium.launch_persistent_context(str(root/'profile'),executable_path=chrome,headless=True,ignore_default_args=['--disable-extensions'],args=[*flags,'--enable-unsafe-extension-debugging',f'--disable-extensions-except={ROOT/"extension"}',f'--load-extension={ROOT/"extension"}'])
-                    if not context.service_workers:context.browser.new_browser_cdp_session().send('Extensions.loadUnpacked',{'path':str(ROOT/'extension')})
-                    service=context.service_workers[0] if context.service_workers else context.wait_for_event('serviceworker',timeout=15000)
-                    server.test_origin=service.url.split('/background-entry.js')[0];entry=server.test_origin
+                    if context.service_workers:
+                        server.test_origin=context.service_workers[0].url.split('/background-entry.js')[0]
+                    else:
+                        # CDP registration can complete before an idle MV3
+                        # worker starts. Use the registered extension identity;
+                        # an actual extension message below must wake its worker.
+                        registered=context.browser.new_browser_cdp_session().send('Extensions.loadUnpacked',{'path':str(ROOT/'extension')})
+                        server.test_origin='chrome-extension://'+registered['id']
+                    entry=server.test_origin
                     if not installed:context.add_init_script(NATIVE_SHIM)
                 else:
                     browser=p.chromium.launch(executable_path=chrome,headless=True,args=flags);context=browser.new_context(viewport={'width':900,'height':800})
@@ -264,6 +270,10 @@ def run(args):
                     context.on('response',response_evidence)
                 for surface in (page,popup):surface.on('pageerror',lambda e:page_errors.append(type(e).__name__))
                 page.goto(entry+'/shelf.html');page.get_by_role('tab',name='File Explorer',exact=True).click();expect(page.locator('.ex-row')).not_to_have_count(0)
+                if installed:
+                    diagnostic=page.evaluate('()=>chrome.runtime.sendMessage({type:"chute-diagnostics"})')
+                    assert diagnostic and 'recovery' in diagnostic,'Actual MV3 background did not respond'
+                    report['background']='Actual installed extension worker responded to diagnostics'
                 command(page,'media_policy_set',{'allowed':True});root_handle=command(page,'roots')['roots'][0]['handle'];listing=command(page,'list',{'handle':root_handle,'limit':100})['entries']
                 source=next(row for row in listing if row['name']=='copy-source.bin');destination=next(row for row in listing if row['name']=='destination')
                 # Command floods are bounded. 429s are counted, never called pass as responsiveness.
