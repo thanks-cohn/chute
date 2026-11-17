@@ -179,3 +179,9 @@ workers. Real Chromium rejects a damaged MP4 with a decode-specific message;
 the positive twelve media cases still pass. Cleanup detaches error callbacks and
 uses existing release operations. Actual File bytes retain precedence over an
 incidental opaque text sideband; opaque-reference-only mascot drops stay blocked.
+
+Windows CI timing also showed the old “sparse” test fixture used ordinary NTFS
+truncate, spending ~20–30 seconds allocating/zeroing 3 GiB per case. It now marks
+only its newly created disposable fixture with FSCTL_SET_SPARSE before extension.
+This changes no product/owner file, keeps the same logical 3-GiB range checks,
+and makes the resource test genuinely sparse on Windows as well as POSIX.

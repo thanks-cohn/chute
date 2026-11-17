@@ -21,6 +21,15 @@ class MediaAPITests(unittest.TestCase):
         self.root = Path(self.temp.name)
         self.file = self.root/'movie.webm'
         with self.file.open('wb') as file:
+            if os.name=='nt':
+                # NTFS truncate alone allocates/zeroes gigabytes. Explicitly
+                # mark this OWNED temporary fixture sparse before extending it.
+                import ctypes,msvcrt
+                from ctypes import wintypes as W
+                ioctl=ctypes.WinDLL('kernel32',use_last_error=True).DeviceIoControl
+                ioctl.argtypes=[W.HANDLE,W.DWORD,ctypes.c_void_p,W.DWORD,ctypes.c_void_p,W.DWORD,ctypes.POINTER(W.DWORD),ctypes.c_void_p];ioctl.restype=W.BOOL
+                returned=W.DWORD()
+                if not ioctl(msvcrt.get_osfhandle(file.fileno()),0x900C4,None,0,None,0,ctypes.byref(returned),None):raise ctypes.WinError(ctypes.get_last_error())
             file.write(b'0123456789')
             file.truncate(3*1024**3) # sparse, never materialized in RAM or copied
         self.engine = Explorer([RootGrant(self.root)])
