@@ -53,6 +53,19 @@ def main():
             with request(media['url'],method='HEAD') as response:assert response.read()==b''
             command('release_media',{'ticket':media['ticket']})
             assert not server.explorer_api.media
+            # First-use enrollment has only the known Store root, no external
+            # folder picker, writes, native registration or installed data.
+            from chute.explorer import native as authority
+            from chute import native_host
+            prior_write,prior_ids=authority.private_write,native_host._allowed_extension_ids
+            try:
+                authority.private_write=lambda *args:None
+                native_host._allowed_extension_ids=lambda:[ORIGIN.split('//')[1]]
+                controller=authority.NativeExplorer(store=False,saved_store=server.store)
+                own=controller.action(ORIGIN,select=False)
+                assert own['scope']=='saved_store' and own['read_only']
+                controller.adapter(ORIGIN).engine.close()
+            finally:authority.private_write,native_host._allowed_extension_ids=prior_write,prior_ids
             # Prove new dynamically reached modules/timezone data in the EXE.
             export=command('history_export_create',{'scope':'all','timezone':'America/Chicago'})
             for _ in range(200):
@@ -74,7 +87,7 @@ def main():
                 if job['state'] not in {'accepted','running'}:break
                 time.sleep(.01);job=command('transfer_status',{'id':job['id']})
             assert job['state']=='COMMITTED',job
-            print(json.dumps({'result':'PASS','checks':['temporary approved root','canonical identity','real JPEG thumbnail','8 MiB range fixture','HEAD','ticket release','single ZIP64 export/timezone data','daily UTF-8 highlight','bounded text page','verified asynchronous copy'],
+            print(json.dumps({'result':'PASS','checks':['temporary approved root','canonical identity','real JPEG thumbnail','8 MiB range fixture','HEAD','ticket release','single ZIP64 export/timezone data','daily UTF-8 highlight','bounded text page','verified asynchronous copy','first-use enrolled Store-only scope'],
                 'installed_worker':'untouched','scope':'isolated API check; not Chrome or sustained playback acceptance'}))
         finally:
             server.shutdown();server.server_close();thread.join();engine.close()

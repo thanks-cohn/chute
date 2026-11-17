@@ -538,7 +538,7 @@ def serve(host: str = DEFAULT_HOST, port: int = DEFAULT_PORT, root: Path | None 
     server.explorer_api = adapter
     if os.name == "nt" and host == DEFAULT_HOST:
         from .explorer.native import NativeExplorer
-        server.native_explorer = NativeExplorer()
+        server.native_explorer = NativeExplorer(saved_store=store)
     if adapter:
         print("Explorer READ ONLY session (15 minutes; paste in the enrolled Shelf): " + adapter.session.token, flush=True)
     print(f"Chute is listening at http://{host}:{port}")

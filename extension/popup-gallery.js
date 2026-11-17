@@ -296,7 +296,12 @@
   }
   async function localConnect(choose=false){
     try{
-      await window.ChuteyExplorerAPI.nativeSession(choose);
+      const session=await window.ChuteyExplorerAPI.nativeSession(choose);
+      if(session.scope==='saved_store'){
+        local.querySelector('#popup-local-list').replaceChildren();
+        local.querySelector('[role=status]').textContent='Choose an external folder to authorize previewing its original media. Saved Chutey files remain in Saved items.';
+        return;
+      }
       const roots=await window.ChuteyExplorerAPI.command('roots');
       if(!roots.roots.length){local.querySelector('[role=status]').textContent='Choose a folder to authorize local media access.';return;}
       await localLoad(roots.roots[0].handle);

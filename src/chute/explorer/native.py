@@ -52,17 +52,27 @@ def choose_folder(*, writable=False):
 
 
 class NativeExplorer:
-    def __init__(self, *, store=None):
+    def __init__(self, *, store=None, saved_store=None):
         from .grant_store import GrantStore
         self.store = store if store is not None else (GrantStore() if os.name == "nt" else None)
         from collections import deque
         self.events = deque(maxlen=64)
         self.descriptors = {}
+        self.saved_store = saved_store
         self.token=secrets.token_urlsafe(32)
         self.adapters={}
         self.lock=threading.Lock()
         self.selection_lock=threading.Lock()
         private_write(control_path(),json.dumps({'token':self.token}).encode())
+
+    def _saved_scope(self,origin,session):
+        # Enrollment already authorizes this client's Chutey history. It does
+        # NOT authorize any external folder. Never accept a client-supplied path.
+        if self.saved_store is None:raise ExplorerError('NEEDS_SELECTION','Select a folder to begin browsing.')
+        grant=RootGrant(self.saved_store.files_dir,label='Saved Chutey files',writable=False)
+        adapter=ExplorerAPI(Explorer([grant]),session);adapter.store_only=True
+        self.adapters[origin]=adapter
+        return adapter
 
     def action(self, origin, *, select, writable=False):
         from ..native_host import _allowed_extension_ids
@@ -110,22 +120,25 @@ class NativeExplorer:
                     else:
                         adapter=ExplorerAPI(old.engine,session)
                         adapter.resume_handle=getattr(old,'resume_handle',grant.id)
+                        adapter.store_only=getattr(old,'store_only',False)
                         self.adapters[origin]=adapter
                 elif self.store:
                     from .grant_store import restore
-                    descriptor=self.store.load(origin)
-                    grant,handle=restore(descriptor)
-                    engine=Explorer([grant])
-                    adapter=ExplorerAPI(engine,session)
-                    adapter.resume_handle=handle
-                    self.descriptors[origin]=descriptor
-                    self.adapters[origin]=adapter
+                    try:descriptor=self.store.load(origin)
+                    except ExplorerError as exc:
+                        if exc.code!='NEEDS_SELECTION':raise
+                        adapter=self._saved_scope(origin,session)
+                    else:
+                        grant,handle=restore(descriptor)
+                        engine=Explorer([grant]);adapter=ExplorerAPI(engine,session)
+                        adapter.resume_handle=handle
+                        self.descriptors[origin]=descriptor;self.adapters[origin]=adapter
                 else:
-                    raise ExplorerError('NEEDS_SELECTION','Select a folder to begin browsing.')
+                    adapter=self._saved_scope(origin,session)
                 adapter.native_state=lambda command,args: self.state(origin,command,args)
                 return {'ok':True,'token':session.token,'expires_in':max(0,int(session.expires-time.monotonic())),'read_only':not next(iter(adapter.engine.grants.values())).writable,
                         'native_roundtrip_ms':round((time.perf_counter()-started)*1000,2),
-                        'protocol':'1.1','persistent':bool(self.store)}
+                        'protocol':'1.1','persistent':bool(self.store),'scope':'saved_store' if getattr(adapter,'store_only',False) else 'approved_folder'}
         except Exception as error:
             outcome = error.code if isinstance(error, ExplorerError) else 'UNAVAILABLE'
             raise
@@ -146,6 +159,9 @@ class NativeExplorer:
     def state(self, origin, command, args):
         adapter=self.adapters[origin]
         with self.lock, adapter.engine.lock:
+            if getattr(adapter,'store_only',False):
+                if command=='remember_location':return {'remembered':False,'reason':'SAVED_STORE_SCOPE'}
+                if command in {'begin_transfer','finish_transfer','reconcile_transfer'}:raise ExplorerError('WRITE_CONSENT_REQUIRED','Approve an external destination folder first.')
             if command == 'recent_transfers':
                 if args: raise ExplorerError('INVALID_ARGUMENT','Unexpected receipt arguments.')
                 operations=self.descriptors[origin].get('operations',{})

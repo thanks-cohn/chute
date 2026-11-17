@@ -40,7 +40,10 @@ requires deleting your History, changing the archive or clearing production data
    In VM Chrome `chrome://extensions` → Developer mode → Load unpacked → select
    the directory containing manifest.json. Pin the test icon manually. Use only
    the VM test profile. Grant the added Downloads permission for native Save As.
-5. Open a normal webpage and Shelf. If native enrollment is forbidden, note the
+5. Open a normal webpage and Shelf. Before selecting any external directory, test
+   a daily text capture and History Export: the enrolled session should use only
+   the read-only Saved Chutey files scope. Local media must still explicitly ask
+   for an external authorized folder. If native enrollment is forbidden, note the
    exact unpacked extension ID and diagnostics; use the documented explicit-ID
    authorization in the VM (not a wildcard or production manifest edit). Existing
    production/explicit IDs must survive regeneration. Reload ONLY this VM test

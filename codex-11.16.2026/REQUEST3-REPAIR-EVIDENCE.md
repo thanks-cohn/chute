@@ -204,3 +204,17 @@ Merely marking an NTFS file sparse was insufficient: Windows CRT truncate can
 still zero-fill it. The fixture now uses SetFilePointerEx/SetEndOfFile after the
 sparse flag, and asserts GetCompressedFileSize reports under 1 MiB allocated for
 the logical 3-GiB range source. These are disposable test-only operations.
+
+### Fresh-install integration
+
+Run 43995127246 (c5da2b3) passed Windows Python/JS, real Chrome media in both
+viewers, Windows builds, packaged checker and native framed handshake. A subsequent
+fresh-install audit found Store-only operations accidentally depended on an existing
+external Explorer root. Native resume now creates a read-only, explicitly labeled
+saved_store scope from the server's known Store/files when no external approval
+exists. No caller path, automatic picker, external permission or writable grant.
+External selection retains its original permission checks; popup Local media asks
+for that selection rather than pretending Store originals are external files.
+New tests cover native enrollment, scoped listing, write denial, renewal, no grant
+persistence and explicit transition to an owner-selected external folder. The
+packaged isolated checker also exercises this first-use path.

@@ -219,3 +219,12 @@ Implemented extensions: [single ZIP64 History export](HISTORY-EXPORT-API.md),
 All use the existing permission-checked engine. Export and copy dispatch receipts
 are not completed work; poll the documented inner job states. Earlier synchronous
 commands remain compatible. See the updated OpenAPI enum and endpoint definitions.
+
+A fresh enrolled installation can resume a native session with `scope:saved_store`
+and read_only=true, rooted solely at the worker's existing Store/files. History
+export, daily highlights, saved-file GO TO and text/media previews therefore do
+not require prior external-folder selection. No client path or writable external
+grant is inferred. The popup Local media route explicitly asks for an external
+folder in this state. Native folder selection still creates `scope:approved_folder`
+with its existing read/write consent. Store-only view state is not persisted as
+external folder approval; broken existing approvals are not silently broadened.
