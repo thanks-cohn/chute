@@ -1,0 +1,51 @@
+{
+  "scope": "Real authenticated HTTP API + guarded Windows files + actual Paint/Explorer paste; synthetic enrolled session/test grants, no installed Chrome proof",
+  "checks": [
+    {
+      "operation": "Chutey file Copy -> Windows Explorer Ctrl+V",
+      "state": "PASS",
+      "sha256": "41abfbfcd61df9c503ce541cae4b9b64b0e0487ff0e742742749895769bd4d1d"
+    },
+    {
+      "operation": "Same Chutey file Copy -> Chutey Paste job",
+      "state": "PASS",
+      "sha256": "41abfbfcd61df9c503ce541cae4b9b64b0e0487ff0e742742749895769bd4d1d"
+    },
+    {
+      "operation": "Windows Explorer Ctrl+C -> Chutey verified Paste",
+      "state": "PASS",
+      "sha256": "0e1b6ac062112d7814e184c84a3f8f6c4b5d8781b3b12054488322b84f68d83a"
+    },
+    {
+      "operation": "png pixel Copy -> Paint Ctrl+V -> saved PNG",
+      "state": "PASS",
+      "pixel": [
+        40,
+        120,
+        200
+      ],
+      "evidence": "paint-paste-png.png"
+    },
+    {
+      "operation": "jpg pixel Copy -> Paint Ctrl+V -> saved PNG",
+      "state": "PASS",
+      "pixel": [
+        39,
+        120,
+        199
+      ],
+      "evidence": "paint-paste-jpg.png"
+    },
+    {
+      "operation": "webp pixel Copy -> Paint Ctrl+V -> saved PNG",
+      "state": "PASS",
+      "pixel": [
+        38,
+        121,
+        200
+      ],
+      "evidence": "paint-paste-webp.png"
+    }
+  ],
+  "state": "PASS"
+}

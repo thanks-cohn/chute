@@ -1,0 +1,805 @@
+{
+  "result": "PASS",
+  "transport": "installed",
+  "scope": "Actual packaged Windows worker + actual unpacked Chrome extension + real native messaging; only test-owned DPAPI folder consent is provisioned",
+  "requested_wall_seconds": 15,
+  "samples": [
+    {
+      "elapsed_seconds": 0.0,
+      "media": [
+        {
+          "connected": true,
+          "time": 0.0385,
+          "duration": 108,
+          "paused": false,
+          "ended": false,
+          "ready": 4,
+          "rate": 1,
+          "error": null
+        },
+        {
+          "connected": true,
+          "time": 0.0295,
+          "duration": 108,
+          "paused": false,
+          "ended": false,
+          "ready": 4,
+          "rate": 1,
+          "error": null
+        }
+      ],
+      "harness_resources": {
+        "event": "runtime_resources",
+        "pid": 7780,
+        "disk_free_bytes": 30978375680,
+        "memory_total_bytes": 17174360064,
+        "memory_available_bytes": 13785272320,
+        "commit_limit_bytes": 20261367808,
+        "commit_available_bytes": 17076899840,
+        "process_rss_bytes": 52436992,
+        "process_peak_rss_bytes": 52436992,
+        "process_private_bytes": 40288256,
+        "process_cpu_seconds": 1.6875,
+        "python_threads": 1
+      },
+      "chrome_resources": {
+        "cpu_seconds_by_type": {
+          "network.mojom.NetworkService": 0.512,
+          "browser": 2.962,
+          "renderer": 2.428,
+          "storage.mojom.StorageService": 0.062,
+          "GPU": 0.635
+        },
+        "process_count": 8,
+        "shelf_js_heap_used_bytes": 5085092,
+        "shelf_js_heap_total_bytes": 6430720
+      },
+      "mode": {
+        "mode": "efficiency",
+        "effective_limits": {
+          "control": 4,
+          "preview": 2,
+          "navigation": 2,
+          "thumbnail": 1,
+          "media": 2,
+          "intake": 1,
+          "chunk_bytes": 262144,
+          "thumbnail_prefetch": 1,
+          "http_threads": 32
+        },
+        "hardware": {
+          "available_memory_bytes": 13785251840,
+          "cpu_count": 4,
+          "low_memory": false
+        },
+        "resources": {
+          "event": "runtime_resources",
+          "pid": 3276,
+          "disk_free_bytes": 30978375680,
+          "memory_total_bytes": 17174360064,
+          "memory_available_bytes": 13785251840,
+          "commit_limit_bytes": 20261367808,
+          "commit_available_bytes": 17076899840,
+          "process_rss_bytes": 52924416,
+          "process_peak_rss_bytes": 52924416,
+          "process_private_bytes": 37920768,
+          "process_cpu_seconds": 3.3125,
+          "python_threads": 7
+        },
+        "metrics": {
+          "control": {
+            "completed": 69,
+            "busy": 0,
+            "active": 1,
+            "p50_ms": 16,
+            "p95_ms": 32,
+            "p99_ms": 46,
+            "worst_ms": 47
+          },
+          "navigation": {
+            "completed": 87,
+            "busy": 34,
+            "active": 0,
+            "p50_ms": 16,
+            "p95_ms": 187,
+            "p99_ms": 219,
+            "worst_ms": 219
+          },
+          "thumbnail": {
+            "completed": 21,
+            "busy": 0,
+            "active": 0,
+            "p50_ms": 0,
+            "p95_ms": 31,
+            "p99_ms": 31,
+            "worst_ms": 31
+          },
+          "media": {
+            "completed": 3,
+            "busy": 0,
+            "active": 2,
+            "p50_ms": 31,
+            "p95_ms": 31,
+            "p99_ms": 31,
+            "worst_ms": 94
+          }
+        },
+        "queue_policy": "bounded admission; no stale click queue"
+      }
+    }
+  ],
+  "bursts": [
+    {
+      "mode": "efficiency",
+      "ack": {
+        "mode": "efficiency",
+        "effective_limits": {
+          "control": 4,
+          "preview": 2,
+          "navigation": 2,
+          "thumbnail": 1,
+          "media": 2,
+          "intake": 1,
+          "chunk_bytes": 262144,
+          "thumbnail_prefetch": 1,
+          "http_threads": 32
+        },
+        "hardware": {
+          "available_memory_bytes": 13845975040,
+          "cpu_count": 4,
+          "low_memory": false
+        },
+        "resources": {
+          "event": "runtime_resources",
+          "pid": 3276,
+          "disk_free_bytes": 31180148736,
+          "memory_total_bytes": 17174360064,
+          "memory_available_bytes": 13845975040,
+          "commit_limit_bytes": 20261367808,
+          "commit_available_bytes": 17146765312,
+          "process_rss_bytes": 40714240,
+          "process_peak_rss_bytes": 40714240,
+          "process_private_bytes": 27484160,
+          "process_cpu_seconds": 0.53125,
+          "python_threads": 3
+        },
+        "metrics": {
+          "control": {
+            "completed": 4,
+            "busy": 0,
+            "active": 1,
+            "p50_ms": 16,
+            "p95_ms": 16,
+            "p99_ms": 16,
+            "worst_ms": 31
+          },
+          "navigation": {
+            "completed": 4,
+            "busy": 0,
+            "active": 0,
+            "p50_ms": 0,
+            "p95_ms": 15,
+            "p99_ms": 15,
+            "worst_ms": 62
+          },
+          "thumbnail": {
+            "completed": 3,
+            "busy": 0,
+            "active": 0,
+            "p50_ms": 31,
+            "p95_ms": 31,
+            "p99_ms": 31,
+            "worst_ms": 31
+          }
+        },
+        "queue_policy": "bounded admission; no stale click queue"
+      },
+      "widths": [
+        {
+          "width": 1,
+          "latency": {
+            "count": 1,
+            "p50_ms": 3.6,
+            "p95_ms": 3.6,
+            "p99_ms": 3.6,
+            "worst_ms": 3.6
+          },
+          "errors": {}
+        },
+        {
+          "width": 4,
+          "latency": {
+            "count": 4,
+            "p50_ms": 9.3,
+            "p95_ms": 35.8,
+            "p99_ms": 35.8,
+            "worst_ms": 35.8
+          },
+          "errors": {
+            "BUSY": 1
+          }
+        },
+        {
+          "width": 10,
+          "latency": {
+            "count": 10,
+            "p50_ms": 24.8,
+            "p95_ms": 83.8,
+            "p99_ms": 83.8,
+            "worst_ms": 83.8
+          },
+          "errors": {
+            "BUSY": 5
+          }
+        },
+        {
+          "width": 32,
+          "latency": {
+            "count": 32,
+            "p50_ms": 60.9,
+            "p95_ms": 75.6,
+            "p99_ms": 119.1,
+            "worst_ms": 119.1
+          },
+          "errors": {
+            "BUSY": 16
+          }
+        }
+      ]
+    },
+    {
+      "mode": "balanced",
+      "ack": {
+        "mode": "balanced",
+        "effective_limits": {
+          "control": 4,
+          "preview": 2,
+          "navigation": 4,
+          "thumbnail": 2,
+          "media": 2,
+          "intake": 1,
+          "chunk_bytes": 262144,
+          "thumbnail_prefetch": 2,
+          "http_threads": 32
+        },
+        "hardware": {
+          "available_memory_bytes": 13842968576,
+          "cpu_count": 4,
+          "low_memory": false
+        },
+        "resources": {
+          "event": "runtime_resources",
+          "pid": 3276,
+          "disk_free_bytes": 31180148736,
+          "memory_total_bytes": 17174360064,
+          "memory_available_bytes": 13842968576,
+          "commit_limit_bytes": 20261367808,
+          "commit_available_bytes": 17138995200,
+          "process_rss_bytes": 42102784,
+          "process_peak_rss_bytes": 42213376,
+          "process_private_bytes": 29364224,
+          "process_cpu_seconds": 0.796875,
+          "python_threads": 3
+        },
+        "metrics": {
+          "control": {
+            "completed": 16,
+            "busy": 0,
+            "active": 1,
+            "p50_ms": 16,
+            "p95_ms": 32,
+            "p99_ms": 32,
+            "worst_ms": 47
+          },
+          "navigation": {
+            "completed": 18,
+            "busy": 22,
+            "active": 0,
+            "p50_ms": 16,
+            "p95_ms": 78,
+            "p99_ms": 78,
+            "worst_ms": 109
+          },
+          "thumbnail": {
+            "completed": 3,
+            "busy": 0,
+            "active": 0,
+            "p50_ms": 31,
+            "p95_ms": 31,
+            "p99_ms": 31,
+            "worst_ms": 31
+          }
+        },
+        "queue_policy": "bounded admission; no stale click queue"
+      },
+      "widths": [
+        {
+          "width": 1,
+          "latency": {
+            "count": 1,
+            "p50_ms": 4,
+            "p95_ms": 4,
+            "p99_ms": 4,
+            "worst_ms": 4
+          },
+          "errors": {}
+        },
+        {
+          "width": 4,
+          "latency": {
+            "count": 4,
+            "p50_ms": 15.2,
+            "p95_ms": 38.6,
+            "p99_ms": 38.6,
+            "worst_ms": 38.6
+          },
+          "errors": {}
+        },
+        {
+          "width": 10,
+          "latency": {
+            "count": 10,
+            "p50_ms": 27.3,
+            "p95_ms": 111.2,
+            "p99_ms": 111.2,
+            "worst_ms": 111.2
+          },
+          "errors": {
+            "BUSY": 1
+          }
+        },
+        {
+          "width": 32,
+          "latency": {
+            "count": 32,
+            "p50_ms": 79.7,
+            "p95_ms": 183,
+            "p99_ms": 186.7,
+            "worst_ms": 186.7
+          },
+          "errors": {
+            "BUSY": 11
+          }
+        }
+      ]
+    },
+    {
+      "mode": "turbo",
+      "ack": {
+        "mode": "turbo",
+        "effective_limits": {
+          "control": 4,
+          "preview": 2,
+          "navigation": 6,
+          "thumbnail": 2,
+          "media": 2,
+          "intake": 1,
+          "chunk_bytes": 262144,
+          "thumbnail_prefetch": 3,
+          "http_threads": 32
+        },
+        "hardware": {
+          "available_memory_bytes": 13840596992,
+          "cpu_count": 4,
+          "low_memory": false
+        },
+        "resources": {
+          "event": "runtime_resources",
+          "pid": 3276,
+          "disk_free_bytes": 31180132352,
+          "memory_total_bytes": 17174360064,
+          "memory_available_bytes": 13840596992,
+          "commit_limit_bytes": 20261367808,
+          "commit_available_bytes": 17133101056,
+          "process_rss_bytes": 44441600,
+          "process_peak_rss_bytes": 44503040,
+          "process_private_bytes": 31649792,
+          "process_cpu_seconds": 1.234375,
+          "python_threads": 3
+        },
+        "metrics": {
+          "control": {
+            "completed": 28,
+            "busy": 0,
+            "active": 1,
+            "p50_ms": 16,
+            "p95_ms": 32,
+            "p99_ms": 46,
+            "worst_ms": 47
+          },
+          "navigation": {
+            "completed": 42,
+            "busy": 34,
+            "active": 0,
+            "p50_ms": 16,
+            "p95_ms": 109,
+            "p99_ms": 171,
+            "worst_ms": 187
+          },
+          "thumbnail": {
+            "completed": 3,
+            "busy": 0,
+            "active": 0,
+            "p50_ms": 31,
+            "p95_ms": 31,
+            "p99_ms": 31,
+            "worst_ms": 31
+          }
+        },
+        "queue_policy": "bounded admission; no stale click queue"
+      },
+      "widths": [
+        {
+          "width": 1,
+          "latency": {
+            "count": 1,
+            "p50_ms": 3.9,
+            "p95_ms": 3.9,
+            "p99_ms": 3.9,
+            "worst_ms": 3.9
+          },
+          "errors": {}
+        },
+        {
+          "width": 4,
+          "latency": {
+            "count": 4,
+            "p50_ms": 14.8,
+            "p95_ms": 38.5,
+            "p99_ms": 38.5,
+            "worst_ms": 38.5
+          },
+          "errors": {}
+        },
+        {
+          "width": 10,
+          "latency": {
+            "count": 10,
+            "p50_ms": 29,
+            "p95_ms": 113.3,
+            "p99_ms": 113.3,
+            "worst_ms": 113.3
+          },
+          "errors": {}
+        },
+        {
+          "width": 32,
+          "latency": {
+            "count": 32,
+            "p50_ms": 108.6,
+            "p95_ms": 313.9,
+            "p99_ms": 314.5,
+            "worst_ms": 314.5
+          },
+          "errors": {}
+        }
+      ]
+    }
+  ],
+  "errors": [],
+  "assets": [
+    {
+      "format": "mp4",
+      "bytes": 46960394,
+      "sha256": "3d307a286a27fe259c67a42bf1cb050b69f5126a3eb382142a3e5f8ab1ff7695",
+      "duration_at_least_seconds": 105
+    },
+    {
+      "format": "webm",
+      "bytes": 25291577,
+      "sha256": "f2058db6160ab1c3e61ffc26a2eae2b398b53715ed1526511da1d02e382867e5",
+      "duration_at_least_seconds": 105
+    }
+  ],
+  "installed_pair": {
+    "installer_sha256": "e17cf38642f0ba82d8bc405a6f1f97756228a510579df1f2a7b2a2e2dbea8a11",
+    "installed_worker_sha256": "e17cf38642f0ba82d8bc405a6f1f97756228a510579df1f2a7b2a2e2dbea8a11",
+    "native_helper_sha256": "9b7035e2efa1a314e8d7e5547b475af517bbd1f9556370689d65a260bc4bf72a",
+    "consent": "DPAPI provisioned synthetic approved root; Shell picker not tested",
+    "native_messaging": "genuine Chrome/native-host/worker"
+  },
+  "background": "Actual installed extension worker responded to diagnostics",
+  "installed_gui_clipboard": [
+    {
+      "operation": "Windows clipboard Paste",
+      "state": "PASS",
+      "bytes": 67108864,
+      "sha256": "53533a909d7179bf06ded406612e4afd5bf53fe972658495580ab6ff2bc2f05d"
+    },
+    {
+      "operation": "Windows clipboard Paste",
+      "state": "PASS",
+      "bytes": 67108864,
+      "sha256": "53533a909d7179bf06ded406612e4afd5bf53fe972658495580ab6ff2bc2f05d"
+    },
+    {
+      "operation": "Copy/Paste inside Chutey",
+      "state": "PASS",
+      "bytes": 67108864,
+      "sha256": "53533a909d7179bf06ded406612e4afd5bf53fe972658495580ab6ff2bc2f05d"
+    },
+    {
+      "operation": "Chrome png pixel Copy -> independent Windows clipboard image read",
+      "state": "PASS",
+      "pixel": [
+        40,
+        120,
+        200
+      ]
+    },
+    {
+      "operation": "Chrome jpg pixel Copy -> independent Windows clipboard image read",
+      "state": "PASS",
+      "pixel": [
+        39,
+        120,
+        199
+      ]
+    },
+    {
+      "operation": "Chrome webp pixel Copy -> independent Windows clipboard image read",
+      "state": "PASS",
+      "pixel": [
+        38,
+        121,
+        200
+      ]
+    }
+  ],
+  "navigation": {
+    "count": 5,
+    "p50_ms": 1141.0,
+    "p95_ms": 3453.0,
+    "p99_ms": 3453.0,
+    "worst_ms": 3453.0
+  },
+  "mode_history": [
+    {
+      "elapsed": 0.0,
+      "mode": "efficiency",
+      "effective": {
+        "mode": "efficiency",
+        "effective_limits": {
+          "control": 4,
+          "preview": 2,
+          "navigation": 2,
+          "thumbnail": 1,
+          "media": 2,
+          "intake": 1,
+          "chunk_bytes": 262144,
+          "thumbnail_prefetch": 1,
+          "http_threads": 32
+        },
+        "hardware": {
+          "available_memory_bytes": 13785276416,
+          "cpu_count": 4,
+          "low_memory": false
+        },
+        "resources": {
+          "event": "runtime_resources",
+          "pid": 3276,
+          "disk_free_bytes": 30978375680,
+          "memory_total_bytes": 17174360064,
+          "memory_available_bytes": 13785276416,
+          "commit_limit_bytes": 20261367808,
+          "commit_available_bytes": 17077428224,
+          "process_rss_bytes": 52862976,
+          "process_peak_rss_bytes": 52867072,
+          "process_private_bytes": 37916672,
+          "process_cpu_seconds": 3.28125,
+          "python_threads": 7
+        },
+        "metrics": {
+          "control": {
+            "completed": 66,
+            "busy": 0,
+            "active": 1,
+            "p50_ms": 16,
+            "p95_ms": 32,
+            "p99_ms": 46,
+            "worst_ms": 47
+          },
+          "navigation": {
+            "completed": 87,
+            "busy": 34,
+            "active": 0,
+            "p50_ms": 16,
+            "p95_ms": 187,
+            "p99_ms": 219,
+            "worst_ms": 219
+          },
+          "thumbnail": {
+            "completed": 20,
+            "busy": 0,
+            "active": 0,
+            "p50_ms": 0,
+            "p95_ms": 31,
+            "p99_ms": 31,
+            "worst_ms": 31
+          },
+          "media": {
+            "completed": 3,
+            "busy": 0,
+            "active": 2,
+            "p50_ms": 31,
+            "p95_ms": 31,
+            "p99_ms": 31,
+            "worst_ms": 94
+          }
+        },
+        "queue_policy": "bounded admission; no stale click queue"
+      }
+    }
+  ],
+  "wall_seconds": 15.265,
+  "mp4": {
+    "final": {
+      "connected": true,
+      "time": 108,
+      "duration": 108,
+      "paused": true,
+      "ended": true,
+      "ready": 4,
+      "rate": 1,
+      "error": null
+    },
+    "events": {
+      "counts": {
+        "playing": 2,
+        "seeking": 1,
+        "waiting": 1,
+        "seeked": 1,
+        "pause": 1,
+        "ended": 1
+      },
+      "errors": [],
+      "lastProgress": 65539.5
+    },
+    "long_tasks": {
+      "count": 0,
+      "p50_ms": null,
+      "p95_ms": null,
+      "p99_ms": null,
+      "worst_ms": null
+    },
+    "worker_authorization": {
+      "available": true,
+      "original_get": {
+        "status": 206,
+        "code": "OK",
+        "origin_present": true
+      },
+      "lease_seconds": 96.57799999999997
+    }
+  },
+  "webm": {
+    "final": {
+      "connected": true,
+      "time": 108,
+      "duration": 108,
+      "paused": true,
+      "ended": true,
+      "ready": 4,
+      "rate": 1,
+      "error": null
+    },
+    "events": {
+      "counts": {
+        "playing": 2,
+        "seeking": 1,
+        "waiting": 1,
+        "seeked": 1,
+        "pause": 1,
+        "ended": 1
+      },
+      "errors": [],
+      "lastProgress": 25494.199999999953
+    },
+    "long_tasks": {
+      "count": 0,
+      "p50_ms": null,
+      "p95_ms": null,
+      "p99_ms": null,
+      "worst_ms": null
+    },
+    "worker_authorization": {
+      "available": true,
+      "original_get": {
+        "status": 206,
+        "code": "OK",
+        "origin_present": true
+      },
+      "lease_seconds": 100.82899999999995
+    }
+  },
+  "network_origin_note": "Playwright request headers may precede DNR; worker_authorization records the server-observed Origin.",
+  "http_media_requests": [
+    {
+      "seconds": 59.859,
+      "method": "GET",
+      "status": 206,
+      "range": true,
+      "origin_present": false,
+      "origin_category": "missing"
+    },
+    {
+      "seconds": 66.297,
+      "method": "GET",
+      "status": 206,
+      "range": true,
+      "origin_present": false,
+      "origin_category": "missing"
+    },
+    {
+      "seconds": 66.312,
+      "method": "GET",
+      "status": 206,
+      "range": true,
+      "origin_present": false,
+      "origin_category": "missing"
+    },
+    {
+      "seconds": 66.375,
+      "method": "GET",
+      "status": 206,
+      "range": true,
+      "origin_present": false,
+      "origin_category": "missing"
+    },
+    {
+      "seconds": 66.406,
+      "method": "GET",
+      "status": 206,
+      "range": true,
+      "origin_present": false,
+      "origin_category": "missing"
+    },
+    {
+      "seconds": 81.687,
+      "method": "GET",
+      "status": 206,
+      "range": true,
+      "origin_present": false,
+      "origin_category": "missing"
+    },
+    {
+      "seconds": 84.312,
+      "method": "GET",
+      "status": 206,
+      "range": true,
+      "origin_present": false,
+      "origin_category": "missing"
+    }
+  ],
+  "http_statuses": {
+    "206": 7
+  },
+  "copy_jobs": [
+    {
+      "state": "COMMITTED",
+      "phase": "complete",
+      "kind": "local_copy",
+      "size": 67108864,
+      "bytes": 67108864,
+      "error": null,
+      "verification": {
+        "state": "VERIFIED",
+        "verified": true
+      },
+      "dismissed": null
+    },
+    {
+      "state": "running",
+      "phase": "verifying_source",
+      "kind": "local_copy",
+      "size": 67108864,
+      "bytes": 0,
+      "error": null,
+      "verification": null,
+      "dismissed": null
+    }
+  ],
+  "endurance_gate": "SMOKE ONLY: not a 30-minute acceptance",
+  "browser": "156.0.8078.80",
+  "platform": "win32"
+}

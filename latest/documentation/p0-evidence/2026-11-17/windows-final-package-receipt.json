@@ -1,0 +1,40 @@
+{
+  "run": 44141513522,
+  "artifact_id": 14358435326,
+  "source_commit": "1e2b2bc6d5da0119e87bcbc0c52b86abe55dd122",
+  "result": "PASS",
+  "manifest_files_verified": 24,
+  "extension_files_verified_with_text_eol_normalization": 65,
+  "hashes": {
+    "ACCEPTANCE-STATUS.txt": "b990033526883c76ce4e969b3fc195bac6a2f198f618855a134947e67964f432",
+    "BUILD-DEPENDENCIES.txt": "57ba8f9b779fa49bda66b88cdf03ef4c469e309c23914f9140cca9505de4df0d",
+    "Chute-NativeHost.exe": "9b7035e2efa1a314e8d7e5547b475af517bbd1f9556370689d65a260bc4bf72a",
+    "Chutey-Chrome-P0-2026-11-17-TEST.zip": "7998e425dd99bc90ff322499baceb677887bd8933df964fb86688639b70e8f9d",
+    "Chutey-Phase1-Isolated-Check.exe": "f2808c825fa754cb8ab13f2f30cdcb9545dacffc6fea05d3240c2fec1c7fa6d7",
+    "Chutey-Setup-P0-2026-11-17-TEST.exe": "e17cf38642f0ba82d8bc405a6f1f97756228a510579df1f2a7b2a2e2dbea8a11",
+    "p0-windows-tests.xml": "9088535b1766422caa1a2ae9d43840b63ee7af3420350ca584ed82c2935b833e",
+    "SOURCE-COMMIT.txt": "c7c863a3ba0d4186dd79bd89722e3d6368c873e15318da6b960016b136e15079",
+    "START-HERE.md": "49cab65117884c022f9f63a0eed98a756e0c5b6344ed2f4373587afd7aafb48c"
+  },
+  "wall_seconds": 1800.172,
+  "browser": "156.0.8078.80",
+  "http_statuses": {
+    "206": 9
+  },
+  "navigation_combined_ui_steps": {
+    "count": 515,
+    "p50_ms": 812.0,
+    "p95_ms": 4468.0,
+    "p99_ms": 5563.0,
+    "worst_ms": 6406.0
+  },
+  "verified_copy_jobs": 15,
+  "clipboard_app_checks": 6,
+  "installed_gui_clipboard_checks": 6,
+  "worker_peak_rss_bytes": 430505984,
+  "worker_sampled_rss_max_bytes": 421007360,
+  "worker_pids": [
+    5204
+  ],
+  "memory_total_bytes": 17174360064
+}

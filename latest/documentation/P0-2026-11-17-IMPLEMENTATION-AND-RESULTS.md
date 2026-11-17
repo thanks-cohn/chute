@@ -68,12 +68,39 @@ movie playback**. Reproduce with `scripts/verify-p0-large-transfer.py --mib 1024
 
 ## Windows paired artifact and final gates
 
-The earlier [paired run 44132927899](https://github.com/thanks-cohn/chute/actions/runs/44132927899) completed **1800.250 seconds**, two real videos, **527** combined browsing steps and nine media HTTP **206** responses, with no player errors and worker-observed Origin present. Its overall workflow failed the clipboard application gate; the test had not focused the Explorer file item and hid the API error code. A later [strict clipboard diagnostic 44141513640](https://github.com/thanks-cohn/chute/actions/runs/44141513640) passed all six actual file/pixel/Explorer/Paint checks after those test-harness corrections. The earlier playback report is preserved as [measured evidence](p0-evidence/2026-11-17/windows-first-30-minute-1b65b2d.json). It is not substituted for the latest candidate.
+The earlier [paired run 44132927899](https://github.com/thanks-cohn/chute/actions/runs/44132927899) completed **1800.250 seconds**, two real videos, **527** combined browsing steps and nine media HTTP **206** responses, with no player errors and worker-observed Origin present. Its overall workflow failed the clipboard application gate; the test did not establish exact Explorer item focus and hid the structured API error code. The corrected harness selects/focuses the specific owned file, waits for a clipboard sequence change and handles the actual bounded transient error codes. A later [strict clipboard diagnostic 44141513640](https://github.com/thanks-cohn/chute/actions/runs/44141513640) passed all six actual file/pixel/Explorer/Paint checks after those test-harness corrections. The earlier playback report is preserved as [measured evidence](p0-evidence/2026-11-17/windows-first-30-minute-1b65b2d.json). It is not substituted for the latest candidate.
 
-Latest exact candidate: `1e2b2bc6d5da0119e87bcbc0c52b86abe55dd122`, [paired run 44141513522](https://github.com/thanks-cohn/chute/actions/runs/44141513522). Its final 1800-second gate is currently running; final hashes/results will be appended after completion. The artifact must contain exact `SOURCE-COMMIT.txt`, setup/helper/Chrome ZIP SHA-256, JUnit, installed smoke, compact UX, real clipboard application evidence, and 1800-second real-time playback/navigation metrics. A failure here remains a release blocker; do not mark issues closed or GOLD merely because the source compiles.
+Latest exact candidate: `1e2b2bc6d5da0119e87bcbc0c52b86abe55dd122`, [paired run 44141513522](https://github.com/thanks-cohn/chute/actions/runs/44141513522). Its final 1800-second gate and the full workflow passed; exact hashes/results are recorded in the final receipt below. The artifact must contain exact `SOURCE-COMMIT.txt`, setup/helper/Chrome ZIP SHA-256, JUnit, installed smoke, compact UX, real clipboard application evidence, and 1800-second real-time playback/navigation metrics. A failure here remains a release blocker; do not mark issues closed or GOLD merely because the source compiles.
 
 The first Windows run's combined navigation steps included search waits, image preview/key actions and folder transitions: p50 **813 ms**, p95 **3718 ms**, worst **5484 ms**. These are not individual API response times. This is a material limit on any near-native claim; inspect the per-lane/burst measurements in the report separately. Long synthetic video fixtures are 640×360/12fps without audio tracks; separate short MP4-with-audio and MP3 cases do not prove full-length A/V synchronization or 4K playback.
 
 ## Remaining owner/hardware acceptance
 
 The protected worker, installed Chrome profile, approved D: scope, actual saved files/History and original YUMMY assets are untouched. Owner acceptance still needs the intended ~4-GB Windows device and its real media/codecs/large files, approved D: tree, actual OS associations/toolbar behavior, same-device Explorer comparison, sleep/wake, sign-in, low disk, process/browser restart and prolonged workload. Unit fault injection and synthetic CI workloads are useful evidence, not that full real-world gate. Current limits include one native copy per origin, 20,000 entries per directory, 50,000 handles per grant, bounded image decoding, and browser-supported codecs. No Movie Mode tab, transcoder, independent scripting enrollment, general batch pause/resume, arbitrary-path API or Development 2 mascot was added.
+
+## Final paired receipt — PASS, TEST only
+
+- Exact source: `1e2b2bc6d5da0119e87bcbc0c52b86abe55dd122`.
+- [Successful complete Windows run](https://github.com/thanks-cohn/chute/actions/runs/44141513522).
+- [Download the matching Windows/Chrome TEST package](https://github.com/thanks-cohn/chute/actions/runs/44141513522/artifacts/14358435326) (GitHub sign-in; 90-day artifact retention).
+- **163 Windows tests passed, 14 skipped, 27 subtests passed**. Linux: **164 passed, 13 skipped, 37 subtests passed**.
+- Actual packaged worker/helper + actual Chrome 156.0.8078.80 + genuine native messaging: **1800.172 seconds**, two videos, **515** combined browsing steps, **15** independently verified 64-MiB copy jobs, **nine HTTP 206 media responses**, zero player errors, and worker-observed Origin present. Both players reached EOF with their original elements intact. Explicit test pause/seeks are counted separately from errors.
+- Six installed GUI clipboard/internal-copy/pixel-readback checks and all six real Explorer/Paint application checks passed. `ACCEPTANCE-STATUS.txt` records `clipboard_apps=success`.
+- Downloaded manifest: **24 files** independently hash-verified. All **65 extension files** match the tested source after normalizing Windows text line endings; binary assets match exactly.
+
+| Packaged file | SHA-256 |
+|---|---|
+| Windows TEST setup | `e17cf38642f0ba82d8bc405a6f1f97756228a510579df1f2a7b2a2e2dbea8a11` |
+| Chrome TEST ZIP | `7998e425dd99bc90ff322499baceb677887bd8933df964fb86688639b70e8f9d` |
+| Matching native helper | `9b7035e2efa1a314e8d7e5547b475af517bbd1f9556370689d65a260bc4bf72a` |
+| Safe isolated checker | `f2808c825fa754cb8ab13f2f30cdcb9545dacffc6fea05d3240c2fec1c7fa6d7` |
+
+[Machine-readable final receipt](p0-evidence/2026-11-17/windows-final-package-receipt.json) · [Full endurance evidence](p0-evidence/2026-11-17/windows-final-30-minute-1e2b2bc.json) · [Actual application evidence](p0-evidence/2026-11-17/windows-final-clipboard-apps.json)
+
+## Important unfinished performance work
+
+**The bounded long-session memory goal is not achieved/validated yet.** In this successful Windows run, sampled worker RSS rose from **49.7 MiB** at startup to **400.4 MiB** near the end; private memory rose from **35.9 to 530.8 MiB**. Peak RSS was **410.6 MiB**. The same worker PID remained alive. This trend needs profiling and a memory-plateau regression before production promotion or a claim of predictable long-session operation on ~4-GB machines. Bounded I/O buffers and admission lanes do not by themselves prove bounded process memory. A concrete next inspection target is per-call ctypes structure/pointer-type creation in `windows_fs.py` and `runtime_log.py`; that is a hypothesis, not a verified allocation root cause.
+
+Combined GUI navigation steps measured p50 **812 ms**, p95 **4468 ms**, worst **6406 ms**. The final worker-side control lane measured p95 **31 ms** and navigation service p95 **47 ms**; the combined GUI steps include several actions and waits. The gap needs profiling before a near-native claim. Thumbnail admission recorded **1797 BUSY** rejections under the mixed workload; control recorded none. These are visible capacity limits, not silently completed work.
+
+The CI machine had roughly **16 GiB RAM**, not the owner's ~4-GB device. Full-length high-bitrate 4K A/V, multi-day reliability, actual D: hardware, sleep/wake and same-device Explorer comparisons remain owner/future engineering gates. The phase is handed off here without starting further implementation.
