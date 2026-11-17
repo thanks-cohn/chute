@@ -1,0 +1,337 @@
+{
+  "platform": "win32",
+  "resource_snapshot": {
+    "event": "runtime_resources",
+    "pid": 792,
+    "disk_free_bytes": 28642922496,
+    "memory_total_bytes": 17174360064,
+    "memory_available_bytes": 13882150912,
+    "commit_limit_bytes": 20261367808,
+    "commit_available_bytes": 17162973184
+  },
+  "browser": "156.0.8078.80",
+  "scope": "Real browser and real filesystem guards; test-only HTTP native enrollment; installed extension/owner acceptance pending",
+  "media": [
+    {
+      "name": "small.mp4",
+      "size": 1031338,
+      "sha256": "95488705061f0499cc567ee763eaa9e0594c6a48e807e6de8327b18735135cab",
+      "format": "mp4",
+      "large": false,
+      "surface": "Shelf",
+      "played": true,
+      "paused": true,
+      "seek_seconds": 2,
+      "ticket_released": true
+    },
+    {
+      "name": "small.webm",
+      "size": 1241450,
+      "sha256": "c5f002659494bdc69e9f989600771beb1f2a24c7fae324e72b0b21261eca2bbd",
+      "format": "webm",
+      "large": false,
+      "surface": "Shelf",
+      "played": true,
+      "paused": true,
+      "seek_seconds": 2,
+      "ticket_released": true
+    },
+    {
+      "name": "small.mp3",
+      "size": 122296,
+      "sha256": "8af564e141af76b3403aa4cf69326b6b8a2527b7105dee01dd8796499796d8c9",
+      "format": "mp3",
+      "large": false,
+      "surface": "Shelf",
+      "played": true,
+      "paused": true,
+      "seek_seconds": 2,
+      "ticket_released": true
+    },
+    {
+      "name": "large.mp4",
+      "size": 45679203,
+      "sha256": "294119d574dcebe6c79f5950adf5d48f5fd046db7c3ba81d8d0a692105e8f993",
+      "format": "mp4",
+      "large": true,
+      "surface": "Shelf",
+      "played": true,
+      "paused": true,
+      "seek_seconds": 2,
+      "ticket_released": true
+    },
+    {
+      "name": "large.webm",
+      "size": 67075612,
+      "sha256": "570c1957842d930fe5a57b28ff6e8a0c186962d4de8d3a1eb1e3722b60ee6daa",
+      "format": "webm",
+      "large": true,
+      "surface": "Shelf",
+      "played": true,
+      "paused": true,
+      "seek_seconds": 2,
+      "ticket_released": true
+    },
+    {
+      "name": "large.mp3",
+      "size": 36003047,
+      "sha256": "5290644423606fb8ad780e78b9c228d52754df67847801fee350022704126982",
+      "format": "mp3",
+      "large": true,
+      "surface": "Shelf",
+      "played": true,
+      "paused": true,
+      "seek_seconds": 850,
+      "ticket_released": true
+    },
+    {
+      "name": "small.mp4",
+      "size": 1031338,
+      "sha256": "95488705061f0499cc567ee763eaa9e0594c6a48e807e6de8327b18735135cab",
+      "format": "mp4",
+      "large": false,
+      "surface": "Popup",
+      "played": true,
+      "paused": true,
+      "seek_seconds": 2,
+      "ticket_released": true
+    },
+    {
+      "name": "small.webm",
+      "size": 1241450,
+      "sha256": "c5f002659494bdc69e9f989600771beb1f2a24c7fae324e72b0b21261eca2bbd",
+      "format": "webm",
+      "large": false,
+      "surface": "Popup",
+      "played": true,
+      "paused": true,
+      "seek_seconds": 2,
+      "ticket_released": true
+    },
+    {
+      "name": "small.mp3",
+      "size": 122296,
+      "sha256": "8af564e141af76b3403aa4cf69326b6b8a2527b7105dee01dd8796499796d8c9",
+      "format": "mp3",
+      "large": false,
+      "surface": "Popup",
+      "played": true,
+      "paused": true,
+      "seek_seconds": 2,
+      "ticket_released": true
+    },
+    {
+      "name": "large.mp4",
+      "size": 45679203,
+      "sha256": "294119d574dcebe6c79f5950adf5d48f5fd046db7c3ba81d8d0a692105e8f993",
+      "format": "mp4",
+      "large": true,
+      "surface": "Popup",
+      "played": true,
+      "paused": true,
+      "seek_seconds": 2,
+      "ticket_released": true
+    },
+    {
+      "name": "large.webm",
+      "size": 67075612,
+      "sha256": "570c1957842d930fe5a57b28ff6e8a0c186962d4de8d3a1eb1e3722b60ee6daa",
+      "format": "webm",
+      "large": true,
+      "surface": "Popup",
+      "played": true,
+      "paused": true,
+      "seek_seconds": 2,
+      "ticket_released": true
+    },
+    {
+      "name": "large.mp3",
+      "size": 36003047,
+      "sha256": "5290644423606fb8ad780e78b9c228d52754df67847801fee350022704126982",
+      "format": "mp3",
+      "large": true,
+      "surface": "Popup",
+      "played": true,
+      "paused": true,
+      "seek_seconds": 850,
+      "ticket_released": true
+    }
+  ],
+  "copies": [
+    {
+      "name": "small.mp4",
+      "size": 1031338,
+      "sha256": "95488705061f0499cc567ee763eaa9e0594c6a48e807e6de8327b18735135cab",
+      "format": "mp4",
+      "large": false,
+      "copy_seconds": 0.422
+    },
+    {
+      "name": "small.webm",
+      "size": 1241450,
+      "sha256": "c5f002659494bdc69e9f989600771beb1f2a24c7fae324e72b0b21261eca2bbd",
+      "format": "webm",
+      "large": false,
+      "copy_seconds": 0.437
+    },
+    {
+      "name": "small.mp3",
+      "size": 122296,
+      "sha256": "8af564e141af76b3403aa4cf69326b6b8a2527b7105dee01dd8796499796d8c9",
+      "format": "mp3",
+      "large": false,
+      "copy_seconds": 0.453
+    },
+    {
+      "name": "large.mp4",
+      "size": 45679203,
+      "sha256": "294119d574dcebe6c79f5950adf5d48f5fd046db7c3ba81d8d0a692105e8f993",
+      "format": "mp4",
+      "large": true,
+      "copy_seconds": 0.875
+    },
+    {
+      "name": "large.webm",
+      "size": 67075612,
+      "sha256": "570c1957842d930fe5a57b28ff6e8a0c186962d4de8d3a1eb1e3722b60ee6daa",
+      "format": "webm",
+      "large": true,
+      "copy_seconds": 1.297
+    },
+    {
+      "name": "large.mp3",
+      "size": 36003047,
+      "sha256": "5290644423606fb8ad780e78b9c228d52754df67847801fee350022704126982",
+      "format": "mp3",
+      "large": true,
+      "copy_seconds": 0.468
+    }
+  ],
+  "simultaneous_copy_stream_browse_health": [
+    {
+      "job_state": "running",
+      "listing_seconds": 0.016000000000019554,
+      "range": {
+        "status": 206,
+        "size": 2048
+      },
+      "health": 200
+    },
+    {
+      "job_state": "running",
+      "listing_seconds": 0.031999999999982265,
+      "range": {
+        "status": 206,
+        "size": 2048
+      },
+      "health": 200
+    },
+    {
+      "job_state": "running",
+      "listing_seconds": 0.016000000000019554,
+      "range": {
+        "status": 206,
+        "size": 2048
+      },
+      "health": 200
+    },
+    {
+      "job_state": "running",
+      "listing_seconds": 0.04699999999996862,
+      "range": {
+        "status": 206,
+        "size": 2048
+      },
+      "health": 200
+    },
+    {
+      "job_state": "running",
+      "listing_seconds": 0.03100000000000591,
+      "range": {
+        "status": 206,
+        "size": 2048
+      },
+      "health": 200
+    },
+    {
+      "job_state": "running",
+      "listing_seconds": 0.03100000000000591,
+      "range": {
+        "status": 206,
+        "size": 2048
+      },
+      "health": 200
+    },
+    {
+      "job_state": "running",
+      "listing_seconds": 0.031999999999982265,
+      "range": {
+        "status": 206,
+        "size": 2048
+      },
+      "health": 200
+    },
+    {
+      "job_state": "running",
+      "listing_seconds": 0.031999999999982265,
+      "range": {
+        "status": 206,
+        "size": 2048
+      },
+      "health": 200
+    },
+    {
+      "job_state": "running",
+      "listing_seconds": 0.03100000000000591,
+      "range": {
+        "status": 206,
+        "size": 2048
+      },
+      "health": 200
+    },
+    {
+      "job_state": "running",
+      "listing_seconds": 0.047000000000025466,
+      "range": {
+        "status": 206,
+        "size": 2048
+      },
+      "health": 200
+    },
+    {
+      "job_state": "running",
+      "listing_seconds": 0.03100000000000591,
+      "range": {
+        "status": 206,
+        "size": 2048
+      },
+      "health": 200
+    },
+    {
+      "job_state": "running",
+      "listing_seconds": 0.031999999999982265,
+      "range": {
+        "status": 206,
+        "size": 2048
+      },
+      "health": 200
+    },
+    {
+      "job_state": "running",
+      "listing_seconds": 0.016000000000019554,
+      "range": {
+        "status": 206,
+        "size": 2048
+      },
+      "health": 200
+    }
+  ],
+  "directory_latency_max_seconds": 0.016000000000019554,
+  "traced_python_peak_bytes": 5201279,
+  "elapsed_seconds": 12.219,
+  "browser_file_import": {
+    "name": "large.mp3",
+    "size": 36003047,
+    "sha256": "5290644423606fb8ad780e78b9c228d52754df67847801fee350022704126982"
+  }
+}
