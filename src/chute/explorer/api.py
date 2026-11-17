@@ -323,12 +323,13 @@ class ExplorerAPI:
                         value = external_action(self.engine,body['command'],**args)
                     result = {'state':'completed','result':value}
                 elif body["command"] == "media_source":
-                    if not getattr(self,'media_allowed',True):raise ExplorerError('MEDIA_CONSENT_REQUIRED','Enable Allow movie media playback in Settings → Folder Access for this approved folder.')
                     args = body.get("args", {})
                     if set(args) != {"handle", "identity"} or not all(isinstance(value,str) for value in args.values()):
                         raise ExplorerError("INVALID_ARGUMENT", "A file handle and identity are required.")
                     with self.engine.lock:
                         grant = self.engine.grant_for(args["handle"])
+                        saved_scope=getattr(self,'store_only',False) or grant in getattr(self,'saved_grants',{}).values()
+                        if not saved_scope and not getattr(self,'media_allowed',True):raise ExplorerError('MEDIA_CONSENT_REQUIRED','Enable Allow movie media playback in Settings → Folder Access for this approved folder.')
                         with grant.open(args["handle"]) as fd:
                             row = self.engine._record(grant, grant.parts(args["handle"]), os.fstat(fd), fd=fd)
                         if row["identity"] != args["identity"]:
@@ -344,7 +345,7 @@ class ExplorerAPI:
                             if self.media[key]["expires"]<=time.monotonic():self.media.pop(key,None)
                         if len(self.media) >= 32:
                             raise ExplorerError("BUSY", "Close an unused media preview before opening another.")
-                        self.media[ticket] = {"file":args, "expires":expiry, "revoked":False}
+                        self.media[ticket] = {"file":args, "expires":expiry, "revoked":False,"permission_scope":"saved_store" if saved_scope else "approved_folder"}
                     self.media_events.append({"event":"issued","at":time.monotonic()})
                     result = {"state":"completed", "result":{"url":"/api/explorer/v1/media/" + ticket,
                         "ticket":ticket,"expires_in":max(0,int(expiry-time.monotonic())),"mime":row["mime"],"size":row["size"],"range":True}}

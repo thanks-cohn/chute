@@ -136,6 +136,7 @@
         };
         body.replaceChildren(video); return;
       }
+      body.textContent='Preview unavailable for this media format. Use Reveal / GO TO to locate the file; browser codec support varies.';
     }catch(error){if(id===pinnedId)body.textContent=error.message;}
   }
   function isMedia(row){return /^(video|audio)\//.test(row.mime||'')||/\.(mp4|webm|mp3|m4a|wav|flac|oga)$/i.test(row.name||'');}

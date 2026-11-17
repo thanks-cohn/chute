@@ -1,7 +1,7 @@
 """Real Chromium UX fixture; Chrome enrollment mocked, real worker/guarded files.
 This is NOT owner-installed Windows acceptance or native clipboard testing.
 """
-import importlib.util,io,json,os,shutil,sys,tempfile,threading
+import importlib.util,io,json,mimetypes,os,shutil,sys,tempfile,threading
 from pathlib import Path
 ROOT=Path(__file__).resolve().parents[1];sys.path.insert(0,str(ROOT/'src'))
 spec=importlib.util.spec_from_file_location('fixture',ROOT/'scripts/verify-development1-browser.py');f=importlib.util.module_from_spec(spec);spec.loader.exec_module(f)
@@ -17,6 +17,7 @@ def main():
  with tempfile.TemporaryDirectory(prefix='chutey-p0-ux-') as temp:
   root=Path(temp);approved=root/'approved';approved.mkdir();store=Store(root/'store')
   for i,color in enumerate(('red','green','blue')):Image.new('RGB',(280,150),color).save(approved/('%02d-image.png'%i))
+  (approved/'unsupported.mkv').write_bytes(b'not a supported media stream');mimetypes.add_type('video/x-matroska','.mkv')
   item=store.add_stream('saved.txt',io.BytesIO(b'kept original'),13,mime='text/plain')
   baseline={p:p.read_bytes() for p in store.history_dir.iterdir()}
   session=Session(f.f.ORIGIN);engine=Explorer([RootGrant(approved)])
@@ -66,7 +67,7 @@ def main():
     page.locator('[data-file-preference=chuteyOpenTarget]').select_option('chutey')
     page.locator('.chutey-presentation-options > summary').click()
     page.get_by_role('tab',name='File Explorer',exact=True).click()
-    expect(page.locator('.ex-row')).to_have_count(3)
+    expect(page.locator('.ex-row')).to_have_count(4)
     for width,height in ((390,700),(300,400)):
      page.set_viewport_size({'width':width,'height':height})
      page.locator('.ex-row',has_text='00-image.png').dblclick()
@@ -88,6 +89,10 @@ def main():
      page.keyboard.press('Escape');expect(menu).not_to_be_visible()
      image.click();page.keyboard.press('ArrowLeft');expect(page.locator('.ex-preview strong')).to_have_text('01-image.png')
      page.get_by_role('button',name='Close preview',exact=True).click()
+    page.locator('.ex-row',has_text='unsupported.mkv').click(button='right')
+    page.get_by_role('menuitem',name='Preview',exact=True).click()
+    expect(page.locator('.ex-pinned-body')).to_contain_text('Preview unavailable for this media format')
+    expect(page.locator('.ex-pinned-body video,.ex-pinned-body audio')).to_have_count(0)
     assert not errors,errors
     report={'scope':'Real browser and guarded worker; native Chrome enrollment mocked','settings':'restore scoped to UI/performance, first-use system action defaults, explicit Chutey preserved, persisted toolbar setting','performance_modes':'worker acknowledgements for Efficiency/Balanced/Turbo in popup and Shelf','folder_access':'hit-tested top layer above expanded preview at 390x700 and 300x400, controls clickable, Escape closes','keyboard':'image center click Right/Right/Left and after expand, no extra arrow button click','data':'History, original bytes and unrelated grants/credential sentinel unchanged'}
     (out/'results.json').write_text(json.dumps(report,indent=2));print(json.dumps(report,indent=2));browser.close()

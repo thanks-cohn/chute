@@ -117,8 +117,10 @@ class NativeConsentTests(unittest.TestCase):
         self.controller.state(ORIGIN,'media_policy_set',{'allowed':True})
         self.assertTrue(consent.value['media_allowed'])
         adapter.media['synthetic']={'revoked':False}
+        adapter.media['saved']={'revoked':False,'permission_scope':'saved_store'}
         self.controller.state(ORIGIN,'media_policy_set',{'allowed':False})
         self.assertTrue(adapter.media['synthetic']['revoked'])
+        self.assertFalse(adapter.media['saved']['revoked'])
         self.assertEqual(next(iter(adapter.engine.grants)),original_grant)
         self.assertFalse(next(iter(adapter.engine.grants.values())).writable)
         # Restart with an actual pre-policy descriptor. Preserve its existing
@@ -131,3 +133,12 @@ class NativeConsentTests(unittest.TestCase):
         self.assertTrue(policy['allowed'] and policy['migrated'])
         self.assertTrue(consent.value['media_policy_migrated'])
         self.assertTrue(restored['read_only'])
+
+    def test_saved_store_scope_does_not_accept_external_folder_playback_policy(self):
+        from chute.store import Store
+        self.controller=NativeExplorer(store=False,saved_store=Store(self.root/'saved-store'))
+        scope=self.controller.action(ORIGIN,select=False)
+        self.assertEqual(scope['scope'],'saved_store')
+        with self.assertRaises(ExplorerError) as rejected:self.controller.state(ORIGIN,'media_policy_set',{'allowed':False})
+        self.assertEqual(rejected.exception.code,'NATIVE_CONSENT_REQUIRED')
+        self.assertTrue(self.controller.state(ORIGIN,'media_policy_get',{})['allowed'])

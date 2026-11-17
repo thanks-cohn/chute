@@ -32,6 +32,17 @@ class ContinuationTests(base.MediaAPITests):
         from urllib.error import HTTPError
         with self.assertRaises(HTTPError):self.request(source['url'])
 
+    def test_external_folder_opt_out_does_not_disable_saved_history_media(self):
+        self.adapter.media_allowed=False
+        from urllib.error import HTTPError
+        with self.assertRaises(HTTPError):self.source()
+        saved=self.server.store.add_stream('saved.mp4',io.BytesIO(b'saved movie bytes'),17,mime='video/mp4')
+        row=self.command('locate_saved',{'id':saved.id})
+        source=self.command('media_source',{key:row[key] for key in ('handle','identity')})
+        with self.request(source['url'],headers={'Range':'bytes=0-4'}) as response:self.assertEqual(response.read(),b'saved')
+        self.assertEqual(self.adapter.media[source['ticket']]['permission_scope'],'saved_store')
+
+
 def test_presets_distinct_persist_adapt_and_reserved_control(tmp_path):
     p=Performance(Store(tmp_path));assert p.mode=='balanced'
     with patch.object(p,'hardware',return_value={'available_memory_bytes':4*1024**3,'cpu_count':8,'low_memory':False}):

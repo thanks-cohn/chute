@@ -175,13 +175,15 @@ class NativeExplorer:
         with self.lock, adapter.engine.lock:
             if command in {'media_policy_get','media_policy_set'}:
                 if command=='media_policy_set':
+                    if getattr(adapter,'store_only',False):raise ExplorerError('NATIVE_CONSENT_REQUIRED','This playback choice applies to an approved external folder. Saved History media retains its existing access.')
                     if set(args)!={'allowed'} or type(args['allowed']) is not bool:raise ExplorerError('INVALID_ARGUMENT','A playback checkbox value is required.')
                     descriptor={**self.descriptors.get(origin,{}),'media_allowed':args['allowed'],'media_policy_version':1,'media_policy_migrated':False}
                     if self.store and not getattr(adapter,'store_only',False):self.store.save(origin,descriptor)
                     self.descriptors[origin]=descriptor;adapter.media_allowed=args['allowed']
                     if not args['allowed']:
                         with adapter.media_lock:
-                            for source in adapter.media.values():source['revoked']=True
+                            for source in adapter.media.values():
+                                if source.get('permission_scope')!='saved_store':source['revoked']=True
                 return {'allowed':getattr(adapter,'media_allowed',True),'scope':'saved_store' if getattr(adapter,'store_only',False) else 'approved_folder','migrated':self.descriptors.get(origin,{}).get('media_policy_migrated',False)}
             if getattr(adapter,'store_only',False):
                 if command=='remember_location':return {'remembered':False,'reason':'SAVED_STORE_SCOPE'}
