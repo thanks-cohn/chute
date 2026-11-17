@@ -58,6 +58,22 @@ Shelf keeps one active pinned player independent of list refresh, parent/back/fo
 
 `media_status.original_get` takes priority over a subsequent HEAD when diagnosing a player error. It records only status, safe error code and whether Origin was present. A 403 does not alone prove that the folder was revoked. Known categories include UNAUTHORIZED, INVALID_HOST, STREAM_EXPIRED, FILE_CHANGED, EXPLORER_DISABLED, BUSY, decode failure, browser cancellation and disconnect. After headers have been sent, stream truncation cannot change the prior HTTP status; authenticated diagnostics distinguish late lease/revocation failure.
 
+### Chrome media Origin transport
+
+The paired Windows/Chrome 156 test reproduced media GET and HEAD failures with
+HTTP 403 and an omitted Origin. Crossorigin=anonymous alone did not ensure this
+header on privileged extension requests. The TEST extension now requests
+`declarativeNetRequestWithHostAccess` and installs one session header rule: only
+this extension's initiator, GET/HEAD, exact `127.0.0.1:17891`, and the scoped
+`/api/explorer/v1/media/<ticket>` path. The rule supplies the exact extension
+Origin. Website initiators, other hosts/ports and general APIs do not match.
+The worker continues rejecting missing/foreign Origin and validates the ticket,
+lease, file identity and root authority. Scripts still supply their explicitly
+enrolled Origin normally. No Origin query parameter or broad bearer URL exists.
+The extension waits for a background acknowledgment before issuing media access.
+Review the new TEST extension permission when loading it in an isolated profile;
+no existing owner extension is silently upgraded.
+
 ## Approved-session examples
 
 The caller must already have an enrolled session, securely injected into its process environment; these examples do not bypass native consent or introduce independent client enrollment.

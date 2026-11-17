@@ -338,7 +338,7 @@
       "get": {
         "summary": "Authorized file-specific media bytes with single HTTP range support",
         "security": [],
-        "description": "The opaque single-file read ticket is minted with authenticated media_source. Exact enrolled Origin and loopback Host remain mandatory. Lease lasts 120 seconds; authenticated renew_media extends it without replacing the URL. General session expiry does not revoke a continuing lease; explicit grant revocation, release, identity change and lease expiry stop reads. No general bearer token in URL. Archived workers do not implement continuation.",
+        "description": "The opaque single-file read ticket is minted with authenticated media_source. Exact enrolled Origin and loopback Host remain mandatory. Lease lasts 120 seconds; authenticated renew_media extends it without replacing the URL. General session expiry does not revoke a continuing lease; explicit grant revocation, release, identity change and lease expiry stop reads. No general bearer token in URL. Archived workers do not implement continuation. Chrome extension media transport restores the exact extension Origin using an initiator- and endpoint-scoped DNR session rule; websites and general API requests do not match. See P0-NATIVE-API-2026-11-17.md.",
         "parameters": [
           {
             "$ref": "#/components/parameters/Origin"
@@ -408,7 +408,7 @@
       "head": {
         "summary": "Authorized file-specific media metadata without response body; Range ignored",
         "security": [],
-        "description": "The opaque single-file read ticket is minted with authenticated media_source. Exact enrolled Origin and loopback Host remain mandatory. Lease lasts 120 seconds; authenticated renew_media extends it without replacing the URL. General session expiry does not revoke a continuing lease; explicit grant revocation, release, identity change and lease expiry stop reads. No general bearer token in URL. Archived workers do not implement continuation.",
+        "description": "The opaque single-file read ticket is minted with authenticated media_source. Exact enrolled Origin and loopback Host remain mandatory. Lease lasts 120 seconds; authenticated renew_media extends it without replacing the URL. General session expiry does not revoke a continuing lease; explicit grant revocation, release, identity change and lease expiry stop reads. No general bearer token in URL. Archived workers do not implement continuation. Chrome extension media transport restores the exact extension Origin using an initiator- and endpoint-scoped DNR session rule; websites and general API requests do not match. See P0-NATIVE-API-2026-11-17.md.",
         "parameters": [
           {
             "$ref": "#/components/parameters/Origin"

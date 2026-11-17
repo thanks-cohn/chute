@@ -118,6 +118,7 @@ def generate(folder,seconds):
         directory=folder/f'branch-{branch:02}';directory.mkdir()
         for i in range(24):Image.new('RGB',(320,180),((branch*31)%255,(i*9)%255,90)).save(directory/f'image-{i:03}.png')
         (directory/'document.txt').write_text('literal document lines\n'*1000,encoding='utf-8')
+    for suffix in ('png','jpg','webp'):Image.new('RGB',(40,30),(40,120,200)).save(folder/('clipboard-pixels.'+suffix))
     (folder/'destination').mkdir()
     with (folder/'copy-source.bin').open('wb') as stream:
         for i in range(64):stream.write(bytes([i])*1024*1024)
@@ -280,14 +281,46 @@ def run(args):
                         values=page.evaluate(BURST_JS,{'width':width,'root':root_handle,'thumbnail':None});mode_record['widths'].append({'width':width,'latency':summary([v['ms'] for v in values]),'errors':dict(Counter(v.get('code') for v in values if not v['ok']))})
                 assert len({json.dumps(v['ack'].get('effective_limits'),sort_keys=True) for v in report['bursts']})>1,'Performance modes must apply distinct budgets'
                 command(page,'performance_set',{'mode':'balanced'})
+                if installed:
+                    # Actual Chrome GUI -> packaged native clipboard -> same
+                    # guarded job engine. No direct clipboard API shortcut here.
+                    source_row=page.locator('.ex-row').filter(has=page.locator('.ex-name',has_text='copy-source.bin'))
+                    source_row.click(button='right');expect(page.get_by_role('menuitem',name='Copy',exact=True)).to_have_count(1)
+                    page.get_by_role('menuitem',name='Copy inside Chutey',exact=True).click()
+                    source_row.click();page.keyboard.press('Control+c')
+                    expect(page.locator('.ex-status')).to_contain_text('to Windows clipboard')
+                    page.locator('.ex-row').filter(has=page.locator('.ex-name',has_text='destination')).dblclick()
+                    clipboard_checks=[]
+                    for index in range(3):
+                        if index<2:page.locator('[data-copy=paste]').click()
+                        else:
+                            page.locator('.ex-list').click(button='right',position={'x':3,'y':3})
+                            page.get_by_role('menuitem',name='Paste inside Chutey',exact=True).click()
+                        filename='copy-source.bin' if index==0 else f'copy-source ({index}).bin'
+                        expect(page.locator('.ex-name').filter(has_text=filename)).to_be_visible(timeout=30000)
+                        assert digest(approved/'destination'/filename)==digest(approved/'copy-source.bin')
+                        pending=page.evaluate('async()=> (await chrome.storage.local.get({chuteyPendingTransfer:null})).chuteyPendingTransfer')
+                        assert pending is None,'A verified GUI copy left its pending marker'
+                        clipboard_checks.append({'operation':'Windows clipboard Paste' if index<2 else 'Copy/Paste inside Chutey','state':'PASS','bytes':67108864,'sha256':digest(approved/'destination'/filename)})
+                    page.get_by_role('button',name='Parent folder',exact=True).click()
+                    expect(page.locator('.ex-breadcrumb')).not_to_contain_text('destination')
+                    from PIL import ImageGrab
+                    for suffix in ('png','jpg','webp'):
+                        row=page.locator('.ex-row').filter(has=page.locator('.ex-name',has_text='clipboard-pixels.'+suffix))
+                        row.click(button='right');page.get_by_role('menuitem',name='Copy image pixels to Windows clipboard',exact=True).click()
+                        expect(page.locator('.ex-status')).to_contain_text('Copied image pixels')
+                        image=ImageGrab.grabclipboard();assert isinstance(image,Image.Image),'GUI clipboard contained a file list instead of image pixels'
+                        pixel=image.convert('RGB').getpixel((10,10));assert all(abs(a-b)<=3 for a,b in zip(pixel,(40,120,200)))
+                        clipboard_checks.append({'operation':'Chrome '+suffix+' pixel Copy -> independent Windows clipboard image read','state':'PASS','pixel':pixel})
+                    report['installed_gui_clipboard']=clipboard_checks;save()
                 preview(page,'movie.mp4');main=page.locator('.ex-pinned-body video')
                 try:
-                    expect(main).to_be_visible();page.wait_for_function('document.querySelector(".ex-pinned-body video")?.readyState>=1')
+                    expect(main).to_be_visible();page.wait_for_function('()=>document.querySelector(".ex-pinned-body video")?.readyState>=1')
                 except Exception:
                     report['startup_playback_status']=page.locator('.ex-pinned-player').inner_text()[:300]
                     report['media_diagnostics']=command(page,'media_diagnostics')
                     page.screenshot(path=str(out/'playback-start-failed.png'));save();raise
-                popup.goto(entry+'/popup.html');popup.locator('#popup-local-toggle').click();popup.get_by_role('button',name='▶ movie.webm',exact=True).click();second=popup.locator('.chutey-lightbox-player video');expect(second).to_be_visible();popup.wait_for_function('document.querySelector(".chutey-lightbox-player video")?.readyState>=1')
+                popup.goto(entry+'/popup.html');popup.locator('#popup-local-toggle').click();popup.get_by_role('button',name='▶ movie.webm',exact=True).click();second=popup.locator('.chutey-lightbox-player video');expect(second).to_be_visible();popup.wait_for_function('()=>document.querySelector(".chutey-lightbox-player video")?.readyState>=1')
                 for media in (main,second):media.evaluate(INSTALL_OBSERVERS);media.evaluate('n=>{n.muted=true;return n.play()}')
                 started=time.monotonic();last_times=[0,0];stalled_since=[None,None];iteration=0;latencies=[];copy_jobs=[];mode_history=[];last_copy=-999;branch_open=False
                 while time.monotonic()-started<args.seconds:
@@ -339,10 +372,11 @@ def run(args):
                     iteration+=1;page.wait_for_timeout(1500)
                 report['wall_seconds']=round(time.monotonic()-started,3);report['navigation']=summary(latencies);report['mode_history']=mode_history
                 for name,media,surface in [('mp4',main,page),('webm',second,popup)]:
-                    assert not media.evaluate('n=>n.error');media.evaluate('n=>{n.currentTime=n.duration-1;return n.play()}');surface.wait_for_function('window.__p0PinnedNode?.ended',timeout=20000)
+                    assert not media.evaluate('n=>n.error');media.evaluate('n=>{n.currentTime=n.duration-1;return n.play()}');surface.wait_for_function('()=>window.__p0PinnedNode?.ended',timeout=20000)
                     report[name]={'final':media.evaluate(MEDIA_STATE),'events':surface.evaluate('window.__p0Events'),'long_tasks':summary(surface.evaluate('window.__p0LongTasks'))}
+                    report[name]['worker_authorization']=surface.evaluate('async()=>ChuteyExplorerAPI.command("media_status",{ticket:new URL(window.__p0PinnedNode.src).pathname.split("/").pop()})')
                     surface.screenshot(path=str(out/(name+'-end.png')))
-                report['http_media_requests']=list(server.media_requests);report['http_statuses']=dict(Counter(str(r['status']) for r in server.media_requests));report['copy_jobs']=[{k:v for k,v in j.items() if k not in {'id','receipt'}} for j in copy_jobs]
+                report['network_origin_note']='Playwright request headers may precede DNR; worker_authorization records the server-observed Origin.';report['http_media_requests']=list(server.media_requests);report['http_statuses']=dict(Counter(str(r['status']) for r in server.media_requests));report['copy_jobs']=[{k:v for k,v in j.items() if k not in {'id','receipt'}} for j in copy_jobs]
                 assert not page_errors,page_errors;assert not any(r['status']>=400 for r in server.media_requests),report['http_statuses'];assert report['wall_seconds']>=args.seconds
                 report['result']='PASS';report['endurance_gate']='30-minute elapsed gate passed' if args.seconds>=1800 else 'SMOKE ONLY: not a 30-minute acceptance';report['browser']=context.browser.version if context.browser else browser.version;report['platform']=sys.platform;save();print(json.dumps({k:v for k,v in report.items() if k not in {'samples','http_media_requests'}},indent=2))
         except Exception as error:
