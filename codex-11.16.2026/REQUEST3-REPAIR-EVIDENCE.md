@@ -190,3 +190,17 @@ The native-to-Live GUI copy now emits the shared count-change event after
 COMMITTED, just like other verified saves. A transport regression exercises
 accepted→running→COMMITTED and verifies failed/uncertain jobs never broadcast
 success. This prevents waiting for the broker's bounded fallback polling interval.
+
+The subsequent Windows gate passed the previous four cases but exposed a too-short
+three-second HTTP job test and teardown racing its still-running owned writer.
+It failed before packaging (no candidate binaries published). The test now waits
+for terminal status using a 30-second deadline and joins its own job before
+removing disposable data. Receipt fsync runs OUTSIDE the status lock, retaining
+RUNNING/committing_receipt and responsive status/cancellation until durable commit;
+terminal publication and capacity release remain atomic. The delayed-write test
+verifies both responsiveness and absence of early COMMITTED.
+
+Merely marking an NTFS file sparse was insufficient: Windows CRT truncate can
+still zero-fill it. The fixture now uses SetFilePointerEx/SetEndOfFile after the
+sparse flag, and asserts GetCompressedFileSize reports under 1 MiB allocated for
+the logical 3-GiB range source. These are disposable test-only operations.

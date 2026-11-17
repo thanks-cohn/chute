@@ -21,17 +21,25 @@ class MediaAPITests(unittest.TestCase):
         self.root = Path(self.temp.name)
         self.file = self.root/'movie.webm'
         with self.file.open('wb') as file:
+            file.write(b'0123456789');file.flush()
             if os.name=='nt':
-                # NTFS truncate alone allocates/zeroes gigabytes. Explicitly
-                # mark this OWNED temporary fixture sparse before extending it.
+                # CRT truncate zero-fills on Windows even for a sparse file.
+                # Use native sparse EOF for this OWNED temporary 3-GiB fixture.
                 import ctypes,msvcrt
                 from ctypes import wintypes as W
-                ioctl=ctypes.WinDLL('kernel32',use_last_error=True).DeviceIoControl
+                kernel=ctypes.WinDLL('kernel32',use_last_error=True);handle=msvcrt.get_osfhandle(file.fileno())
+                ioctl=kernel.DeviceIoControl
                 ioctl.argtypes=[W.HANDLE,W.DWORD,ctypes.c_void_p,W.DWORD,ctypes.c_void_p,W.DWORD,ctypes.POINTER(W.DWORD),ctypes.c_void_p];ioctl.restype=W.BOOL
                 returned=W.DWORD()
-                if not ioctl(msvcrt.get_osfhandle(file.fileno()),0x900C4,None,0,None,0,ctypes.byref(returned),None):raise ctypes.WinError(ctypes.get_last_error())
-            file.write(b'0123456789')
-            file.truncate(3*1024**3) # sparse, never materialized in RAM or copied
+                if not ioctl(handle,0x900C4,None,0,None,0,ctypes.byref(returned),None):raise ctypes.WinError(ctypes.get_last_error())
+                seek=kernel.SetFilePointerEx;seek.argtypes=[W.HANDLE,ctypes.c_longlong,ctypes.c_void_p,W.DWORD];seek.restype=W.BOOL
+                end=kernel.SetEndOfFile;end.argtypes=[W.HANDLE];end.restype=W.BOOL
+                if not seek(handle,3*1024**3,None,0) or not end(handle):raise ctypes.WinError(ctypes.get_last_error())
+            else:file.truncate(3*1024**3)
+        if os.name=='nt':
+            allocated=kernel.GetCompressedFileSizeW;allocated.argtypes=[W.LPCWSTR,ctypes.POINTER(W.DWORD)];allocated.restype=W.DWORD
+            high=W.DWORD();low=allocated(str(self.file),ctypes.byref(high))
+            self.assertLess((high.value<<32)|low,1024*1024,'Logical 3-GiB fixture must allocate less than 1 MiB')
         self.engine = Explorer([RootGrant(self.root)])
         self.session = Session(ORIGIN)
         self.server = ChuteServer(('127.0.0.1',0),Store(self.root/'history'))
@@ -44,6 +52,12 @@ class MediaAPITests(unittest.TestCase):
         self.row = next(row for row in self.engine.execute('list',handle=root)['result']['entries'] if row['name']=='movie.webm')
     def tearDown(self):
         self.server.shutdown(); self.server.server_close(); self.thread.join()
+        if self.adapter.jobs:
+            for job in list(self.adapter.jobs.jobs.values()):
+                thread=job.get('thread')
+                if thread and thread.is_alive():
+                    self.adapter.jobs.cancel(job['id']);thread.join(timeout=30)
+                    self.assertFalse(thread.is_alive(),'Owned test copy did not release its resources')
         self.engine.close(); self.temp.cleanup()
     def request(self,path,body=None,headers=None,method=None):
         return self.opener.open(Request(self.base+path,
@@ -203,9 +217,11 @@ class MediaAPITests(unittest.TestCase):
         self.assertIsNone(self.adapter.jobs)
         job=self.command('transfer_start',args)
         import time
-        for _ in range(300):
-            if job['state'] not in {'accepted','running'}:break
-            time.sleep(.01);job=self.command('transfer_status',{'id':job['id']})
+        deadline=time.monotonic()+30
+        while job['state'] in {'accepted','running'} and time.monotonic()<deadline:
+            time.sleep(.03);job=self.command('transfer_status',{'id':job['id']})
+        if job['state']!='COMMITTED':
+            import faulthandler;faulthandler.dump_traceback()
         self.assertEqual(job['state'],'COMMITTED')
         self.assertEqual(job['receipt']['file']['id'],'c'*32)
         self.assertEqual(self.server.store.get('c'*32)[1].read_bytes(),b'actual copy')

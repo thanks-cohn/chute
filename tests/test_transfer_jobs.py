@@ -79,7 +79,7 @@ def test_unauthorized_changed_and_interrupted_receipts(fixture):
 
 def test_terminal_state_and_capacity_publish_after_durable_receipt(fixture,monkeypatch):
     source,target,engine,api,store,jobs,row,destination=fixture
-    entered=threading.Event();release=threading.Event();observed=threading.Event();result=[]
+    entered=threading.Event();release=threading.Event()
     persist=jobs._persist
     def delayed(j):
         if j['state']=='COMMITTED':entered.set();assert release.wait(5)
@@ -87,13 +87,9 @@ def test_terminal_state_and_capacity_publish_after_durable_receipt(fixture,monke
     monkeypatch.setattr(jobs,'_persist',delayed)
     first=start(jobs,api,kind='local_to_live',handle=row['handle'],identity=row['identity'])
     assert entered.wait(10)
-    def client():
-        try:
-            result.append(jobs.status(first['id']))
-            result.append(start(jobs,api,kind='local_copy',handle=row['handle'],identity=row['identity'],destination=destination))
-        finally:observed.set()
-    thread=threading.Thread(target=client);thread.start()
-    assert not observed.wait(.05),'Terminal receipt cannot escape before its durable commit'
-    release.set();assert observed.wait(10);thread.join()
-    assert result[0]['state']=='COMMITTED' and result[1]['state'] in {'accepted','running'}
-    jobs.cancel(result[1]['id']);wait(jobs,result[1])
+    before=time.monotonic();pending=jobs.status(first['id'])
+    assert pending['state']=='running' and pending['phase']=='committing_receipt'
+    assert time.monotonic()-before<.5,'Status must stay responsive during slow durable receipt writes'
+    release.set();finished=wait(jobs,first);assert finished['state']=='COMMITTED'
+    second=start(jobs,api,kind='local_copy',handle=row['handle'],identity=row['identity'],destination=destination)
+    jobs.cancel(second['id']);wait(jobs,second)

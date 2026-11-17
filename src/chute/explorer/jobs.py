@@ -49,16 +49,19 @@ class TransferJobs:
             try:self._persist(j)
             except OSError:raise ExplorerError('NO_SPACE','Cannot persist a transfer intent. Check free disk space before retrying.')
             self.jobs[ident]=j;self.active=ident
-            threading.Thread(target=self._run,args=(j,),daemon=True).start();return self.status(ident)
+            thread=threading.Thread(target=self._run,args=(j,),daemon=True);j['thread']=thread
+            thread.start();return self.status(ident)
 
     def _finish(self,j,state,**values):
-        # Publish a terminal state and release capacity in ONE critical section,
-        # only after its receipt is durable. Slow Windows fsync exposed a race
-        # where clients saw COMMITTED while the queue still reported BUSY.
+        # fsync may be slow on Windows: keep status/cancellation responsive and
+        # report RUNNING until durable commit. Publish terminal state and free
+        # capacity together, so a completed receipt never leaves spurious BUSY.
         with self.lock:
+            j['phase']='committing_receipt'
             final={**j,**values,'state':state}
-            try:self._persist(final)
-            except OSError:final.update(state='UNCERTAIN',error='Receipt persistence failed. Inspect the destination before retrying.')
+        try:self._persist(final)
+        except OSError:final.update(state='UNCERTAIN',error='Receipt persistence failed. Inspect the destination before retrying.')
+        with self.lock:
             j.update(final)
             if self.active==j['id']:self.active=None
 
