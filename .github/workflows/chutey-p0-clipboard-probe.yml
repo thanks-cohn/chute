@@ -1,0 +1,28 @@
+name: P0 real Windows clipboard application diagnostic
+on:
+  push:
+    branches: [fix/chutey-media-worker-2026-11-17]
+    paths: [scripts/verify-windows-clipboard-ui.py, .github/workflows/chutey-p0-clipboard-probe.yml]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  clipboard:
+    runs-on: windows-latest
+    timeout-minutes: 10
+    env:
+      PYTHONPATH: src
+      PYTHONIOENCODING: utf-8
+      CHUTE_QUIET: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install -e . Pillow==13.0.0
+      - run: python scripts/verify-windows-clipboard-ui.py dist/p0-clipboard-apps
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: P0-clipboard-apps-${{ github.sha }}-${{ github.run_id }}
+          path: dist/p0-clipboard-apps/

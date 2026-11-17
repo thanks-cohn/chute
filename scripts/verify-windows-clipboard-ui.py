@@ -7,6 +7,7 @@ production Chutey store. Failure to focus/find an owned test window fails clearl
 from __future__ import annotations
 import ctypes,hashlib,json,os,subprocess,sys,tempfile,time,threading,uuid
 from urllib.request import Request,ProxyHandler,build_opener
+from urllib.error import HTTPError
 from ctypes import wintypes as W
 from pathlib import Path
 ROOT=Path(__file__).resolve().parents[1];sys.path.insert(0,str(ROOT/'src'))
@@ -68,6 +69,24 @@ def open_folder(path,owned):
     win=wait_for(lambda:next((w for w in windows() if w['hwnd'] not in before and w['class']=='CabinetWClass' and path.name in w['title']),None),'Could not find the owned Explorer test folder')
     owned.add(win['hwnd']);focus(win['hwnd']);return win['hwnd']
 
+def select_owned_file(hwnd,name):
+    """Focus the exact file item, not Explorer's address/navigation pane."""
+    env={**os.environ,'CHUTE_TEST_EXPLORER_HWND':str(hwnd),'CHUTE_TEST_EXPLORER_NAME':name,'CHUTE_TEST_EXPLORER_STEM':Path(name).stem}
+    script=r'''
+    Add-Type -AssemblyName UIAutomationClient
+    $view=[System.Windows.Automation.AutomationElement]::FromHandle([intptr][int64]$env:CHUTE_TEST_EXPLORER_HWND)
+    $condition=New-Object System.Windows.Automation.PropertyCondition([System.Windows.Automation.AutomationElement]::ControlTypeProperty,[System.Windows.Automation.ControlType]::ListItem)
+    $deadline=[DateTime]::UtcNow.AddSeconds(10)
+    do {
+      $item=$view.FindAll([System.Windows.Automation.TreeScope]::Descendants,$condition) | Where-Object { -not $_.Current.IsOffscreen -and ($_.Current.Name -eq $env:CHUTE_TEST_EXPLORER_NAME -or $_.Current.Name -eq $env:CHUTE_TEST_EXPLORER_STEM) } | Select-Object -First 1
+      if ($item) { $item.SetFocus();$item.GetCurrentPattern([System.Windows.Automation.SelectionItemPattern]::Pattern).Select();exit 0 }
+      Start-Sleep -Milliseconds 100
+    } while ([DateTime]::UtcNow -lt $deadline)
+    throw 'Could not focus the exact file in the owned Explorer test window'
+    '''
+    result=subprocess.run(['powershell.exe','-NoProfile','-NonInteractive','-Command',script],env=env,stdout=subprocess.PIPE,stderr=subprocess.PIPE,timeout=20,creationflags=subprocess.CREATE_NO_WINDOW)
+    if result.returncode:raise RuntimeError('Owned Explorer file selection failed; actual Ctrl+C is not verified')
+
 def sha(path):
     with path.open('rb') as stream:return hashlib.file_digest(stream,'sha256').hexdigest()
 
@@ -76,6 +95,7 @@ def main():
     global user
     user=ctypes.WinDLL('user32',use_last_error=True)
     user.GetForegroundWindow.restype=W.HWND
+    user.GetClipboardSequenceNumber.restype=W.DWORD
     user.SetForegroundWindow.argtypes=[W.HWND];user.IsWindowVisible.argtypes=[W.HWND]
     user.GetWindowTextW.argtypes=[W.HWND,W.LPWSTR,ctypes.c_int];user.GetClassNameW.argtypes=[W.HWND,W.LPWSTR,ctypes.c_int]
     user.GetWindowThreadProcessId.argtypes=[W.HWND,ctypes.POINTER(W.DWORD)]
@@ -83,6 +103,9 @@ def main():
     user.keybd_event.argtypes=[ctypes.c_ubyte,ctypes.c_ubyte,W.DWORD,ctypes.c_size_t]
     out=Path(sys.argv[1]) if len(sys.argv)>1 else Path('dist/clipboard-ui-evidence');out.mkdir(parents=True,exist_ok=True)
     report={'scope':'Real authenticated HTTP API + guarded Windows files + actual Paint/Explorer paste; synthetic enrolled session/test grants, no installed Chrome proof','checks':[]}
+    def record(check):
+        report['checks'].append(check)
+        (out/'results.json').write_text(json.dumps(report,indent=2),encoding='utf-8')
     owned=set()
     with tempfile.TemporaryDirectory(prefix='ChuteyClipboardUI-') as temp:
         root=Path(temp);approved=root/'approved';approved.mkdir();target=root/'Explorer Paste Verification';target.mkdir();incoming=root/'Windows Copy Source';incoming.mkdir();native_target=root/'Native Paste Verification';native_target.mkdir()
@@ -96,7 +119,11 @@ def main():
         opener=build_opener(ProxyHandler({}));base=f'http://127.0.0.1:{server.server_port}'
         def command(name,args=None):
             request=Request(base+'/api/explorer/v1/command',json.dumps({'command':name,'args':args or {}}).encode(),{'Origin':origin,'Authorization':'Bearer '+session.token,'Content-Type':'application/json'})
-            with opener.open(request,timeout=30) as response:receipt=json.load(response)
+            try:
+                with opener.open(request,timeout=30) as response:receipt=json.load(response)
+            except HTTPError as error:
+                failure=json.load(error).get('error',{})
+                raise ExplorerError(failure.get('code','HTTP_ERROR'),failure.get('message','Windows clipboard API request failed.')) from None
             assert receipt['state']=='completed',receipt
             return receipt['result']
         def paste(snapshot,destination):
@@ -118,17 +145,22 @@ def main():
             hwnd=open_folder(target,owned);keys(hwnd,0x11,0x56)
             pasted=target/item['name'];wait_for(lambda:pasted.exists(),'Explorer did not paste the native CF_HDROP file')
             assert sha(pasted)==sha(approved/item['name'])
-            report['checks'].append({'operation':'Chutey file Copy -> Windows Explorer Ctrl+V','state':'PASS','sha256':sha(pasted)})
+            record({'operation':'Chutey file Copy -> Windows Explorer Ctrl+V','state':'PASS','sha256':sha(pasted)})
             # The same real OS clipboard also feeds Chutey's authenticated job.
             snapshot=command('clipboard_read_files',{'user_gesture':True})
             receipts=paste(snapshot,roots[1]['handle'])
             assert len(receipts)==1 and receipts[0]['sha256']==sha(approved/item['name'])
-            report['checks'].append({'operation':'Same Chutey file Copy -> Chutey Paste job','state':'PASS','sha256':receipts[0]['sha256']})
+            record({'operation':'Same Chutey file Copy -> Chutey Paste job','state':'PASS','sha256':receipts[0]['sha256']})
             # Windows Explorer -> Chutey: actual Ctrl+C, purpose-limited read and
             # same verified receive engine used by native copy jobs.
-            hwnd=open_folder(incoming,owned);keys(hwnd,0x11,0x41);keys(hwnd,0x11,0x43)
+            hwnd=open_folder(incoming,owned);select_owned_file(hwnd,'é Windows copy.txt')
+            prior_sequence=user.GetClipboardSequenceNumber();keys(hwnd,0x11,0x43)
+            wait_for(lambda:user.GetClipboardSequenceNumber()!=prior_sequence,'Explorer Ctrl+C did not update the Windows clipboard')
             def read_current():
-                try:return command('clipboard_read_files',{'user_gesture':True})
+                try:
+                    snapshot=command('clipboard_read_files',{'user_gesture':True})
+                    if len(snapshot['files'])==1 and snapshot['files'][0]['name']=='é Windows copy.txt':return snapshot
+                    command('clipboard_release',{'snapshot':snapshot['snapshot']});return None
                 except ExplorerError as error:
                     if error.code in {'CLIPBOARD_BUSY','CLIPBOARD_FORMAT_UNAVAILABLE'}:return None
                     raise
@@ -136,7 +168,7 @@ def main():
             assert len(snapshot['files'])==1
             for receipt in paste(snapshot,roots[1]['handle']):
                 assert receipt['sha256']==sha(incoming/receipt['name'])
-                report['checks'].append({'operation':'Windows Explorer Ctrl+C -> Chutey verified Paste','state':'PASS','sha256':receipt['sha256']})
+                record({'operation':'Windows Explorer Ctrl+C -> Chutey verified Paste','state':'PASS','sha256':receipt['sha256']})
             # Three common image formats -> actual Paint Ctrl+V -> saved PNG,
             # verified by decoding canvas pixels, not clipboard filename/URL.
             for suffix in ('png','jpg','webp'):
@@ -151,7 +183,7 @@ def main():
                 with Image.open(output) as decoded:
                     pixel=decoded.convert('RGB').getpixel((10,10))
                     assert all(abs(a-b)<=3 for a,b in zip(pixel,(40,120,200))),(suffix,pixel)
-                report['checks'].append({'operation':suffix+' pixel Copy -> Paint Ctrl+V -> saved PNG','state':'PASS','pixel':pixel,'evidence':output.name})
+                record({'operation':suffix+' pixel Copy -> Paint Ctrl+V -> saved PNG','state':'PASS','pixel':pixel,'evidence':output.name})
                 user.PostMessageW(hwnd,0x10,0,0);owned.discard(hwnd)
             report['state']='PASS'
         finally:
