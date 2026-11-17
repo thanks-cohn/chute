@@ -23,11 +23,13 @@ Repository: `thanks-cohn/chute`
 - Visible **X (close)**, **– (minimize to mascot)** and **□ (maximize/restore)** controls. Users can drag the titlebar to MOVE the window and drag its **edges and corners** to RESIZE height and width. Maintain selection, scroll and functional layouts across sizes. No duplicate windows.
 - **THE ENTIRE PORTABLE EXPLORER WINDOW** (not just the right-click menu) needs the **nostalgic yellow legal-pad aesthetic**: warm yellow paper surfaces, soft brown complementary accents, stationery feel and readable filenames, thumbnails, controls and previews. Preserve familiar file manager capabilities.
 
-### 3. Minimize/rest position and bottom-right summon
+### 3. Minimize/rest position, three mascot visibility modes and bottom-right summon
 - Minimize collapses Explorer into the existing Chutey mascot at the **last saved Drop Off screen position**, not the window's location.
-- After **10 seconds of inactivity**, the collapsed mascot disappears; while active or expanded, no auto-hide.
-- Move mouse to the **bottom-right screen hotspot** to summon Chutey again even if the last Drop Off position is elsewhere. Avoid accidental summoning from general webpage hover.
-- Menus, drag/drop and user interactions pause idle hiding.
+- Maintain the original **mascot-only visibility modes**: **Auto-hide after 10 seconds (default)**; **Always visible** (collapsed mascot never times out); and the existing **right-click-controlled/manual visibility** concept (preserve right-click menu functionality and don't invent global desktop context-menu hooks). The auto-hide mode hides the **collapsed mascot only** after 10 seconds of inactivity, not an Explorer.
+- With **Auto-hide after 10 seconds**, moving the mouse to the consistent **bottom-right screen hotspot** reveals the hidden mascot again at its saved Drop Off position, even if that position is elsewhere. The mascot remains available for **another 10 seconds of inactivity** and then hides again; subsequent hotspot visits repeat this. Avoid accidental summoning from ordinary webpage hover.
+- In the future multi-Chutey phase, this visibility preference belongs to **each individual Chutey**. One visit to the bottom-right hotspot reveals **all eligible hidden auto-hide mascots** together for 10 idle seconds, with independent safe positions; Always visible mascots remain visible. This sentence is **future design clarification only** and does **not** authorize multi-instance implementation in held Development 2.
+- Right-click menus, drag/drop, hover, Pick Me Up/Drop Off, and other active interactions prevent/refresh the mascot idle hide. Right-click must not itself cause mascot disappearance.
+- **ABSOLUTE EXPLORER RULE:** If the native Explorer is expanded, it remains **visible, movable, draggable-droppable and ALWAYS ON TOP indefinitely**. It NEVER auto-hides after 10 seconds, on hotspot arrival/departure, on mouse inactivity, or because a different Chutey is minimized. Only an explicit X/Minimize action changes the corresponding Explorer window. Mascot visibility must not control the expanded window's visibility or z-order.
 
 ### 4. Assign and Make Chutey Location!
 - **Assign** opens compact Chutey Explorer folder chooser to select where drops on the collapsed mascot should save. Until explicitly changed, existing working destination remains.
@@ -47,6 +49,6 @@ Repository: `thanks-cohn/chute`
 
 ## Scope boundary, test and delivery
 - The scope is the **one existing mascot**, its reusable menu, its movable/resizable always-on-top legal-pad Explorer and verified drop destinations. No unrelated future features.
-- Test real Windows always-on-top across Chrome + other apps, titlebar drag, edge/corner resize, X/minimize/maximize/restore, 10s idle timer, bottom-right reveal, folder assignment and individual folder/background/lightbox drops, duplicate avoidance and resource use.
+- Test real Windows always-on-top across Chrome + other apps, titlebar drag, edge/corner resize, X/minimize/maximize/restore, the three mascot-only visibility modes, repeated bottom-right 10s reveals, drag/menu pausing idle hide, **Explorer NEVER auto-hiding or losing topmost when mascot timer expires**, folder assignment and individual folder/background/lightbox drops, duplicate avoidance and resource use.
 - Do not overwrite protected Chute.exe, Chrome extension, files, history, stored images or native registrations. Deliver commit SHA, tests, Windows handoff, limitations.
 - **Even after Development 2 implementation**, owner decides whether it is accepted or deployed.
