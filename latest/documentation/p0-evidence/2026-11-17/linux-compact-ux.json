@@ -1,0 +1,8 @@
+{
+  "scope": "Real browser and guarded worker; native Chrome enrollment mocked",
+  "settings": "restore scoped to UI/performance, first-use system action defaults, explicit Chutey preserved, persisted toolbar setting",
+  "performance_modes": "worker acknowledgements for Efficiency/Balanced/Turbo in popup and Shelf",
+  "folder_access": "hit-tested top layer above expanded preview at 390x700 and 300x400, controls clickable, Escape closes",
+  "keyboard": "image center click Right/Right/Left and after expand, no extra arrow button click",
+  "data": "History, original bytes and unrelated grants/credential sentinel unchanged"
+}

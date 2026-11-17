@@ -2,7 +2,7 @@
 
 **Created:** 2026-11-17  
 **Repository:** `thanks-cohn/chute`  
-**Status:** Implementation specification only — **not coded, merged, built or user-tested**  
+**Status:** Repair candidate implemented and pushed; final paired validation and owner-device acceptance are tracked in `latest/documentation/P0-PHASE-HANDOFF-2026-11-17.md`. No merge, production promotion or owner-installed validation is claimed.  
 **Pinned user-tested candidate:** Development 1 Request 3, source `1cca0406c9a81c658feabc0d7aa57aad4028247f`, Actions run `43996443418`. Confirm the checked-out code and installed exact worker + Chrome extension before diagnosing.
 **Issues:** [#20 Open/Reveal onboarding](https://github.com/thanks-cohn/chute/issues/20), [#21 obsolete preview warning](https://github.com/thanks-cohn/chute/issues/21), [#22 P0 media 403](https://github.com/thanks-cohn/chute/issues/22), [#23 Settings/toolbar](https://github.com/thanks-cohn/chute/issues/23), [#24 Folder Access stacking](https://github.com/thanks-cohn/chute/issues/24), [#25 preview arrow-key focus](https://github.com/thanks-cohn/chute/issues/25), [#26 native clipboard](https://github.com/thanks-cohn/chute/issues/26), [#27 P0 stuck internal copy](https://github.com/thanks-cohn/chute/issues/27), [#28 P0 worker overload/stalls](https://github.com/thanks-cohn/chute/issues/28).
 

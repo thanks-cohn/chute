@@ -1,0 +1,240 @@
+{
+  "source_commit": "1cca0406c9a81c658feabc0d7aa57aad4028247f",
+  "platform": "linux",
+  "python": "3.12.14",
+  "logical_cpus": 5,
+  "listen_backlog": 5,
+  "scope": "In-process guarded HTTP fixture on synthetic files. Two paced byte readers, no browser decoder/native enrollment; not owner-machine or native Windows Explorer acceptance.",
+  "profiles": [
+    {
+      "mode": "request3-fixed",
+      "ack": {
+        "navigation_and_thumbnail_shared": 4,
+        "media": 2,
+        "intake": 1
+      },
+      "bursts": [
+        {
+          "width": 1,
+          "latency": {
+            "count": 3,
+            "p50_ms": 33.593,
+            "p95_ms": 46.629,
+            "p99_ms": 46.629,
+            "worst_ms": 46.629
+          },
+          "by_operation": {
+            "list": {
+              "latency": {
+                "count": 3,
+                "p50_ms": 33.593,
+                "p95_ms": 46.629,
+                "p99_ms": 46.629,
+                "worst_ms": 46.629
+              },
+              "rejected": 0
+            },
+            "search": {
+              "latency": {
+                "count": 0
+              },
+              "rejected": 0
+            },
+            "thumbnail": {
+              "latency": {
+                "count": 0
+              },
+              "rejected": 0
+            },
+            "control": {
+              "latency": {
+                "count": 0
+              },
+              "rejected": 0
+            }
+          },
+          "accepted": 3,
+          "rejected": 0,
+          "errors": []
+        },
+        {
+          "width": 4,
+          "latency": {
+            "count": 12,
+            "p50_ms": 45.932,
+            "p95_ms": 145.652,
+            "p99_ms": 145.652,
+            "worst_ms": 145.652
+          },
+          "by_operation": {
+            "list": {
+              "latency": {
+                "count": 3,
+                "p50_ms": 50.152,
+                "p95_ms": 55.203,
+                "p99_ms": 55.203,
+                "worst_ms": 55.203
+              },
+              "rejected": 0
+            },
+            "search": {
+              "latency": {
+                "count": 3,
+                "p50_ms": 33.429,
+                "p95_ms": 58.247,
+                "p99_ms": 58.247,
+                "worst_ms": 58.247
+              },
+              "rejected": 0
+            },
+            "thumbnail": {
+              "latency": {
+                "count": 3,
+                "p50_ms": 125.388,
+                "p95_ms": 145.652,
+                "p99_ms": 145.652,
+                "worst_ms": 145.652
+              },
+              "rejected": 0
+            },
+            "control": {
+              "latency": {
+                "count": 3,
+                "p50_ms": 24.244,
+                "p95_ms": 31.171,
+                "p99_ms": 31.171,
+                "worst_ms": 31.171
+              },
+              "rejected": 0
+            }
+          },
+          "accepted": 12,
+          "rejected": 0,
+          "errors": []
+        },
+        {
+          "width": 10,
+          "latency": {
+            "count": 30,
+            "p50_ms": 71.88,
+            "p95_ms": 144.712,
+            "p99_ms": 156.943,
+            "worst_ms": 156.943
+          },
+          "by_operation": {
+            "list": {
+              "latency": {
+                "count": 9,
+                "p50_ms": 89.275,
+                "p95_ms": 144.712,
+                "p99_ms": 144.712,
+                "worst_ms": 144.712
+              },
+              "rejected": 2
+            },
+            "search": {
+              "latency": {
+                "count": 9,
+                "p50_ms": 72.175,
+                "p95_ms": 106.824,
+                "p99_ms": 106.824,
+                "worst_ms": 106.824
+              },
+              "rejected": 4
+            },
+            "thumbnail": {
+              "latency": {
+                "count": 6,
+                "p50_ms": 49.834,
+                "p95_ms": 156.943,
+                "p99_ms": 156.943,
+                "worst_ms": 156.943
+              },
+              "rejected": 5
+            },
+            "control": {
+              "latency": {
+                "count": 6,
+                "p50_ms": 47.703,
+                "p95_ms": 92.247,
+                "p99_ms": 92.247,
+                "worst_ms": 92.247
+              },
+              "rejected": 5
+            }
+          },
+          "accepted": 14,
+          "rejected": 16,
+          "errors": [
+            "BUSY"
+          ]
+        },
+        {
+          "width": 32,
+          "latency": {
+            "count": 96,
+            "p50_ms": 151.291,
+            "p95_ms": 1167.871,
+            "p99_ms": 1298.257,
+            "worst_ms": 1298.257
+          },
+          "by_operation": {
+            "list": {
+              "latency": {
+                "count": 24,
+                "p50_ms": 220.219,
+                "p95_ms": 1101.776,
+                "p99_ms": 1207.713,
+                "worst_ms": 1207.713
+              },
+              "rejected": 10
+            },
+            "search": {
+              "latency": {
+                "count": 24,
+                "p50_ms": 139.544,
+                "p95_ms": 1150.703,
+                "p99_ms": 1298.257,
+                "worst_ms": 1298.257
+              },
+              "rejected": 15
+            },
+            "thumbnail": {
+              "latency": {
+                "count": 24,
+                "p50_ms": 189.709,
+                "p95_ms": 1168.529,
+                "p99_ms": 1234.984,
+                "worst_ms": 1234.984
+              },
+              "rejected": 14
+            },
+            "control": {
+              "latency": {
+                "count": 24,
+                "p50_ms": 131.162,
+                "p95_ms": 1112.783,
+                "p99_ms": 1146.985,
+                "worst_ms": 1146.985
+              },
+              "rejected": 18
+            }
+          },
+          "accepted": 39,
+          "rejected": 57,
+          "errors": [
+            "BUSY"
+          ]
+        }
+      ],
+      "verified_copy": {
+        "bytes": 67108864,
+        "sha256": "53533a909d7179bf06ded406612e4afd5bf53fe972658495580ab6ff2bc2f05d",
+        "verified_elapsed_seconds": 1.197,
+        "verified_mib_per_second": 53.485,
+        "overlap_run_wall_seconds": 4.842
+      },
+      "stream_reader_errors": []
+    }
+  ]
+}

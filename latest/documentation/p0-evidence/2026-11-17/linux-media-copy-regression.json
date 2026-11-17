@@ -1,0 +1,310 @@
+{
+  "platform": "linux",
+  "resource_snapshot": {
+    "event": "runtime_resources",
+    "pid": 177482,
+    "disk_free_bytes": 59926740992,
+    "process_cpu_seconds": 4.139882,
+    "process_peak_rss_bytes": 41275392,
+    "process_rss_bytes": 41807872,
+    "python_threads": 3
+  },
+  "browser": "156.0.8078.79",
+  "scope": "Real browser and real filesystem guards; test-only HTTP native enrollment; installed extension/owner acceptance pending",
+  "media": [
+    {
+      "name": "small.mp4",
+      "size": 1031341,
+      "sha256": "b87703965d5d8bc3df86683f6b86be212e0bc4065bd0b96e20c2741b1b9f1a28",
+      "format": "mp4",
+      "large": false,
+      "surface": "Shelf",
+      "played": true,
+      "paused": true,
+      "seek_seconds": 2,
+      "ticket_released": true
+    },
+    {
+      "name": "small.webm",
+      "size": 1242705,
+      "sha256": "fc71103f29494947c31cef99c4483abdd9bec0b4b3bc1e8d3693c5a8157cf8ef",
+      "format": "webm",
+      "large": false,
+      "surface": "Shelf",
+      "played": true,
+      "paused": true,
+      "seek_seconds": 2,
+      "ticket_released": true
+    },
+    {
+      "name": "small.mp3",
+      "size": 122296,
+      "sha256": "3abda8d171d0d16d1d1e23fb63f8aa3b90ac217095521326d7b1aec671d1ea64",
+      "format": "mp3",
+      "large": false,
+      "surface": "Shelf",
+      "played": true,
+      "paused": true,
+      "seek_seconds": 2,
+      "ticket_released": true
+    },
+    {
+      "name": "large.mp4",
+      "size": 45679223,
+      "sha256": "f5c673d3d9ce225f0bd46b983ad642f9c382ee833126b5e4b7fd2cd439c74854",
+      "format": "mp4",
+      "large": true,
+      "surface": "Shelf",
+      "played": true,
+      "paused": true,
+      "seek_seconds": 2,
+      "ticket_released": true
+    },
+    {
+      "name": "large.webm",
+      "size": 67078232,
+      "sha256": "c10a17b485a9d1dd6fe2ec87e1c44db22ce6cb5b84f969a66af8859818e41c34",
+      "format": "webm",
+      "large": true,
+      "surface": "Shelf",
+      "played": true,
+      "paused": true,
+      "seek_seconds": 2,
+      "ticket_released": true
+    },
+    {
+      "name": "large.mp3",
+      "size": 36003047,
+      "sha256": "c1d698c4b129d9a32e25b609c862056df7e9fa5c6e7ee3fc38bc01cc0d82f057",
+      "format": "mp3",
+      "large": true,
+      "surface": "Shelf",
+      "played": true,
+      "paused": true,
+      "seek_seconds": 850,
+      "ticket_released": true
+    },
+    {
+      "name": "small.mp4",
+      "size": 1031341,
+      "sha256": "b87703965d5d8bc3df86683f6b86be212e0bc4065bd0b96e20c2741b1b9f1a28",
+      "format": "mp4",
+      "large": false,
+      "surface": "Popup",
+      "played": true,
+      "paused": true,
+      "seek_seconds": 2,
+      "ticket_released": true
+    },
+    {
+      "name": "small.webm",
+      "size": 1242705,
+      "sha256": "fc71103f29494947c31cef99c4483abdd9bec0b4b3bc1e8d3693c5a8157cf8ef",
+      "format": "webm",
+      "large": false,
+      "surface": "Popup",
+      "played": true,
+      "paused": true,
+      "seek_seconds": 2,
+      "ticket_released": true
+    },
+    {
+      "name": "small.mp3",
+      "size": 122296,
+      "sha256": "3abda8d171d0d16d1d1e23fb63f8aa3b90ac217095521326d7b1aec671d1ea64",
+      "format": "mp3",
+      "large": false,
+      "surface": "Popup",
+      "played": true,
+      "paused": true,
+      "seek_seconds": 2,
+      "ticket_released": true
+    },
+    {
+      "name": "large.mp4",
+      "size": 45679223,
+      "sha256": "f5c673d3d9ce225f0bd46b983ad642f9c382ee833126b5e4b7fd2cd439c74854",
+      "format": "mp4",
+      "large": true,
+      "surface": "Popup",
+      "played": true,
+      "paused": true,
+      "seek_seconds": 2,
+      "ticket_released": true
+    },
+    {
+      "name": "large.webm",
+      "size": 67078232,
+      "sha256": "c10a17b485a9d1dd6fe2ec87e1c44db22ce6cb5b84f969a66af8859818e41c34",
+      "format": "webm",
+      "large": true,
+      "surface": "Popup",
+      "played": true,
+      "paused": true,
+      "seek_seconds": 2,
+      "ticket_released": true
+    },
+    {
+      "name": "large.mp3",
+      "size": 36003047,
+      "sha256": "c1d698c4b129d9a32e25b609c862056df7e9fa5c6e7ee3fc38bc01cc0d82f057",
+      "format": "mp3",
+      "large": true,
+      "surface": "Popup",
+      "played": true,
+      "paused": true,
+      "seek_seconds": 850,
+      "ticket_released": true
+    }
+  ],
+  "copies": [
+    {
+      "name": "small.mp4",
+      "size": 1031341,
+      "sha256": "b87703965d5d8bc3df86683f6b86be212e0bc4065bd0b96e20c2741b1b9f1a28",
+      "format": "mp4",
+      "large": false,
+      "copy_seconds": 0.4527
+    },
+    {
+      "name": "small.webm",
+      "size": 1242705,
+      "sha256": "fc71103f29494947c31cef99c4483abdd9bec0b4b3bc1e8d3693c5a8157cf8ef",
+      "format": "webm",
+      "large": false,
+      "copy_seconds": 0.4291
+    },
+    {
+      "name": "small.mp3",
+      "size": 122296,
+      "sha256": "3abda8d171d0d16d1d1e23fb63f8aa3b90ac217095521326d7b1aec671d1ea64",
+      "format": "mp3",
+      "large": false,
+      "copy_seconds": 0.4311
+    },
+    {
+      "name": "large.mp4",
+      "size": 45679223,
+      "sha256": "f5c673d3d9ce225f0bd46b983ad642f9c382ee833126b5e4b7fd2cd439c74854",
+      "format": "mp4",
+      "large": true,
+      "copy_seconds": 0.4817
+    },
+    {
+      "name": "large.webm",
+      "size": 67078232,
+      "sha256": "c10a17b485a9d1dd6fe2ec87e1c44db22ce6cb5b84f969a66af8859818e41c34",
+      "format": "webm",
+      "large": true,
+      "copy_seconds": 0.9175
+    },
+    {
+      "name": "large.mp3",
+      "size": 36003047,
+      "sha256": "c1d698c4b129d9a32e25b609c862056df7e9fa5c6e7ee3fc38bc01cc0d82f057",
+      "format": "mp3",
+      "large": true,
+      "copy_seconds": 0.4788
+    }
+  ],
+  "simultaneous_copy_stream_browse_health": [
+    {
+      "job_state": "running",
+      "listing_seconds": 0.012943257999722846,
+      "range": {
+        "status": 206,
+        "size": 2048
+      },
+      "health": 200
+    },
+    {
+      "job_state": "running",
+      "listing_seconds": 0.01647859600780066,
+      "range": {
+        "status": 206,
+        "size": 2048
+      },
+      "health": 200
+    },
+    {
+      "job_state": "running",
+      "listing_seconds": 0.017509804994915612,
+      "range": {
+        "status": 206,
+        "size": 2048
+      },
+      "health": 200
+    },
+    {
+      "job_state": "running",
+      "listing_seconds": 0.01758584000344854,
+      "range": {
+        "status": 206,
+        "size": 2048
+      },
+      "health": 200
+    },
+    {
+      "job_state": "running",
+      "listing_seconds": 0.013742155002546497,
+      "range": {
+        "status": 206,
+        "size": 2048
+      },
+      "health": 200
+    },
+    {
+      "job_state": "running",
+      "listing_seconds": 0.013435724991722964,
+      "range": {
+        "status": 206,
+        "size": 2048
+      },
+      "health": 200
+    },
+    {
+      "job_state": "running",
+      "listing_seconds": 0.014228269996237941,
+      "range": {
+        "status": 206,
+        "size": 2048
+      },
+      "health": 200
+    },
+    {
+      "job_state": "running",
+      "listing_seconds": 0.016912373001105152,
+      "range": {
+        "status": 206,
+        "size": 2048
+      },
+      "health": 200
+    },
+    {
+      "job_state": "running",
+      "listing_seconds": 0.01769025600515306,
+      "range": {
+        "status": 206,
+        "size": 2048
+      },
+      "health": 200
+    },
+    {
+      "job_state": "running",
+      "listing_seconds": 0.018541209006798454,
+      "range": {
+        "status": 206,
+        "size": 2048
+      },
+      "health": 200
+    }
+  ],
+  "directory_latency_max_seconds": 0.03011982199677732,
+  "traced_python_peak_bytes": 2743242,
+  "elapsed_seconds": 13.072,
+  "browser_file_import": {
+    "name": "large.mp3",
+    "size": 36003047,
+    "sha256": "c1d698c4b129d9a32e25b609c862056df7e9fa5c6e7ee3fc38bc01cc0d82f057"
+  }
+}

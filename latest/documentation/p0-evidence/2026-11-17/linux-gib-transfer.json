@@ -1,0 +1,117 @@
+{
+  "scope": "Linux/in-process HTTP fixture with synthetic .mp4 bytes, no video decoding, native messaging, installed Windows, 4-GB device or near-native claim. Two paced range readers (~100 Mbit/s each) and actual large verified copies.",
+  "source_commit": "1b65b2db6313937d4f67c9bb82230b6cab2b03cd",
+  "source_bytes": 1073741824,
+  "jobs": [
+    {
+      "state": "COMMITTED",
+      "size": 1073741824,
+      "sha256": "2c06ade942ee3f17a048dd1064b2fab046a4bb95386d8bb41b68dc6711ac2af3",
+      "verified_end_to_end_seconds": 12.117,
+      "verified_mib_per_second": 84.51
+    },
+    {
+      "state": "COMMITTED",
+      "size": 1073741824,
+      "sha256": "2c06ade942ee3f17a048dd1064b2fab046a4bb95386d8bb41b68dc6711ac2af3",
+      "verified_end_to_end_seconds": 8.469,
+      "verified_mib_per_second": 120.907
+    }
+  ],
+  "resources_before": {
+    "event": "runtime_resources",
+    "pid": 182922,
+    "disk_free_bytes": 58981519360,
+    "process_cpu_seconds": 4.663233,
+    "process_peak_rss_bytes": 23175168,
+    "process_rss_bytes": 23527424,
+    "python_threads": 2
+  },
+  "result": "PASS",
+  "streams": [
+    {
+      "state": "PASS",
+      "bytes": 287571968,
+      "elapsed_seconds": 24.391
+    },
+    {
+      "state": "PASS",
+      "bytes": 285474816,
+      "elapsed_seconds": 24.369
+    }
+  ],
+  "control_list_plus_metrics_latency": {
+    "count": 208,
+    "p50_ms": 51.321,
+    "p95_ms": 92.572,
+    "worst_ms": 121.51
+  },
+  "resources_after": {
+    "event": "runtime_resources",
+    "pid": 182922,
+    "disk_free_bytes": 56834011136,
+    "process_cpu_seconds": 36.828299,
+    "process_peak_rss_bytes": 55758848,
+    "process_rss_bytes": 55173120,
+    "python_threads": 3
+  },
+  "traced_python_peak_bytes": 3179404,
+  "performance": {
+    "mode": "balanced",
+    "effective_limits": {
+      "control": 4,
+      "preview": 2,
+      "navigation": 4,
+      "thumbnail": 2,
+      "media": 2,
+      "intake": 1,
+      "chunk_bytes": 262144,
+      "thumbnail_prefetch": 2,
+      "http_threads": 32
+    },
+    "hardware": {
+      "available_memory_bytes": 34705575936,
+      "cpu_count": 5,
+      "low_memory": false
+    },
+    "resources": {
+      "event": "runtime_resources",
+      "pid": 182922,
+      "disk_free_bytes": 56834011136,
+      "process_cpu_seconds": 36.843912,
+      "process_peak_rss_bytes": 55758848,
+      "process_rss_bytes": 54734848,
+      "python_threads": 3
+    },
+    "metrics": {
+      "navigation": {
+        "completed": 209,
+        "busy": 0,
+        "active": 0,
+        "p50_ms": 17.995,
+        "p95_ms": 39.316,
+        "p99_ms": 60.071,
+        "worst_ms": 63.895
+      },
+      "control": {
+        "completed": 422,
+        "busy": 0,
+        "active": 1,
+        "p50_ms": 2.472,
+        "p95_ms": 6.768,
+        "p99_ms": 20.788,
+        "worst_ms": 34.194
+      },
+      "media": {
+        "completed": 2,
+        "busy": 0,
+        "active": 0,
+        "p50_ms": 24354.121,
+        "p95_ms": 24354.121,
+        "p99_ms": 24354.121,
+        "worst_ms": 24380.165
+      }
+    },
+    "queue_policy": "bounded admission; no stale click queue"
+  }
+}
