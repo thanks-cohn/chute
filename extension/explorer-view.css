@@ -118,3 +118,37 @@ body:has(#chutey-explorer-view:not([hidden])) #chutey-explorer-view { flex:1; he
 #chutey-explorer-view .ex-icon img { position:absolute; inset:0; background:var(--chutey-explorer-panel); }
 #chutey-explorer-view .ex-preview-body audio { display:block; width:100%; margin:12px auto; }
 #chutey-explorer-view .ex-advanced-actions label { display:flex; gap:8px; align-items:center; padding:6px; }
+/* Folder Access uses Chrome's top layer, outside ancestor stacking/clipping. */
+#chutey-explorer-view .ex-advanced-actions[popover]:not(:popover-open) { display:none; }
+#chutey-explorer-view .ex-advanced-actions[popover]:popover-open { display:flex; z-index:auto; box-sizing:border-box; color:var(--chutey-explorer-text); background:var(--chutey-explorer-panel); }
+#chutey-explorer-view .ex-advanced-actions[popover]::backdrop { background:transparent; pointer-events:none; }
+#chutey-explorer-view .ex-advanced-actions[data-overlay-fallback=true] { position:static; max-height:220px; overflow-y:auto; display:flex; }
+#chutey-explorer-view .ex-native:has(.ex-advanced-actions[data-overlay-fallback=true]) { z-index:19; }
+#chutey-explorer-view .ex-preview:focus { outline:none; }
+#chutey-explorer-view .ex-preview:focus-visible { outline:2px solid var(--chutey-explorer-accent); outline-offset:-2px; }
+/* Pinned playback and document previews are independent overlays; file geometry
+   remains unchanged while folders/search/selection change underneath them. */
+#chutey-explorer-view { --ex-pinned-height:clamp(90px,33%,220px); }
+#chutey-explorer-view .ex-pinned-player { position:absolute; z-index:18; left:0; right:0; bottom:0; height:var(--ex-pinned-height); min-height:0; display:flex; flex-direction:column; overflow:hidden; background:var(--chutey-explorer-panel); border:1px solid var(--chutey-explorer-border); border-radius:8px 8px 0 0; box-shadow:0 -5px 18px #0007; }
+#chutey-explorer-view .ex-pinned-player header { display:flex; gap:7px; align-items:center; padding:5px 8px; }
+#chutey-explorer-view .ex-pinned-player strong { flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+#chutey-explorer-view .ex-pinned-body { flex:1; min-height:0; padding:5px; overflow:auto; }
+#chutey-explorer-view .ex-pinned-body video { display:block; width:100%; height:100%; object-fit:contain; }
+#chutey-explorer-view .ex-pinned-body audio { display:block; width:100%; margin:5px auto; }
+#chutey-explorer-view.ex-has-pinned .ex-preview { bottom:var(--ex-pinned-height); max-height:calc(100% - var(--ex-pinned-height) - 48px); }
+#chutey-explorer-view .ex-native:has(.ex-advanced-actions[data-overlay-fallback=true]) { flex-wrap:wrap; }
+#chutey-explorer-view .ex-more-settings:has(.ex-advanced-actions[data-overlay-fallback=true]) { width:100%; margin-left:0; }
+
+.ex-copy-toolbar {display:flex;flex-wrap:wrap;gap:3px;padding:4px 7px;flex-shrink:0;border-bottom:1px solid #39412e;}
+.ex-copy-toolbar button {font-size:10px;padding:4px 6px;color:#eff2e8;background:#252a20;border:1px solid #46513b;border-radius:5px;cursor:pointer;}
+#chutey-explorer-view .ex-pinned-player[hidden] { display:none; }
+body:has(#chutey-explorer-view:not([hidden])) { min-width:0; }
+@media (max-height:500px) {
+  body:has(#chutey-explorer-view:not([hidden])) > .topbar {padding:3px 8px;min-height:32px;}
+  body:has(#chutey-explorer-view:not([hidden])) > .topbar .subtitle {display:none;}
+  #chutey-explorer-view .ex-native,#chutey-explorer-view .ex-toolbar,#chutey-explorer-view .ex-filter {padding:3px 5px;gap:3px;min-height:32px;}
+  #chutey-explorer-view .ex-copy-toolbar {padding:2px 5px;gap:2px;}
+  #chutey-explorer-view .ex-copy-toolbar [data-copy=verify],#chutey-explorer-view .ex-copy-toolbar [data-copy=cancel],#chutey-explorer-view .ex-copy-toolbar [data-copy=dismiss] {display:none;}
+  #chutey-explorer-view .ex-status {padding:3px 5px;font-size:10px;}
+  #chutey-explorer-view .ex-preview header {padding:3px;gap:3px;}
+}

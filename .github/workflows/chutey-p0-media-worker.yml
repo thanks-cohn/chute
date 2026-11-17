@@ -1,0 +1,105 @@
+name: Chutey P0 adaptive worker and 30-minute paired acceptance
+on:
+  workflow_dispatch:
+  push:
+    branches: [fix/chutey-media-worker-2026-11-17]
+    paths: ['src/**','extension/**','tests/**','scripts/**','.github/workflows/chutey-p0-media-worker.yml']
+permissions:
+  contents: read
+jobs:
+  paired:
+    runs-on: windows-latest
+    timeout-minutes: 75
+    env:
+      PYTHONPATH: src
+      PYTHONIOENCODING: utf-8
+      CHUTE_QUIET: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Dependencies
+        run: python -m pip install -e . pytest==9.2.0 Pillow==13.0.0 playwright==1.65.2
+      - name: Worker regressions and real Windows clipboard formats
+        run: python -m pytest -q --junitxml=p0-windows-tests.xml
+      - name: Extension regression contracts
+        run: |
+          node scripts/verify-worker-boot.cjs
+          node scripts/verify-thumbnail-icons.cjs
+          node scripts/verify-explorer-api.cjs
+          node scripts/verify-transfer-reconciliation.cjs
+          node scripts/verify-p0-settings.cjs
+          node scripts/verify-media-diagnostics.cjs
+          python scripts/verify-upgrades-package.py
+      - name: Fixture encoder
+        shell: pwsh
+        run: |
+          if (-not (Get-Command ffmpeg -ErrorAction SilentlyContinue)) { choco install ffmpeg --no-progress -y; if ($LASTEXITCODE -ne 0) { throw 'FFmpeg failed' } }
+      - name: Build matching setup, helper, extension and safe checker
+        shell: pwsh
+        run: |
+          ./scripts/build-windows.ps1
+          if ($LASTEXITCODE -ne 0) { throw 'Worker build failed' }
+          ./scripts/build-phase1-isolated-check.ps1
+          if ($LASTEXITCODE -ne 0) { throw 'Safe checker build failed' }
+          python scripts/build-chrome-store.py
+          if ($LASTEXITCODE -ne 0) { throw 'Chrome build failed' }
+          & ./dist/phase1-isolated/Chutey-Phase1-Isolated-Check.exe
+          if ($LASTEXITCODE -ne 0) { throw 'Checker failed' }
+          python scripts/verify-packaged-explorer-host.py dist/windows/Chute-NativeHost.exe dist/windows/Chute-NativeHost.exe
+          if ($LASTEXITCODE -ne 0) { throw 'Native framing failed' }
+      - name: Actual paired Chrome/native-host/worker smoke
+        run: python scripts/verify-p0-endurance.py --seconds 15 --transport installed --output dist/p0-installed-smoke
+      - name: Real browser compact overlay, keyboard, Settings and preservation
+        env:
+          CHUTE_UX_EVIDENCE: dist/p0-ux
+        run: python scripts/verify-p0-ux-browser.py
+      - name: Real Paint and Explorer clipboard application acceptance
+        id: clipboard_apps
+        continue-on-error: true
+        run: python scripts/verify-windows-clipboard-ui.py dist/p0-clipboard-apps
+      - name: Actual paired 30-minute MP4 and WebM alongside browsing
+        run: python scripts/verify-p0-endurance.py --seconds 1800 --transport installed --output dist/p0-endurance
+      - name: Package exact candidate and evidence
+        shell: pwsh
+        env:
+          CLIPBOARD_APPS: ${{ steps.clipboard_apps.outcome }}
+        run: |
+          $ErrorActionPreference='Stop'
+          New-Item -ItemType Directory -Force dist/p0-pair | Out-Null
+          Copy-Item dist/windows/Chute-Windows.exe dist/p0-pair/Chutey-Setup-P0-2026-11-17-TEST.exe
+          Copy-Item dist/windows/Chute-NativeHost.exe dist/p0-pair/
+          Copy-Item dist/phase1-isolated/Chutey-Phase1-Isolated-Check.exe dist/p0-pair/
+          Copy-Item dist/phase1-isolated/BUILD-DEPENDENCIES.txt dist/p0-pair/
+          Copy-Item dist/chrome-store/chute-chrome-2.6.1.zip dist/p0-pair/Chutey-Chrome-P0-2026-11-17-TEST.zip
+          Copy-Item latest/documentation/P0-2026-11-17-HANDOFF.md dist/p0-pair/START-HERE.md
+          Copy-Item -Recurse dist/p0-endurance dist/p0-pair/endurance
+          Copy-Item -Recurse dist/p0-installed-smoke dist/p0-pair/smoke
+          if (Test-Path dist/p0-clipboard-apps) { Copy-Item -Recurse dist/p0-clipboard-apps dist/p0-pair/clipboard-apps }
+          Copy-Item -Recurse dist/p0-ux dist/p0-pair/ux
+          Copy-Item p0-windows-tests.xml dist/p0-pair/
+          git rev-parse HEAD | Out-File dist/p0-pair/SOURCE-COMMIT.txt -Encoding ascii
+          "clipboard_apps=$env:CLIPBOARD_APPS`nOwner validation required. NOT GOLD." | Set-Content dist/p0-pair/ACCEPTANCE-STATUS.txt
+          $base=(Resolve-Path dist/p0-pair).Path
+          $lines=@(Get-ChildItem $base -Recurse -File | Sort-Object FullName | ForEach-Object { "$((Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLower())  $($_.FullName.Substring($base.Length+1).Replace('\','/'))" })
+          [IO.File]::WriteAllLines((Join-Path $base 'SHA256SUMS.txt'),[string[]]$lines,[Text.Encoding]::UTF8)
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Chutey-P0-TEST-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: dist/p0-pair/
+          if-no-files-found: error
+          retention-days: 90
+      - name: Enforce clipboard application release gate
+        if: steps.clipboard_apps.outcome != 'success'
+        run: throw 'Paint/Explorer application acceptance did not pass; candidate is NOT complete or GOLD. Inspect artifacts.'
+      - name: Retain failed gate evidence
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Chutey-P0-FAILED-evidence-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            p0-windows-tests.xml
+            dist/p0-*/
+            dist/windows/*.exe
+            dist/chrome-store/*.zip

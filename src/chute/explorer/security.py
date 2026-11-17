@@ -8,6 +8,7 @@ import re
 import secrets
 import stat
 import time
+import threading
 
 from .protocol import ExplorerError
 
@@ -42,6 +43,7 @@ class RootGrant:
         self.label = label or raw.name or raw.anchor or "Local files"
         self.handles = {self.id: ()}
         self._reverse = {(): self.id}
+        self.handle_lock=threading.RLock()
 
     def close(self):
         if self.windows:
@@ -51,13 +53,14 @@ class RootGrant:
             self.fd = None
 
     def handle(self, parts: tuple[str, ...]) -> str:
-        if parts not in self._reverse:
-            if len(self.handles) >= 50000:
-                raise ExplorerError("HANDLE_LIMIT", "Reconnect to refresh directory handles.")
-            value = secrets.token_urlsafe(24)
-            self._reverse[parts] = value
-            self.handles[value] = parts
-        return self._reverse[parts]
+        with self.handle_lock:
+            if parts not in self._reverse:
+                if len(self.handles) >= 50000:
+                    raise ExplorerError("HANDLE_LIMIT", "Reconnect to refresh directory handles.")
+                value = secrets.token_urlsafe(24)
+                self._reverse[parts] = value
+                self.handles[value] = parts
+            return self._reverse[parts]
 
     def parts(self, handle: str) -> tuple[str, ...]:
         if not isinstance(handle, str) or handle not in self.handles:

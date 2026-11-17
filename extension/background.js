@@ -197,7 +197,7 @@ async function relayDragOutStart(file) {
 
 chrome.runtime.onInstalled.addListener(async () => {
   if (chrome.sidePanel?.setPanelBehavior) {
-    await chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: false });
+    await globalThis.ChuteyToolbar?.apply();
   }
 
   const existing = await chrome.storage.sync.get([

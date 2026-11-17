@@ -13,7 +13,7 @@ from .preview import byte_range, media_mime, preview_kind, thumbnail
 
 
 class ExplorerAPI:
-    def __init__(self, engine, session):
+    def __init__(self, engine, session, *, previous=None):
         self.engine, self.session = engine, session
         from .transfers import Transfers
         self.transfers = Transfers(engine)
@@ -21,8 +21,32 @@ class ExplorerAPI:
         self.media_slots = threading.BoundedSemaphore(2)
         self.intake_slots = threading.BoundedSemaphore(1)
         self.jobs = None
+        self.clipboard = None
         self.media = {}
         self.media_lock = threading.Lock()
+        self.media_context={'revoked':False}
+        self.media_events=__import__('collections').deque(maxlen=128)
+        if previous is not None:
+            self.media=previous.media;self.media_lock=previous.media_lock;self.media_context=previous.media_context;self.media_events=previous.media_events
+            self.clipboard=previous.clipboard
+            self.jobs=previous.jobs
+            if self.jobs:self.jobs.api=self
+            self.transfers=previous.transfers
+            self.saved_grants=getattr(previous,'saved_grants',{})
+            self.store_only=getattr(previous,'store_only',False)
+
+    def revoke_media(self):
+        with self.media_lock:
+            self.media_context['revoked']=True
+            for source in self.media.values():source['revoked']=True
+            self.media.clear()
+
+    def _performance(self,handler):
+        with handler.server.performance_lock:
+            if not hasattr(handler.server,'performance'):
+                from .performance import Performance
+                handler.server.performance=Performance(handler.server.store)
+        return handler.server.performance
 
     def headers(self, handler, status, mime, length, extra=()):
         handler._explorer_headers_sent = True
@@ -52,15 +76,33 @@ class ExplorerAPI:
         handler._explorer_headers_sent = False
         handler._quiet_explorer_read = False
         path=urlparse(handler.path).path
-        slots=self.media_slots if path.startswith('/api/explorer/v1/media/') else self.intake_slots if path.endswith('/receive') else self.slots
-        if not slots.acquire(blocking=False):
-            handler.close_connection = True
-            self.json(handler, {"state": "failed", "error": {"code": "BUSY", "message": "The companion is busy. Try browsing again shortly."}}, 429)
-            return True
-        try:
+        # Read only a bounded command envelope to classify lightweight control
+        # separately from directory scans and CPU-heavy thumbnail decoding.
+        if handler.command=='OPTIONS':return self._route(handler)
+        lane='media' if path.startswith('/api/explorer/v1/media/') else 'intake' if path.endswith('/receive') or path.endswith('/highlights') else 'control'
+        if path.endswith('/content'):
+            lane='preview'
+            length=handler.headers.get('Content-Length','')
+            if length.isdigit() and 2<=int(length)<=16384 and not handler.headers.get('Transfer-Encoding'):
+                handler.connection.settimeout(10);raw=handler.rfile.read(int(length));handler._command_raw=raw
+                try:
+                    if json.loads(raw).get('thumbnail'):lane='thumbnail'
+                except (ValueError,AttributeError):pass
+        if path.endswith('/command') and handler.command=='POST':
+            length=handler.headers.get('Content-Length','')
+            if length.isdigit() and 2<=int(length)<=16384 and not handler.headers.get('Transfer-Encoding'):
+                handler.connection.settimeout(10)
+                raw=handler.rfile.read(int(length));handler._command_raw=raw
+                try:command=json.loads(raw).get('command')
+                except (ValueError,AttributeError):command=None
+                if command in {'list','search','roots','stat','preview'}:lane='navigation'
+                if command=='clipboard_copy_image':lane='thumbnail'
+        with self._performance(handler).enter(lane) as admitted:
+            if not admitted:
+                handler.close_connection=True
+                self.json(handler,{'state':'failed','error':{'code':'BUSY','message':'This resource lane is busy. Wait briefly; browsing and playback have separate capacity.'}},429)
+                return True
             return self._route(handler)
-        finally:
-            slots.release()
 
     def _route(self, handler):
         path = urlparse(handler.path).path
@@ -84,8 +126,8 @@ class ExplorerAPI:
                     source = self.media.get(ticket)
                 if not source or time.monotonic() >= source["expires"]:
                     raise ExplorerError("STREAM_EXPIRED", "The media session expired. Select the file again.")
-                self.session.authorize(handler.headers.get("Origin", ""), source["authorization"])
-                self.content(handler, source["file"], authorization=source["authorization"], media=source)
+                if source['revoked'] or self.media_context['revoked']:raise ExplorerError('UNAUTHORIZED','Media access was explicitly revoked.')
+                self.content(handler, source["file"], media=source)
                 return True
             self.session.authorize(handler.headers.get("Origin", ""), handler.headers.get("Authorization", ""))
             if handler.command != "POST":
@@ -137,7 +179,8 @@ class ExplorerAPI:
             if not 2 <= length <= 16384:
                 raise ExplorerError("INVALID_ARGUMENT", "Request exceeds the command limit.")
             handler.connection.settimeout(10)
-            raw = handler.rfile.read(length)
+            raw = getattr(handler,"_command_raw",None)
+            if raw is None:raw=handler.rfile.read(length)
             if len(raw) != length:
                 raise ExplorerError("INVALID_ARGUMENT", "Request ended early.")
             try:
@@ -149,18 +192,18 @@ class ExplorerAPI:
             if path == "/api/explorer/v1/command":
                 if set(body) - {"command", "args"} or not isinstance(body.get("command"), str) or not isinstance(body.get("args", {}), dict):
                     raise ExplorerError("INVALID_ARGUMENT", "Invalid command envelope.")
-                handler._quiet_explorer_read=body['command'] in {'capabilities','roots','list','stat','preview','search','saved_text_page','history_export_status','transfer_status','upload_receipt','resume_location','recent_transfers'}
+                handler._quiet_explorer_read=body['command'] in {'capabilities','roots','list','stat','preview','search','saved_text_page','history_export_status','transfer_status','upload_receipt','resume_location','recent_transfers','performance_get','media_policy_get','media_status','media_diagnostics','renew_media'}
                 if body["command"] == "capabilities":
                     from .protocol import catalog
                     capabilities = catalog()
-                    capabilities['commands'] += ['upload_receipt','transfer_start','transfer_status','transfer_cancel','transfer_dismiss','saved_text_page','history_export_create','history_export_status','history_export_cancel','locate_saved','open','reveal','media_source','release_media']
+                    capabilities['commands'] += ['performance_get','performance_set','media_policy_get','media_policy_set','media_status','media_diagnostics','renew_media','transfer_verify','clipboard_copy_files','clipboard_copy_image','clipboard_read_files','clipboard_release','upload_receipt','transfer_start','transfer_status','transfer_cancel','transfer_dismiss','saved_text_page','history_export_create','history_export_status','history_export_cancel','locate_saved','open','reveal','media_source','release_media']
                     capabilities['blocked'] = {key:value for key,value in capabilities['blocked'].items() if key not in {'open','reveal'}}
                     result={"state":"completed","result":{**capabilities,"transfer":{
                         "source_kind":"local_explorer","maximum_chunk_bytes":262144,
                         "original_bytes":True,"one_use_export":True,
                         "write_consent_required":True,"conflicts":["keep_both","skip"],
                         "commands":["prepare_export","export_to_live","receive_from_live","reconcile_transfer","transfer_start","transfer_status","transfer_cancel","transfer_dismiss"],"asynchronous_copy_jobs":True,"concurrent_jobs":1,
-                        "interop_enabled":False},"media":{"commands":["media_source","release_media"],"methods":["GET","HEAD"],"ranges":True,"ticket_limit":32,"ticket_seconds":600,"concurrent_streams":2,"chunk_bytes":262144},"file_actions":{"commands":["locate_saved","open","reveal"],"system_platform":"windows","system_open":"previewable files only"}}}
+                        "interop_enabled":False},"media":{"commands":["media_source","release_media"],"methods":["GET","HEAD"],"ranges":True,"ticket_limit":32,"ticket_seconds":120,"authenticated_continuation":True,"concurrent_streams":2,"chunk_bytes":262144},"file_actions":{"commands":["locate_saved","open","reveal"],"system_platform":"windows","system_open":"previewable files only"}}}
                 elif body['command'] in {'history_export_create','history_export_status','history_export_cancel'}:
                     from ..history_export import HistoryExports,ExportError
                     # Store-wide manager bounds simultaneous jobs across clients.
@@ -183,10 +226,51 @@ class ExplorerAPI:
                     args=body.get('args',{})
                     if body['command']=='transfer_start':value=self.jobs.start(args,handler.headers.get('Authorization',''))
                     else:
-                        if set(args)!={'id'} or not isinstance(args['id'],str):raise ExplorerError('INVALID_ARGUMENT','A transfer job ID is required.')
+                        if set(args)-{'id','reviewed'} or not isinstance(args.get('id'),str):raise ExplorerError('INVALID_ARGUMENT','A transfer job ID is required.')
                         function={'transfer_status':self.jobs.status,'transfer_cancel':self.jobs.cancel,'transfer_dismiss':self.jobs.dismiss}[body['command']]
-                        value=function(args['id'])
+                        value=function(args['id'],**({'reviewed':args.get('reviewed',False)} if body['command']=='transfer_dismiss' else {}))
                     result={'state':'completed','result':value}
+                elif body['command'] in {'performance_get','performance_set'}:
+                    args=body.get('args',{})
+                    if body['command']=='performance_get':
+                        if args:raise ExplorerError('INVALID_ARGUMENT','No performance query arguments.')
+                        value=self._performance(handler).get()
+                    else:
+                        if set(args)!={'mode'}:raise ExplorerError('INVALID_ARGUMENT','A performance mode is required.')
+                        value=self._performance(handler).set(args['mode'])
+                    result={'state':'completed','result':value}
+                elif body['command'] in {'media_policy_get','media_policy_set'} and hasattr(self,'native_state'):
+                    result={'state':'completed','result':self.native_state(body['command'],body.get('args',{}))}
+                elif body['command'] in {'media_policy_get','media_policy_set'}:
+                    if body['command']=='media_policy_set':self.media_allowed=body.get('args',{}).get('allowed') is True
+                    result={'state':'completed','result':{'allowed':getattr(self,'media_allowed',True),'migration':'fixture policy'}}
+                elif body['command']=='media_status':
+                    args=body.get('args',{})
+                    if set(args)!={'ticket'}:raise ExplorerError('INVALID_ARGUMENT','Media ticket required.')
+                    with self.media_lock:source=self.media.get(args['ticket'])
+                    result={'state':'completed','result':{'available':bool(source and not source['revoked'] and not self.media_context['revoked']),'original_get':source.get('last_get') if source else None,'lease_seconds':max(0,source['expires']-time.monotonic()) if source else 0}}
+                elif body['command']=='media_diagnostics':
+                    result={'state':'completed','result':{'events':list(self.media_events),'active_leases':len(self.media)}}
+                elif body['command']=='renew_media':
+                    args=body.get('args',{})
+                    if set(args)!={'ticket'} or not isinstance(args['ticket'],str):raise ExplorerError('INVALID_ARGUMENT','Media lease ticket required.')
+                    with self.media_lock:
+                        source=self.media.get(args['ticket'])
+                        if not source or source['revoked'] or self.media_context['revoked'] or source['expires']<=time.monotonic():raise ExplorerError('STREAM_EXPIRED','Media lease expired; select the file again.')
+                        source['expires']=time.monotonic()+120
+                    self.media_events.append({'event':'renew','at':time.monotonic()})
+                    result={'state':'completed','result':{'renewed':True,'expires_in':120}}
+                elif body['command'] in {'clipboard_copy_files','clipboard_copy_image','clipboard_read_files','clipboard_release'}:
+                    from .clipboard import Clipboard
+                    with self.engine.lock:
+                        if self.clipboard is None:self.clipboard=Clipboard(self.engine)
+                    result={'state':'completed','result':self.clipboard.dispatch(body['command'],body.get('args',{}))}
+                elif body['command']=='transfer_verify':
+                    args=body.get('args',{})
+                    if not self.jobs:
+                        from .jobs import TransferJobs
+                        self.jobs=TransferJobs(self,handler.server.store)
+                    result={'state':'completed','result':self.jobs.verify(args.get('id'),args.get('destination'))}
                 elif body['command']=='upload_receipt':
                     args=body.get('args',{})
                     if set(args)!={'id'}:raise ExplorerError('INVALID_ARGUMENT','An import ID is required.')
@@ -235,6 +319,7 @@ class ExplorerAPI:
                         value = external_action(self.engine,body['command'],**args)
                     result = {'state':'completed','result':value}
                 elif body["command"] == "media_source":
+                    if not getattr(self,'media_allowed',True):raise ExplorerError('MEDIA_CONSENT_REQUIRED','Enable Allow movie media playback in Settings → Folder Access for this approved folder.')
                     args = body.get("args", {})
                     if set(args) != {"handle", "identity"} or not all(isinstance(value,str) for value in args.values()):
                         raise ExplorerError("INVALID_ARGUMENT", "A file handle and identity are required.")
@@ -249,12 +334,14 @@ class ExplorerAPI:
                     ticket = secrets.token_urlsafe(32)
                     # A short-lived, read-only, origin-bound authority for one file.
                     # Never put the general session token or a filesystem path in a URL.
-                    expiry = min(self.session.expires, time.monotonic() + 600)
+                    expiry = time.monotonic() + 120
                     with self.media_lock:
-                        self.media = {key:value for key,value in self.media.items() if value["expires"] > time.monotonic()}
+                        for key in list(self.media):
+                            if self.media[key]["expires"]<=time.monotonic():self.media.pop(key,None)
                         if len(self.media) >= 32:
                             raise ExplorerError("BUSY", "Close an unused media preview before opening another.")
-                        self.media[ticket] = {"file":args, "expires":expiry, "authorization":handler.headers.get("Authorization", ""),"revoked":False}
+                        self.media[ticket] = {"file":args, "expires":expiry, "revoked":False}
+                    self.media_events.append({"event":"issued","at":time.monotonic()})
                     result = {"state":"completed", "result":{"url":"/api/explorer/v1/media/" + ticket,
                         "ticket":ticket,"expires_in":max(0,int(expiry-time.monotonic())),"mime":row["mime"],"size":row["size"],"range":True}}
                 elif body["command"] == "release_media":
@@ -264,6 +351,7 @@ class ExplorerAPI:
                     with self.media_lock:
                         released = self.media.pop(args["ticket"],None)
                         if released: released["revoked"] = True
+                    self.media_events.append({"event":"release","at":time.monotonic()})
                     result = {"state":"completed", "result":{"released":True}}
                 elif body["command"] == "prepare_export":
                     with self.engine.lock:
@@ -306,6 +394,11 @@ class ExplorerAPI:
                 raise ExplorerError("NOT_FOUND", "Explorer route not found.")
         except ExplorerError as exc:
             handler.close_connection = True
+            if path.startswith('/api/explorer/v1/media/') and handler.command=='GET':
+                with self.media_lock:
+                    source=self.media.get(path.rsplit('/',1)[-1])
+                    if source:source['last_get']={'status':403 if exc.code in {'UNAUTHORIZED','INVALID_HOST'} else 400,'code':exc.code,'origin_present':bool(handler.headers.get('Origin'))}
+            self.media_events.append({"event":"request_error","code":exc.code,"origin_present":bool(handler.headers.get("Origin")),"method":handler.command,"at":time.monotonic()})
             if handler._explorer_headers_sent: return True
             status = 416 if exc.code == "INVALID_RANGE" else 403 if exc.code in {"UNAUTHORIZED", "INVALID_HOST"} else 400
             self.json(handler, {"state": "failed", "error": {"code": exc.code, "message": str(exc)}}, status)
@@ -356,16 +449,18 @@ class ExplorerAPI:
             if original:
                 extra.append(("Content-Disposition", "attachment"))
             handler.connection.settimeout(15)
+            if media and handler.command=='GET':media['last_get']={'status':206 if partial else 200,'code':'OK','origin_present':bool(handler.headers.get('Origin'))}
             self.headers(handler, 206 if partial else 200, mime, end - start, extra)
             if handler.command == "HEAD":
                 return
             os.lseek(fd, start, os.SEEK_SET)
             remaining = end - start
             while remaining:
-                if media and (media["revoked"] or time.monotonic() >= media["expires"]):
+                if media and (media["revoked"] or self.media_context["revoked"] or time.monotonic() >= media["expires"]):
+                    media['last_get']={'status':403 if media['revoked'] or self.media_context['revoked'] else 400,'code':'UNAUTHORIZED' if media['revoked'] or self.media_context['revoked'] else 'STREAM_EXPIRED','origin_present':bool(handler.headers.get('Origin'))}
                     handler.close_connection = True
                     return
-                self.session.authorize(handler.headers.get("Origin", ""), authorization or handler.headers.get("Authorization", ""))
+                if not media:self.session.authorize(handler.headers.get("Origin", ""), authorization or handler.headers.get("Authorization", ""))
                 data = os.read(fd, min(262144, remaining))
                 if not data:
                     handler.close_connection=True

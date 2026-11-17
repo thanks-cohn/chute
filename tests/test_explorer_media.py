@@ -103,8 +103,10 @@ class MediaAPITests(unittest.TestCase):
         with self.assertRaises(HTTPError) as raised: self.request(source['url'])
         self.assertEqual(json.load(raised.exception)['error']['code'],'FILE_CHANGED')
         self.session.expires = 0
+        # A purpose-limited media lease outlives the ordinary session; the
+        # already-replaced source still fails its independent identity check.
         with self.assertRaises(HTTPError) as raised: self.request(source['url'])
-        self.assertEqual(raised.exception.code,403)
+        self.assertEqual(json.load(raised.exception)['error']['code'],'FILE_CHANGED')
     def test_missing_identity_is_rejected_and_thumbnail_uses_same_engine(self):
         with self.assertRaises(HTTPError) as raised:
             self.request('/api/explorer/v1/content',{'handle':self.row['handle']})

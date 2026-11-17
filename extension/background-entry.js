@@ -8,5 +8,6 @@ importScripts(
   "background-custom-storage-compat.js",
   "background-context-resolver.js",
   "background-context-menu.js",
-  "background-sidepanel.js"
+  "background-sidepanel.js",
+  "background-toolbar.js"
 );

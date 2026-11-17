@@ -507,6 +507,19 @@ class ChuteServer(ThreadingHTTPServer):
     daemon_threads = True
     allow_reuse_address = True
 
+    def process_request(self,request,address):
+        # Bound accepted worker threads even when many clients send slow bodies.
+        if not self.http_slots.acquire(blocking=False):
+            try:request.sendall(b'HTTP/1.1 503 Service Unavailable\r\nRetry-After: 1\r\nContent-Length: 0\r\nConnection: close\r\n\r\n')
+            finally:self.shutdown_request(request)
+            return
+        try:super().process_request(request,address)
+        except BaseException:self.http_slots.release();raise
+
+    def process_request_thread(self,request,address):
+        try:super().process_request_thread(request,address)
+        finally:self.http_slots.release()
+
     def handle_error(self, request, client_address):
         import sys
         from .runtime_log import safe_exception
@@ -515,11 +528,14 @@ class ChuteServer(ThreadingHTTPServer):
         if error is not None: print(json.dumps(safe_exception(error)),file=sys.stderr,flush=True)
 
     def __init__(self, address: tuple[str, int], store: Store) -> None:
+        import threading
+        self.http_slots=threading.BoundedSemaphore(32)
         super().__init__(address, ChuteHandler)
         self.store = store
         self.explorer_api = None
         import threading
         self.history_exports_lock = threading.Lock()
+        self.performance_lock = threading.Lock()
 
 
 def serve(host: str = DEFAULT_HOST, port: int = DEFAULT_PORT, root: Path | None = None, *, explorer_root: Path | None = None, explorer_origin: str | None = None) -> None:

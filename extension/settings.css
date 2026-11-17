@@ -1,0 +1,16 @@
+/* Shared Settings, usable in popup document flow and Shelf's settings surface. */
+[data-core-settings] { grid-column:1/-1; display:grid; gap:10px; min-width:0; }
+[data-core-settings] fieldset { min-width:0; margin:0; border:1px solid #46533c; border-radius:8px; padding:10px; }
+[data-core-settings] label { display:grid!important; gap:6px; min-width:0; }
+[data-core-settings] select { width:100%; max-width:100%; min-width:0; }
+[data-core-settings] p { margin:5px 0; line-height:1.45; overflow-wrap:anywhere; }
+[data-core-settings] button { padding:7px; font-size:12px; cursor:pointer; }
+[data-core-settings] #restore-ui-defaults { justify-self:start; }
+[data-core-settings] .settings-checkbox { display:flex!important; align-items:flex-start; gap:8px; }
+[data-core-settings] .settings-description { color:#b9c4ac; font-size:11px; }
+[data-core-settings] [role=status] { font-size:11px; }
+[data-file-action-settings] { margin:8px 0; min-width:0; border:1px solid #46533c; border-radius:8px; }
+[data-file-action-settings] label { display:grid!important; gap:5px; margin:8px 0; }
+[data-file-action-settings] select { width:100%; max-width:100%; min-width:0; }
+body:not(.chutey-gallery-popup) .chutey-presentation-options > summary { cursor:pointer; padding:7px 0; font-weight:650; }
+body:not(.chutey-gallery-popup) .chutey-presentation-options[open] > .chutey-shared-options { z-index:40; padding:10px; max-height:min(70vh,560px); border:1px solid #46533c; border-radius:8px; }

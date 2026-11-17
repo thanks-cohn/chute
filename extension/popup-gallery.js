@@ -69,10 +69,11 @@
   const next = lightbox.querySelector(".chutey-lightbox-next");
   let activeId = null, returnFocus = null, serial = 0;
   const mediaFile=file=>/^(video|audio)\//.test(file.mime||'') || /\.(mp4|webm|mp3)$/i.test(file.name||'');
-  let mediaTicket=null;
+  let mediaTicket=null,stopLease=null;
   const player=document.createElement('div');player.className='chutey-lightbox-player';player.hidden=true;
   lightbox.querySelector('.chutey-lightbox-stage').append(player);
   function releaseMedia(){
+    stopLease?.();stopLease=null;
     player.querySelectorAll('video,audio').forEach(node=>{node.onerror=null;node.pause();node.removeAttribute('src');node.load();});player.replaceChildren();player.hidden=true;
     if(mediaTicket){void window.ChuteyExplorerAPI.command('release_media',{ticket:mediaTicket}).catch(()=>{});mediaTicket=null;}
   }
@@ -82,7 +83,7 @@
       const row=file.__local ? file : await window.ChuteyExplorerAPI.command('locate_saved',{id:file.id});
       const source=await window.ChuteyExplorerAPI.mediaSource(row);
       if(token!==serial){void window.ChuteyExplorerAPI.command('release_media',{ticket:source.ticket}).catch(()=>{});return;}
-      mediaTicket=source.ticket;
+      mediaTicket=source.ticket;stopLease=window.ChuteyMediaPlayback.lease(source,window.ChuteyExplorerAPI,error=>{errorText.textContent='Playback continuation: '+error.message;errorText.hidden=false;});
       const node=document.createElement(source.mime.startsWith('audio/')?'audio':'video');node.controls=true;node.preload='metadata';node.autoplay=false;node.crossOrigin='anonymous';
       if(!node.canPlayType(source.mime))throw Error('This browser does not support the media container/codec.');
       node.onerror=async()=>{const message=await window.ChuteyMediaPlayback.failure(node,source);if(token===serial){releaseMedia();errorText.textContent=message;errorText.hidden=false;}};

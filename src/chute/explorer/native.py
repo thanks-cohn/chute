@@ -96,6 +96,7 @@ class NativeExplorer:
                     from .grant_store import describe
                     grant=RootGrant(Path(path),writable=writable)
                     descriptor=describe(grant,path)
+                    descriptor.update(media_allowed=False,media_policy_version=1)
                     try:
                         if self.store: self.store.save(origin,descriptor)
                     except BaseException:
@@ -105,7 +106,10 @@ class NativeExplorer:
                     adapter=ExplorerAPI(engine,session)
                     # Replacing consent invalidates previous sessions immediately.
                     self.adapters[origin]=adapter
+                    adapter.media_allowed=False
                     if old:
+                        old.revoke_media()
+                        if old.clipboard:old.clipboard.close()
                         old.session.expires=0
                         with old.engine.lock: old.engine.close()
                 elif old:
@@ -118,7 +122,7 @@ class NativeExplorer:
                         adapter=old
                         session=old.session
                     else:
-                        adapter=ExplorerAPI(old.engine,session)
+                        adapter=ExplorerAPI(old.engine,session,previous=old)
                         adapter.resume_handle=getattr(old,'resume_handle',grant.id)
                         adapter.store_only=getattr(old,'store_only',False)
                         self.adapters[origin]=adapter
@@ -135,6 +139,16 @@ class NativeExplorer:
                         self.descriptors[origin]=descriptor;self.adapters[origin]=adapter
                 else:
                     adapter=self._saved_scope(origin,session)
+                descriptor=self.descriptors.get(origin,{})
+                if not getattr(adapter,'store_only',False):
+                    # Preserve previous playback on existing approvals. Explicit
+                    # migration metadata is discoverable; new grants start OFF.
+                    migrated='media_allowed' not in descriptor
+                    if migrated:
+                        descriptor={**descriptor,'media_allowed':True,'media_policy_version':1,'media_policy_migrated':True}
+                        self.descriptors[origin]=descriptor
+                        if self.store:self.store.save(origin,descriptor)
+                    adapter.media_allowed=descriptor['media_allowed']
                 adapter.native_state=lambda command,args: self.state(origin,command,args)
                 return {'ok':True,'token':session.token,'expires_in':max(0,int(session.expires-time.monotonic())),'read_only':not next(iter(adapter.engine.grants.values())).writable,
                         'native_roundtrip_ms':round((time.perf_counter()-started)*1000,2),
@@ -159,6 +173,16 @@ class NativeExplorer:
     def state(self, origin, command, args):
         adapter=self.adapters[origin]
         with self.lock, adapter.engine.lock:
+            if command in {'media_policy_get','media_policy_set'}:
+                if command=='media_policy_set':
+                    if set(args)!={'allowed'} or type(args['allowed']) is not bool:raise ExplorerError('INVALID_ARGUMENT','A playback checkbox value is required.')
+                    descriptor={**self.descriptors.get(origin,{}),'media_allowed':args['allowed'],'media_policy_version':1,'media_policy_migrated':False}
+                    if self.store and not getattr(adapter,'store_only',False):self.store.save(origin,descriptor)
+                    self.descriptors[origin]=descriptor;adapter.media_allowed=args['allowed']
+                    if not args['allowed']:
+                        with adapter.media_lock:
+                            for source in adapter.media.values():source['revoked']=True
+                return {'allowed':getattr(adapter,'media_allowed',True),'scope':'saved_store' if getattr(adapter,'store_only',False) else 'approved_folder','migrated':self.descriptors.get(origin,{}).get('media_policy_migrated',False)}
             if getattr(adapter,'store_only',False):
                 if command=='remember_location':return {'remembered':False,'reason':'SAVED_STORE_SCOPE'}
                 if command in {'begin_transfer','finish_transfer','reconcile_transfer'}:raise ExplorerError('WRITE_CONSENT_REQUIRED','Approve an external destination folder first.')
@@ -217,6 +241,8 @@ class NativeExplorer:
             if command == 'revoke_access':
                 if args: raise ExplorerError('INVALID_ARGUMENT','Unexpected revoke arguments.')
                 if self.store: self.store.revoke(origin)
+                adapter.revoke_media()
+                if adapter.clipboard:adapter.clipboard.close()
                 adapter.session.expires=0
                 adapter.engine.close()
                 self.adapters.pop(origin,None)

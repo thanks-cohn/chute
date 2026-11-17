@@ -10,6 +10,9 @@
     <div class="ex-workspace"><aside class="ex-tree" aria-label="Folder navigator"></aside><div class="ex-column-resize" role="separator" tabindex="0" aria-label="Resize folders and files columns" aria-orientation="vertical" aria-valuemin="15" aria-valuemax="75" aria-valuenow="36" title="Drag to resize folders"></div><div class="ex-list" role="listbox" aria-label="Local files" aria-multiselectable="true" tabindex="0"></div></div>
     <div class="ex-status" role="status" aria-live="polite">Choose Browse once to access a local folder.</div>
     <section class="ex-preview" aria-label="File preview" hidden><div class="ex-resize" role="separator" aria-label="Resize preview" aria-orientation="horizontal" tabindex="0"></div><header><button data-action="previous" title="Previous file" aria-label="Previous file">‹</button><strong></strong><button data-action="next" title="Next file" aria-label="Next file">›</button><button data-action="expand" title="Expand preview" aria-label="Expand preview">Expand</button><button data-action="close" title="Close preview" aria-label="Close preview">×</button></header><div class="ex-preview-body"></div></section><div class="ex-menu" role="menu" hidden></div>`;
+  const copyBar=document.createElement('div');copyBar.className='ex-copy-toolbar';copyBar.setAttribute('aria-label','Windows clipboard and copy recovery');
+  copyBar.innerHTML='<button type="button" data-copy="copy">Copy</button><button type="button" data-copy="paste">Paste</button><button type="button" data-copy="review">Review previous copy</button><button type="button" data-copy="verify">Verify destination</button><button type="button" data-copy="cancel">Cancel copy</button><button type="button" data-copy="dismiss">Dismiss after review</button>';
+  host.querySelector('.ex-workspace').before(copyBar);
   const $ = selector => host.querySelector(selector);
   const list = $(".ex-list"), tree = $(".ex-tree"), preview = $(".ex-preview"), status = $(".ex-status"), menu = $(".ex-menu");
   let current = null, parent = null, rows = [], roots = [], selected = new Set(), back = [], forward = [];
@@ -82,8 +85,63 @@
     $(".ex-preview-body").replaceChildren();
     for (const url of urls) URL.revokeObjectURL(url); urls = []; preview.hidden = true;
   }
+  const pinned=document.createElement('section');pinned.className='ex-pinned-player';pinned.hidden=true;
+  pinned.innerHTML='<header><strong>Media player</strong><button type="button" aria-label="Stop playback">Stop / Close</button></header><div class="ex-pinned-body"></div><p role="status"></p>';
+  host.append(pinned);
+  const pinnedBody=pinned.querySelector('.ex-pinned-body'),pinnedStatus=pinned.querySelector('[role=status]');
+  let pinnedId=0,pinnedTicket=null,pinnedSource=null,pinnedRow=null,stopPinnedLease=null,pinnedUrls=[];
+  function stopPinned(){++pinnedId;stopPinnedLease?.();stopPinnedLease=null;
+    pinned.querySelectorAll('video,audio').forEach(n=>{n.onerror=null;n.pause();n.removeAttribute('src');n.load();});
+    if(pinnedTicket)void api.command('release_media',{ticket:pinnedTicket}).catch(()=>{});
+    pinnedTicket=null;pinnedRow=null;pinnedBody.replaceChildren();pinned.hidden=true;host.classList.remove('ex-has-pinned');
+    for(const url of pinnedUrls)URL.revokeObjectURL(url);pinnedUrls=[];
+  }
+  pinned.querySelector('button').onclick=stopPinned;
+  async function showPinned(row){
+    if(pinnedRow?.identity===row.identity&&pinnedRow?.handle===row.handle)return;
+    stopPinned();const id=pinnedId;pinnedRow=row;pinned.hidden=false;host.classList.add('ex-has-pinned');
+    pinned.querySelector('strong').textContent=row.name;pinnedStatus.textContent='Playback stays here while you browse. Stop explicitly to release access.';
+    const body=pinnedBody;body.textContent='Loading media…';
+    const signal=new AbortController().signal;
+    try{
+      const meta=await api.command('preview',{handle:row.handle});
+      if(id!==pinnedId)return;
+      if(meta.identity!==row.identity)throw Error('The source changed; refresh the file.');
+      const audio=meta.preview==='audio';
+      if (meta.preview === "video" || audio) {
+        const video = document.createElement(audio ? 'audio':'video'); video.controls = true; video.preload = "metadata";
+        video.autoplay = false; video.crossOrigin = "anonymous"; video.setAttribute("referrerpolicy","no-referrer");
+        if (!video.canPlayType(meta.mime)) { body.textContent = "This browser does not support this video container or codec."; return; }
+        try {
+          const source = await api.mediaSource(meta);
+          if (id !== pinnedId) { void api.command("release_media",{ticket:source.ticket}).catch(() => {}); return; }
+          pinnedTicket=source.ticket;pinnedSource=source;video.src=source.url;stopPinnedLease=window.ChuteyMediaPlayback.lease(source,api,error=>{pinnedStatus.textContent='Continuation: '+error.message;});
+        } catch (error) {
+          if (id !== pinnedId) return;
+          // The installed worker remains supported for bounded small clips.
+          // Never materialize a whole movie as a Blob on an older companion.
+          if (error.code !== "UNSUPPORTED_COMMAND" || meta.size > 32 * 1024 * 1024 || meta.preview === "unavailable") {
+            body.textContent = error.code === "UNSUPPORTED_COMMAND" ? "This companion supports only small audio/video previews. Range streaming requires the separate test worker; the installed worker has not been changed." : error.message;
+            return;
+          }
+          const blob = await api.content(meta,{signal});
+          if (id !== pinnedId) return;
+          const url = URL.createObjectURL(blob); pinnedUrls.push(url); video.src = url;
+        }
+        video.onerror = async () => {
+          const message=await window.ChuteyMediaPlayback.failure(video,pinnedSource||{url:video.src});
+          if(id!==pinnedId)return;
+          if(pinnedTicket){void api.command('release_media',{ticket:pinnedTicket}).catch(()=>{});pinnedTicket=null;}stopPinnedLease?.();
+          body.textContent=message;
+        };
+        body.replaceChildren(video); return;
+      }
+    }catch(error){if(id===pinnedId)body.textContent=error.message;}
+  }
+  function isMedia(row){return /^(video|audio)\//.test(row.mime||'')||/\.(mp4|webm|mp3|m4a|wav|flac|oga)$/i.test(row.name||'');}
   async function showPreview(row) {
-    closePreview(); const id = previewId; previewRow = row; preview.hidden = false;
+    if(isMedia(row))return showPinned(row);
+    closePreview(); const id = previewId; previewRow = row; preview.hidden = false;preview.tabIndex=-1;preview.focus({preventScroll:true});
     if (!selected.has(row.handle)) select(row); updateGalleryButtons();
     resizePreview();
     $(".ex-preview strong").textContent = row.name;
@@ -109,37 +167,9 @@
       }
       if (id !== previewId) return;
       const audio = meta.preview === "audio" || /^audio\//i.test(meta.mime || '') || /\.(mp3|m4a|wav|flac|oga)$/i.test(row.name);
-      if (meta.preview === "video" || audio) {
-        const video = document.createElement(audio ? 'audio':'video'); video.controls = true; video.preload = "metadata";
-        video.autoplay = false; video.crossOrigin = "anonymous"; video.setAttribute("referrerpolicy","no-referrer");
-        if (!video.canPlayType(meta.mime)) { body.textContent = "This browser does not support this video container or codec."; return; }
-        try {
-          const source = await api.mediaSource(meta);
-          if (id !== previewId) { void api.command("release_media",{ticket:source.ticket}).catch(() => {}); return; }
-          mediaTicket = source.ticket; video.src = source.url;
-        } catch (error) {
-          if (id !== previewId) return;
-          // The installed worker remains supported for bounded small clips.
-          // Never materialize a whole movie as a Blob on an older companion.
-          if (error.code !== "UNSUPPORTED_COMMAND" || meta.size > 32 * 1024 * 1024 || meta.preview === "unavailable") {
-            body.textContent = error.code === "UNSUPPORTED_COMMAND" ? "This companion supports only small audio/video previews. Range streaming requires the separate test worker; the installed worker has not been changed." : error.message;
-            return;
-          }
-          const blob = await api.content(meta,{signal});
-          if (id !== previewId) return;
-          const url = URL.createObjectURL(blob); urls.push(url); video.src = url;
-        }
-        video.onerror = async () => {
-          const message=await window.ChuteyMediaPlayback.failure(video,{url:video.src});
-          if(id!==previewId)return;
-          if(mediaTicket){void api.command('release_media',{ticket:mediaTicket}).catch(()=>{});mediaTicket=null;}
-          body.textContent=message;
-        };
-        body.replaceChildren(video); return;
-      }
       // Non-video previews retain the existing bounded content API.
       if (meta.preview === "unavailable" || meta.size > 64 * 1024 * 1024) {
-        body.textContent = "Preview unavailable. Large media requires native streaming integration."; return;
+        body.textContent = "This document/image preview is unsupported or exceeds its safe preview size. Use Open or Reveal; supported audio/video uses streaming."; return;
       }
       const blob = await api.content(meta, {signal});
       if (id !== previewId) return;
@@ -224,7 +254,7 @@
     if (!next) return;
     select(next); await showPreview(next);
     const card = [...list.querySelectorAll('.ex-row')].find(node => node.dataset.handle === next.handle);
-    card?.focus({preventScroll:true});
+    if(previewRow?.handle===next.handle)preview.focus({preventScroll:true});
   }
   const thumbnailToggle = $('[data-setting=thumbnails]');
   function applyThumbnails(enabled) {
@@ -269,23 +299,46 @@
     if (items.length !== 1) throw Error("Choose one file. Bulk transfers require verified Premium support.");
     return items[0];
   }
-  async function copySelection() {
+  async function copyInside() {
     const row = transferSelection();
     clipboardFile = {handle:row.handle,identity:row.identity,name:row.name};
     say("Copied for Paste inside Chutey. This is not the Windows file clipboard.");
   }
-  async function pasteSelection(destination = current) {
-    if (!writable) throw Error("To save here, approve this folder in Folder Access settings.");
-    if (!clipboardFile) throw Error("Copy a file in Chutey first, or paste actual files from your clipboard.");
-    const receipt = await api.transfer({kind:"local_copy",handle:clipboardFile.handle,identity:clipboardFile.identity,destination},{onProgress:transferProgress});
-    await load(current,{remember:false}); say("Verified copy: " + receipt.name);
+  async function copySelection(){
+    const files=rows.filter(r=>selected.has(r.handle)&&r.kind==='file').map(r=>({handle:r.handle,identity:r.identity}));
+    if(!files.length)throw Error('Select files to copy.');
+    const result=await api.command('clipboard_copy_files',{files,user_gesture:true});
+    say('Copied '+result.count+' file reference(s) to Windows clipboard for Explorer or Chutey Paste.');
   }
+  async function pasteSelection(destination=current,internal=false){
+    if(!writable)throw Error('Approve write access to the destination first.');
+    if(internal){if(!clipboardFile)throw Error('Copy inside Chutey first.');const receipt=await api.transfer({kind:'local_copy',handle:clipboardFile.handle,identity:clipboardFile.identity,destination},{onProgress:transferProgress});await load(current,{remember:false});say('Verified internal copy: '+receipt.name);return;}
+    const imported=await api.command('clipboard_read_files',{user_gesture:true});
+    try{
+      for(let index=0;index<imported.files.length;index++){
+        const receipt=await api.transfer({kind:'clipboard_to_local',snapshot:imported.snapshot,index,destination},{onProgress:transferProgress});
+        say('Verified Windows clipboard file: '+receipt.name);
+      }
+      await load(current,{remember:false});
+    }finally{void api.command('clipboard_release',{snapshot:imported.snapshot}).catch(()=>{});}
+  }
+  copyBar.querySelector('[data-copy=copy]').onclick=safe(copySelection);
+  copyBar.querySelector('[data-copy=paste]').onclick=safe(()=>pasteSelection());
+  for(const name of ['review','verify'])copyBar.querySelector('[data-copy='+name+']').onclick=safe(async()=>{const result=await api.reviewPending({destination:current,onProgress:transferProgress});say(result.message||result.state);});
+  copyBar.querySelector('[data-copy=cancel]').onclick=safe(async()=>{const result=await api.cancelPending();say(result.state);});
+  copyBar.querySelector('[data-copy=dismiss]').onclick=safe(async()=>{if(confirm('Review the destination first. Dismiss this warning without changing files or repeating any copy?')){await api.dismissPending({reviewed:true});say('Reviewed warning dismissed; job evidence retained.');}});
+  let listAbort=null,thumbnailConcurrency=2;
+  document.addEventListener('chutey-performance-changed',event=>{thumbnailConcurrency=event.detail?.effective_limits?.thumbnail||2;void pump();});
+  document.addEventListener('chutey-folder-access-changed',()=>void safe(connect)());
   async function load(handle, {remember = true, append = false, recovery = true} = {}) {
+    clearTimeout(timer); // A delayed old-folder search must not cancel an explicit navigation.
     const id = ++requestId;
+    listAbort?.abort();listAbort=new AbortController();
     say("Loading…");
     let result;
-    try { result = await api.command("list", {handle, offset:append ? offset : 0,limit:100,sort:$(".ex-filter select").value,query:$(".ex-filter input").value}); }
+    try { result = await api.command("list", {handle, offset:append ? offset : 0,limit:100,sort:$(".ex-filter select").value,query:$(".ex-filter input").value},{signal:listAbort.signal}); }
     catch (error) {
+      if(error.name==='AbortError'||id!==requestId)return;
       if (recovery && error.code === "INVALID_HANDLE") { await connect(false); return; }
       throw error;
     }
@@ -308,7 +361,7 @@
       if (remember && current && current !== handle) { back.push(current); forward = []; }
       observer.disconnect(); queue.length = 0;
       current = handle; parent = result.parent; selected.clear(); anchor = null; closePreview(); releaseThumbnails(); rows = []; list.replaceChildren();
-      await rememberView();
+      void rememberView();
     }
     rows.push(...result.entries); offset = result.next_offset;
     $(".ex-breadcrumb").textContent = result.name;
@@ -340,7 +393,7 @@
       }
       node.onclick = event => {
         select(row, event);
-        if (!preview.hidden) { if (row.kind === "file") void showPreview(row); else closePreview(); }
+        if (!preview.hidden) { if (row.kind === "file" && !isMedia(row)) void showPreview(row); else if(row.kind!=="file") closePreview(); }
       };
       node.ondblclick = safe(() => row.kind === "directory" ? load(row.handle) : fileAction(row,"open"));
       node.oncontextmenu = event => { event.preventDefault(); if (!selected.has(row.handle)) select(row); showMenu(event.clientX, event.clientY, row); };
@@ -359,7 +412,7 @@
   // Lazy thumbnails, max three simultaneous requests; original bytes stay in Python.
   const queue = []; let active = 0;
   async function pump() {
-    if (active >= 3 || !queue.length) return;
+    if (active >= thumbnailConcurrency || !queue.length) return;
     const node = queue.shift(); const row = rows.find(row => row.handle === node.dataset.handle);
     if (!row || !node.isConnected || !showExplorerThumbnails || !visibleThumbnails.has(node)) { void pump(); return; }
     active++;
@@ -471,6 +524,9 @@
     menu.replaceChildren();
     const actions = row ? [[row.kind === "directory" ? "Open folder" : "Preview", () => row.kind === "directory" ? load(row.handle) : showPreview(row)], ["Properties", async () => { const meta = await api.command("stat", {handle: row.handle}); say(`${meta.name} · ${meta.size.toLocaleString()} bytes · ${new Date(meta.modified_ns / 1e6).toLocaleString()}`); }]] : [["Refresh", () => current && load(current, {remember: false})]];
     if (row?.kind === 'file') actions.push(['Open',() => fileAction(row,'open')],['Reveal / GO TO',() => fileAction(row,'reveal')]);
+    if(row?.kind==='file')actions.push(['Copy',copySelection],['Copy inside Chutey',copyInside],['Copy image pixels to Windows clipboard',async()=>{const result=await api.command('clipboard_copy_image',{handle:row.handle,identity:row.identity,user_gesture:true});say('Copied image pixels to Windows clipboard · '+result.width+' × '+result.height);}]);
+    actions.push(['Paste',()=>pasteSelection()],['Paste inside Chutey',()=>pasteSelection(current,true)],['Review previous copy',async()=>{const result=await api.reviewPending({destination:current});say(result.message||result.state);}],['Verify destination',async()=>{const result=await api.reviewPending({destination:current});say(result.message||result.state);}],['Cancel previous copy',async()=>{const result=await api.cancelPending();say(result.state);}],['Dismiss after review',async()=>{if(confirm('Have you reviewed the destination? This changes no files and never repeats a copy.'))await api.dismissPending({reviewed:true});}]);
+
     for (const [name, fn] of actions) { const node = button(name, name, async () => { menu.hidden = true; await fn(); }); node.role = "menuitem"; menu.append(node); }
     for (const [label, fn] of [["Copy",copySelection],["Paste",() => pasteSelection(row?.kind === "directory" ? row.handle : current)]]) {
       const node = button(label,label,async () => { menu.hidden=true; await fn(); }); node.role="menuitem";
@@ -515,7 +571,7 @@
       event.preventDefault(); selected = new Set(rows.filter(row => row.kind !== "blocked").map(row => row.handle)); paintSelection();
     }
     if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "c") { event.preventDefault(); await copySelection(); }
-    if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "v" && clipboardFile) { event.preventDefault(); await pasteSelection(); }
+    if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "v") { event.preventDefault(); await pasteSelection(); }
   }));
   host.addEventListener("keydown", event => { if (event.key === "Escape") { menu.hidden = true; closePreview(); list.focus(); } });
   function dropDestination(event) {
@@ -584,11 +640,17 @@
     say("Original files verified in Live.");
   }
   $(".ex-connect").onsubmit = safe(async event => { event.preventDefault(); api.connect($(".ex-connect input").value); $(".ex-connect input").value = ""; await connect(); });
-  async function rememberView() {
-    if (!current || savedLocations.has(current)) return;
-    try { await api.command("remember_location", {handle:current, view:{sort:$(".ex-filter select").value,
-      query:$(".ex-filter input").value, grid, scroll:Math.round(list.scrollTop)}}); }
-    catch { /* Older paired companions remain browse-compatible. */ }
+  let viewPersistence=null,viewWanted=false,lastPersistedView='';
+  function rememberView(){
+    viewWanted=true;if(viewPersistence)return viewPersistence;
+    viewPersistence=(async()=>{
+      while(viewWanted){viewWanted=false;
+        if(!current||savedLocations.has(current))continue;
+        const args={handle:current,view:{sort:$('.ex-filter select').value,query:$('.ex-filter input').value,grid,scroll:Math.round(list.scrollTop)}};
+        const signature=JSON.stringify(args);if(signature===lastPersistedView)continue;
+        try{await api.command('remember_location',args);lastPersistedView=signature;}catch{}
+      }
+    })().finally(()=>{viewPersistence=null;});return viewPersistence;
   }
   let timer;
   $(".ex-filter input").oninput = () => { clearTimeout(timer); timer = setTimeout(safe(() => current && load(current, {remember: false})), 180); };
@@ -610,17 +672,17 @@
     live: () => copyToLive(rows.filter(row => selected.has(row.handle))),
     write: async () => {
       say("Choose the exact folder to authorize read and write access…");
-      const session = await api.nativeSession(true,true); writable = !session.read_only;
+      const session = await api.nativeSession(true,true);document.dispatchEvent(new CustomEvent('chutey-show-folder-access')); writable = !session.read_only;
       liveCopies.clear(); await connect();
     },
     revoke: async () => {
       await api.command("revoke_access"); ++requestId; ++previewId;
       observer.disconnect(); queue.length = 0; closePreview(); releaseThumbnails();
-      writable = false; liveCopies.clear(); current = null; parent = null; rows = []; roots = []; back = []; forward = [];
+      stopPinned();writable = false; liveCopies.clear(); current = null; parent = null; rows = []; roots = []; back = []; forward = [];
       list.replaceChildren(); tree.replaceChildren(); api.connect("");
       say("Access revoked. Select a folder to approve access again.");
     },
-    select: async () => { say("Opening Windows folder picker…"); const session = await api.nativeSession(true); writable = !session.read_only; liveCopies.clear(); await chrome.storage.local.remove("chuteyExplorerLastHandle"); await connect(); },
+    select: async () => { say("Opening Windows folder picker…"); const session = await api.nativeSession(true);document.dispatchEvent(new CustomEvent('chutey-show-folder-access')); writable = !session.read_only; liveCopies.clear(); await chrome.storage.local.remove("chuteyExplorerLastHandle"); await connect(); },
     resume: async () => { const session = await api.nativeSession(false); writable = !session.read_only; await connect(); },
     refresh: () => current && load(current, {remember: false}), parent: () => parent && load(parent), roots: () => roots[0] && load(roots[0].handle), close: closePreview,
     previous: () => navigatePreview(-1), next: () => navigatePreview(1),
@@ -652,5 +714,5 @@
   if (chrome.runtime?.sendNativeMessage) void api.nativeSession(false).then(session => { writable = !session.read_only; return connect(); }).catch(error => { say(error.message); });
   else $(".ex-connect").hidden = false; // Explicit developer/fixture fallback only.
   new ResizeObserver(() => { if (!preview.hidden) resizePreview(); }).observe(host);
-  window.addEventListener("pagehide", () => { closePreview(); releaseThumbnails(); api.connect(""); });
+  window.addEventListener("pagehide", () => { stopPinned();closePreview(); releaseThumbnails(); api.connect(""); });
 })();

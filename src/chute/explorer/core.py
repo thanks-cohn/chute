@@ -19,11 +19,11 @@ class Explorer:
         self.lock = threading.RLock()
 
     def close(self):
-        for grant in self.grants.values():
+        for grant in list(self.grants.values()):
             grant.close()
 
     def grant_for(self, handle: str) -> RootGrant:
-        for grant in self.grants.values():
+        for grant in list(self.grants.values()):
             if handle in grant.handles:
                 return grant
         raise ExplorerError("INVALID_HANDLE", "This file reference has expired.")
@@ -41,8 +41,7 @@ class Explorer:
     def execute(self, command: str, **args) -> dict:
         operation_id = uuid.uuid4().hex
         try:
-            with self.lock:
-                result = self._execute(command, args)
+            result = self._execute(command, args)
             return {"version": VERSION, "operation_id": operation_id,
                     "state": "completed", "result": result}
         except ExplorerError as exc:
@@ -74,7 +73,7 @@ class Explorer:
         if command == "capabilities":
             return catalog()
         if command == "roots":
-            return {"roots": [{"handle": g.id, "name": g.label, "kind": "directory"} for g in self.grants.values()]}
+            return {"roots": [{"handle": g.id, "name": g.label, "kind": "directory"} for g in list(self.grants.values())]}
         handle = args["handle"]
         grant = self.grant_for(handle)
         parts = grant.parts(handle)

@@ -27,6 +27,52 @@
     }
     return response;
   }
+  const PENDING='chuteyPendingTransfer';
+  let localAdmission=Promise.resolve();
+  function admission(task){
+    if(globalThis.navigator?.locks)return navigator.locks.request('chutey-copy-admission',task);
+    const next=localAdmission.then(task,task);localAdmission=next.catch(()=>{});return next;
+  }
+  async function pending(){
+    const value=(await chrome.storage.session.get({[PENDING]:null}))[PENDING];
+    return value || (chrome.storage.local ? (await chrome.storage.local.get({[PENDING]:null}))[PENDING] : null);
+  }
+  async function savePending(value){
+    await chrome.storage.session.set({[PENDING]:value});
+    if(chrome.storage.local)await chrome.storage.local.set({[PENDING]:value});
+  }
+  async function clearPending(id){
+    for(const area of [chrome.storage.session,chrome.storage.local].filter(Boolean)){
+      if((await area.get({[PENDING]:null}))[PENDING]?.id===id)await area.remove(PENDING);
+    }
+  }
+  function validReceipt(job){
+    const receipt=job?.receipt,size=receipt?.size??receipt?.file?.size;
+    return job.state==='COMMITTED' && receipt?.state==='COMMITTED' && /^[a-f0-9]{64}$/.test(receipt.sha256||'') && Number.isSafeInteger(size) && size>=0 && (job.size===undefined || size===job.size) && (!receipt.file || /^[a-f0-9]{32}$/.test(receipt.file.id||''));
+  }
+  function issue(message,code,job){const error=Error(message);error.code=code;error.job=job;return error;}
+  async function finishPending(marker,job){
+    if(!validReceipt(job))throw issue('The previous copy receipt is incomplete. Verify its destination before retrying.','RECEIPT_INCOMPLETE',job);
+    await chrome.storage.session.set({chuteyLastTransferReceipt:{id:marker.id,state:job.state,receipt:job.receipt}});
+    await clearPending(marker.id);
+    await window.ChuteyExplorerAPI.command('transfer_dismiss',{id:marker.id}).catch(()=>{});
+    return {...job,verified:true,reconciled:true};
+  }
+  async function inspectPending({destination,onProgress=()=>{}}={}){
+    const marker=await pending();if(!marker)return null;
+    let job;
+    try{job=await window.ChuteyExplorerAPI.command('transfer_status',{id:marker.id});}
+    catch(error){return {id:marker.id,state:error.code==='NOT_FOUND'?'MISSING':'WORKER_UNAVAILABLE',verified:false,error:error.code==='NOT_FOUND'?'The worker has no receipt for this ID. Acceptance is unknown; review the destination before dismissal.':'The worker could not inspect the retained copy. Reconnect before retrying.'};}
+    if(['accepted','running'].includes(job.state)){onProgress(job);return {...job,verified:false};}
+    if(['COMMITTED','UNCERTAIN'].includes(job.state)){
+      try{job=await window.ChuteyExplorerAPI.command('transfer_verify',{id:marker.id,...(destination?{destination}:{})});}
+      catch(error){return {...job,verified:false,error:error.message,review_required:true};}
+      if(job.verification?.state==='VERIFYING')return {...job,state:'VERIFYING',verified:false};
+      if(job.verification?.verified===true && validReceipt(job))return finishPending(marker,job);
+      return {...job,verified:false,review_required:true,error:job.verification?.message||job.error||'The previous destination has not been verified. Review it before a new copy.'};
+    }
+    return {...job,verified:false,review_required:true};
+  }
   window.ChuteyExplorerAPI = Object.freeze({
     async nativeSession(select = false, writable = false) {
       if (!select && renewing) return renewing;
@@ -65,8 +111,8 @@
       try { return await renewing; } finally { renewing = null; }
     },
     connect(value) { token = value.trim(); },
-    async command(command, args = {}) {
-      const receipt = await (await request("command", {command, args})).json();
+    async command(command, args = {}, {signal} = {}) {
+      const receipt = await (await request("command", {command, args}, signal)).json();
       if (receipt.state !== "completed") {
         const error = new Error(receipt.error?.message || "Command failed.");
         error.code = receipt.error?.code; throw error;
@@ -83,23 +129,45 @@
       if (!response.ok || receipt.state !== "COMMITTED") throw new Error(receipt.error?.message || "Copy did not commit. Check the destination before retrying.");
       return receipt;
     },
+    async reviewPending(options={}) {return admission(()=>inspectPending(options));},
+    async cancelPending(){
+      const marker=await pending();if(!marker)return null;
+      const job=await window.ChuteyExplorerAPI.command('transfer_cancel',{id:marker.id});return job;
+    },
+    async dismissPending({reviewed=false}={}){
+      if(reviewed!==true)throw issue('Review the destination before dismissing this copy.','REVIEW_REQUIRED');
+      return admission(async()=>{
+        const marker=await pending();if(!marker)return {dismissed:true};
+        let job;
+        try{job=await window.ChuteyExplorerAPI.command('transfer_status',{id:marker.id});}
+        catch(error){if(error.code!=='NOT_FOUND')throw error;job={id:marker.id,state:'MISSING'};}
+        if(['accepted','running'].includes(job.state)||job.verification?.state==='VERIFYING')throw issue('The copy or verification is still active. Cancel and wait first.','TRANSFER_ACTIVE',job);
+        if(job.state!=='MISSING')await window.ChuteyExplorerAPI.command('transfer_dismiss',{id:marker.id,reviewed:true});
+        const history=(await chrome.storage.session.get({chuteyReviewedTransfers:[]})).chuteyReviewedTransfers;
+        await chrome.storage.session.set({chuteyReviewedTransfers:[...history.slice(-31),{id:marker.id,state:job.state,reviewedAt:Date.now()}]});
+        await clearPending(marker.id);
+        return {dismissed:true,evidence_preserved:true,id:marker.id};
+      });
+    },
     async transfer(args,{onProgress=()=>{}}={}) {
-      const previous=(await chrome.storage.session.get({chuteyPendingTransfer:null})).chuteyPendingTransfer;
-      if(previous && previous.id!==args.id)throw Error('Check the previous transfer '+previous.id+' before starting another copy.');
-      const id=args.id || crypto.randomUUID().replaceAll('-','');
-      await chrome.storage.session.set({chuteyPendingTransfer:{id,issuedAt:Date.now()}});
-      let job;
-      try{job=await window.ChuteyExplorerAPI.command('transfer_start',{...args,id});}
-      catch(error){error.message+=' Check transfer '+id+' before retrying; its ID is retained.';throw error;}
+      const started=await admission(async()=>{
+        const previous=await inspectPending({onProgress});
+        if(previous && !previous.reconciled)throw issue(previous.error||'A previous copy is '+previous.state+'. Use Review previous copy beside Paste.','TRANSFER_'+previous.state.toUpperCase(),previous);
+        if(previous?.id===args.id)return {job:previous,id:previous.id,reconciled:true};
+        const id=args.id || crypto.randomUUID().replaceAll('-','');
+        await savePending({id,kind:args.kind,issuedAt:Date.now()});
+        try{return {id,job:await window.ChuteyExplorerAPI.command('transfer_start',{...args,id})};}
+        catch(error){error.message+=' Its ID '+id+' is retained. Review previous copy before retrying.';throw error;}
+      });
+      if(started.reconciled)return started.job.receipt;
+      const {id}=started;let job=started.job;
       while(['accepted','running'].includes(job.state)){
         onProgress(job);await new Promise(resolve=>setTimeout(resolve,400));
         job=await window.ChuteyExplorerAPI.command('transfer_status',{id});
       }
-      if(job.state!=='COMMITTED')throw Error(job.error || 'Transfer did not commit. Check its retained job ID before retrying.');
+      if(!validReceipt(job))throw issue(job.error||'Copy did not return a verified receipt. Review previous copy before retrying.','TRANSFER_'+job.state,job);
       if(args.kind==='local_to_live')void chrome.runtime.sendMessage?.({type:'chute-count-changed'})?.catch(()=>{});
-      await chrome.storage.session.set({chuteyLastTransferReceipt:{id,state:job.state,receipt:job.receipt}});
-      await chrome.storage.session.remove('chuteyPendingTransfer');
-      await window.ChuteyExplorerAPI.command('transfer_dismiss',{id}).catch(()=>{});return job.receipt;
+      await admission(()=>finishPending({id},job));return job.receipt;
     },
     async mediaSource(row) {
       const source = await window.ChuteyExplorerAPI.command("media_source",{handle:row.handle,identity:row.identity});

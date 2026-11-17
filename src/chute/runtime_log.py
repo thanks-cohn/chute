@@ -94,4 +94,29 @@ def resource_snapshot():
         if ctypes.windll.kernel32.GlobalMemoryStatusEx(ctypes.byref(memory)):
             result.update(memory_total_bytes=memory.total,memory_available_bytes=memory.available,
                           commit_limit_bytes=memory.page_total,commit_available_bytes=memory.page_available)
+        # Current-process counters only, never enumerate unrelated processes.
+        from ctypes import wintypes as W
+        kernel=ctypes.WinDLL('kernel32',use_last_error=True)
+        kernel.GetCurrentProcess.restype=W.HANDLE
+        process=kernel.GetCurrentProcess()
+        class Counters(ctypes.Structure):
+            _fields_=[('cb',W.DWORD),('faults',W.DWORD)]+[(name,ctypes.c_size_t) for name in
+                ('peak_rss','rss','peak_pool_paged','pool_paged','peak_pool_nonpaged','pool_nonpaged','pagefile','peak_pagefile','private')]
+        counters=Counters();counters.cb=ctypes.sizeof(counters)
+        psapi=ctypes.WinDLL('psapi',use_last_error=True)
+        psapi.GetProcessMemoryInfo.argtypes=[W.HANDLE,ctypes.c_void_p,W.DWORD]
+        if psapi.GetProcessMemoryInfo(process,ctypes.byref(counters),counters.cb):
+            result.update(process_rss_bytes=counters.rss,process_peak_rss_bytes=counters.peak_rss,process_private_bytes=counters.private)
+        kernel.GetProcessTimes.argtypes=[W.HANDLE]+[ctypes.POINTER(W.FILETIME)]*4
+        times=[W.FILETIME() for _ in range(4)]
+        if kernel.GetProcessTimes(process,*(ctypes.byref(value) for value in times)):
+            result['process_cpu_seconds']=sum((value.dwHighDateTime<<32)+value.dwLowDateTime for value in times[2:])/10_000_000
+    else:
+        try:
+            import resource
+            usage=resource.getrusage(resource.RUSAGE_SELF)
+            result.update(process_cpu_seconds=usage.ru_utime+usage.ru_stime,process_peak_rss_bytes=usage.ru_maxrss*(1 if __import__('sys').platform=='darwin' else 1024))
+            with open('/proc/self/statm') as stream:result['process_rss_bytes']=int(stream.read().split()[1])*os.sysconf('SC_PAGE_SIZE')
+        except (OSError,ImportError,ValueError,IndexError):pass
+    result['python_threads']=threading.active_count()
     return result

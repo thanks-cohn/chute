@@ -75,7 +75,7 @@ class Transfers:
             item = store.add_stream(row['name'], Source(), row['size'], mime=row['mime'], source_path='local_explorer',expected_sha256=expected,check=authorize,item_id=item_id)
             found = store.get(item.id)
             with found[1].open('rb') as copied:
-                actual = digest(copied)
+                actual = digest(copied,authorize)
             if actual != expected:
                 store.remove(item.id)
                 raise ExplorerError('VERIFY_FAILED', 'Live copy failed byte verification.')
