@@ -15,6 +15,13 @@
 - A user who never invokes "Make Me Chutey!" retains exactly the simple one-Chutey experience: one mascot, one usual location, one explorer.
 - An initial new Chutey may use the same mascot artwork; different colors/names/skins later are optional presentation, not separate workers.
 
+## OWNER REFINEMENT — CONFIGURABLE COMPACT EXPLORER SIZE
+
+- In **Chutey Settings → Explorer → Compact window size**, choose a default compact window width and height, starting with **300 × 400 Windows logical pixels (width × height)**, adjustable and persisted. Validate DPI scaling, monitor bounds and a legible drop area; this is a useful preset, not a fixed maximum or minimum.
+- **– Minimize** applies the compact dimensions to *that window only*; it remains fully visible, ALWAYS ON TOP, navigable and droppable, with controls reflowing gracefully in a narrow/portrait layout. **□ Restore** returns *that window* to the prior larger dimensions. **X Close** returns that Chutey to the mascot under its own 10-second/always-visible/manual rules.
+- For future multi-Chutey mode, use a **shared compact-size preference as the default for newly created instances**, with independent window geometry/state. Optional per-instance custom compact-size overrides may come later; **changing one Chutey's manually resized window must not resize the other three or overwrite their full-size restore bounds**.
+- Four compact 300×400 Explorer windows can remain on-screen simultaneously where screen space permits, each still pinned and receiving drag-and-drop. If screen space is insufficient, allow repositioning and do not place windows permanently offscreen. The 10-second mascot timer never applies to a compact window.
+
 ## OWNER RULE — INDEPENDENT MASCOT VISIBILITY MODES, EXPLORER NEVER AUTO-HIDES
 
 **This is a strict distinction.** Each Chutey has two different visual surfaces: (a) its **collapsed mascot**, which may appear/disappear according to its visibility setting, and (b) its **expanded native miniature Explorer window**, which **stays open, visible and ALWAYS ON TOP in either full or compact minimized size** until the user explicitly clicks X to close **that specific window**. **– Minimize only shrinks the Explorer; it never collapses to the mascot.** The mascot's ten-second timer must NEVER hide, minimize, remove, move behind normal applications, or alter either a full or compact minimized Explorer. The Explorer must remain a usable drag-and-drop target indefinitely, including when other mascots are hidden.
