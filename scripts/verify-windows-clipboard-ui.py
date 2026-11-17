@@ -75,7 +75,7 @@ def select_owned_file(hwnd,name):
     script=r'''
     Add-Type -AssemblyName UIAutomationClient
     $view=[System.Windows.Automation.AutomationElement]::FromHandle([intptr][int64]$env:CHUTE_TEST_EXPLORER_HWND)
-    $condition=New-Object System.Windows.Automation.PropertyCondition([System.Windows.Automation.AutomationElement]::ControlTypeProperty,[System.Windows.Automation.ControlType]::ListItem)
+    $condition=[System.Windows.Automation.PropertyCondition]::new([System.Windows.Automation.AutomationElement]::ControlTypeProperty,[System.Windows.Automation.ControlType]::ListItem)
     $deadline=[DateTime]::UtcNow.AddSeconds(10)
     do {
       $item=$view.FindAll([System.Windows.Automation.TreeScope]::Descendants,$condition) | Where-Object { -not $_.Current.IsOffscreen -and ($_.Current.Name -eq $env:CHUTE_TEST_EXPLORER_NAME -or $_.Current.Name -eq $env:CHUTE_TEST_EXPLORER_STEM) } | Select-Object -First 1
