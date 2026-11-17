@@ -65,7 +65,7 @@ def main():
                 rects=lambda selector:page.locator(selector).evaluate_all('(nodes)=>nodes.map(n=>{let r=n.getBoundingClientRect();return [r.x,r.y,r.width,r.height]})')
                 before=rects('.chutey-popup-placeholder')
                 assert all(box[2]>0 and abs(box[2]-box[3])<1 for box in before),before
-                assert page.evaluate('document.body.getBoundingClientRect().height')==590
+                assert page.evaluate('document.documentElement.getBoundingClientRect().height')==590
                 page.screenshot(path=str(out/'popup-first-paint.png'))
                 for route in list(pending):route.continue_()
                 page.unroute('**/api/browse?**')
@@ -90,21 +90,21 @@ def main():
                     page.reload()
                     expect(page.locator('body')).to_have_attribute('data-gallery-layout',{0:'4x4',1:'5x4',2:'5x5',3:'6x5'}[step])
                     assert len(page.locator('#files').evaluate('node=>getComputedStyle(node).gridTemplateColumns.split(" ")'))==columns
-                    assert page.evaluate('document.body.getBoundingClientRect().height')==590
+                    assert page.evaluate('document.documentElement.getBoundingClientRect().height')==590
                 # Each cached density paints its complete skeleton before data.
                 for step,count in [(1,20),(2,25),(3,30),(0,16)]:
                     page.locator('#gallery-density').evaluate('(node,value)=>{node.value=value;node.dispatchEvent(new Event("input",{bubbles:true}))}',str(step))
                     blocked=[];page.route('**/api/browse?**',lambda route:blocked.append(route))
                     page.reload(wait_until='domcontentloaded')
                     expect(page.locator('.chutey-popup-placeholder')).to_have_count(count)
-                    assert page.evaluate('document.body.getBoundingClientRect().height')==590
+                    assert page.evaluate('document.documentElement.getBoundingClientRect().height')==590
                     for route in list(blocked):route.continue_()
                     page.unroute('**/api/browse?**')
                     expect(page.locator('.chutey-gallery-tile')).to_have_count(16)
                 # Offline: fixed outline, placeholders remain, no blocking image prerequisite.
                 page.route('**/api/browse?**',lambda route:route.abort())
                 page.reload();expect(page.locator('.chutey-popup-placeholder')).to_have_count(16)
-                assert page.evaluate('document.body.getBoundingClientRect().height')==590
+                assert page.evaluate('document.documentElement.getBoundingClientRect().height')==590
                 page.unroute('**/api/browse?**')
                 page.goto('http://127.0.0.1:17891/shelf.html')
                 page.get_by_role('tab',name='File Explorer',exact=True).click()

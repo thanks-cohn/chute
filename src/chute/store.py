@@ -59,6 +59,7 @@ class Store:
         self.history_dir = self.root / "history"
         self.queue_path = self.root / "queue.json"
         self.highlights = None
+        self.intakes = {}
         self.files_dir.mkdir(parents=True, exist_ok=True)
         self.thumbs_dir.mkdir(parents=True, exist_ok=True)
         self.custom_thumbs_dir.mkdir(parents=True, exist_ok=True)
@@ -319,6 +320,7 @@ class Store:
         size: int,
         mime: str | None = None,
         source_path: str = "browser-drop",
+        *, expected_sha256: str | None = None, check: Callable[[], None] = lambda: None, item_id: str | None = None,
     ) -> QueueItem:
         return self._add_stream_to(
             self.files_dir,
@@ -327,7 +329,7 @@ class Store:
             stream,
             size,
             mime=mime,
-            source_path=source_path,
+            source_path=source_path, expected_sha256=expected_sha256, check=check, item_id=item_id,
         )
 
     def add_custom_stream(
@@ -358,27 +360,47 @@ class Store:
         *,
         mime: str | None,
         source_path: str,
+        expected_sha256: str | None = None, check: Callable[[], None] = lambda: None, item_id: str | None = None,
     ) -> QueueItem:
         if size < 0:
             raise ValueError("Upload size cannot be negative")
 
         display_name = Path(name).name.strip() or "browser-file"
-        item_id = uuid.uuid4().hex
+        item_id = item_id or uuid.uuid4().hex
+        if len(item_id)!=32 or any(c not in "0123456789abcdef" for c in item_id):raise ValueError("Invalid intake identity")
         leaf_name = f"{item_id}-{display_name}"
         stored_name = f"{stored_prefix}{leaf_name}"
         destination = directory / leaf_name
         partial = directory / f".{leaf_name}.part"
         remaining = size
-
+        if shutil.disk_usage(directory).free < size + 1024*1024:raise ValueError("Insufficient destination disk space for this file.")
+        if destination.exists():raise ValueError("Intake already exists; reconcile its receipt before retrying.")
+        published=False
+        import hashlib
+        incoming=hashlib.sha256();staging_owned=False
+        with _LOCK:
+            if item_id in self.intakes:raise ValueError('Import is already active. Wait and reconcile its receipt.')
+            if len(self.intakes)>=2:raise ValueError('The companion is receiving two files. Wait before another import.')
+            self.intakes[item_id]={'id':item_id,'state':'RECEIVING','size':size,'bytes':0}
         try:
-            with partial.open("wb") as handle:
+            with partial.open("xb") as handle:
+                staging_owned=True
                 while remaining:
+                    check()
                     chunk = stream.read(min(1024 * 1024, remaining))
                     if not chunk:
                         raise ValueError("Upload ended before the declared size")
-                    handle.write(chunk)
+                    handle.write(chunk);incoming.update(chunk)
                     remaining -= len(chunk)
-            os.replace(partial, destination)
+                    self.intakes[item_id]['bytes']=size-remaining
+                handle.flush();os.fsync(handle.fileno())
+            self.intakes[item_id]['state']='VERIFYING'
+            digest=hashlib.sha256()
+            with partial.open('rb') as verify:
+                while chunk:=verify.read(262144):check();digest.update(chunk)
+            if digest.hexdigest()!=incoming.hexdigest() or (expected_sha256 is not None and digest.hexdigest()!=expected_sha256):raise ValueError('Staged file integrity verification failed.')
+            check()
+            os.replace(partial, destination);published=True
 
             item = QueueItem(
                 id=item_id,
@@ -392,11 +414,29 @@ class Store:
             with _LOCK:
                 self._append_queue(item)
                 self._append_history("add", item, item.created_at)
+            receipts=self.root/'upload-receipts';receipts.mkdir(exist_ok=True)
+            receipt_path=receipts/(item.id+'.json');receipt_temp=receipt_path.with_suffix('.part')
+            info=destination.stat()
+            with receipt_temp.open('w',encoding='utf-8') as receipt:
+                json.dump({'id':item.id,'size':item.size,'sha256':digest.hexdigest(),'mtime_ns':info.st_mtime_ns},receipt);receipt.flush();os.fsync(receipt.fileno())
+            os.replace(receipt_temp,receipt_path)
             return item
         except Exception:
-            partial.unlink(missing_ok=True)
-            destination.unlink(missing_ok=True)
+            if staging_owned:partial.unlink(missing_ok=True)
             raise
+        finally:
+            with _LOCK:self.intakes.pop(item_id,None)
+
+    def upload_receipt(self,ident):
+        if not isinstance(ident,str) or len(ident)!=32 or any(c not in '0123456789abcdef' for c in ident):raise ValueError('Invalid import ID.')
+        with _LOCK:
+            if ident in self.intakes:return dict(self.intakes[ident])
+        found=self.get(ident)
+        if not found:return {'id':ident,'state':'NOT_FOUND','error':'No saved item receipt. Inspect pending files before a manual retry.'}
+        try:receipt=json.loads((self.root/'upload-receipts'/(ident+'.json')).read_text())
+        except (OSError,ValueError):return {'id':ident,'state':'UNCERTAIN','error':'File exists but its verified import receipt is unavailable. Do not repeat the upload.'}
+        info=found[1].stat()
+        return {**receipt,'state':'COMMITTED' if (info.st_size,info.st_mtime_ns)==(receipt['size'],receipt['mtime_ns']) else 'UNCERTAIN'}
 
     def _prepare(self, source: Path) -> tuple[Path, str, Callable[[], None]]:
         if source.is_file():

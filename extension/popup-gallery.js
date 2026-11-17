@@ -55,10 +55,10 @@
   lightbox.innerHTML = `
     <header><strong class="chutey-lightbox-title"></strong></header>
     <div class="chutey-lightbox-stage">
-      <button type="button" class="chutey-lightbox-prev" aria-label="Previous image">‹</button>
+      <button type="button" class="chutey-lightbox-prev" aria-label="Previous file">‹</button>
       <img class="chutey-lightbox-image" alt="">
       <div class="chutey-lightbox-reader" hidden><pre tabindex="0" aria-label="Saved text"></pre><nav><button type="button" data-text-back>Previous text page</button><button type="button" data-text-next>Next text page</button></nav><span data-text-position></span></div>
-      <button type="button" class="chutey-lightbox-next" aria-label="Next image">›</button>
+      <button type="button" class="chutey-lightbox-next" aria-label="Next file">›</button>
       <p class="chutey-lightbox-error" hidden>Image unavailable. The History entry is preserved.</p>
     </div>
     <footer><span class="chutey-lightbox-count"></span><button type="button" class="secondary-button chutey-lightbox-shelf" aria-label="Open in Shelf" title="Open in Shelf">↗</button></footer>`;
@@ -68,9 +68,31 @@
   const prev = lightbox.querySelector(".chutey-lightbox-prev");
   const next = lightbox.querySelector(".chutey-lightbox-next");
   let activeId = null, returnFocus = null, serial = 0;
+  const mediaFile=file=>/^(video|audio)\//.test(file.mime||'') || /\.(mp4|webm|mp3)$/i.test(file.name||'');
+  let mediaTicket=null;
+  const player=document.createElement('div');player.className='chutey-lightbox-player';player.hidden=true;
+  lightbox.querySelector('.chutey-lightbox-stage').append(player);
+  function releaseMedia(){
+    player.querySelectorAll('video,audio').forEach(node=>{node.pause();node.removeAttribute('src');node.load();});player.replaceChildren();player.hidden=true;
+    if(mediaTicket){void window.ChuteyExplorerAPI.command('release_media',{ticket:mediaTicket}).catch(()=>{});mediaTicket=null;}
+  }
+  async function showMedia(file,token){
+    try{
+      await window.ChuteyExplorerAPI.nativeSession(false);
+      const row=file.__local ? file : await window.ChuteyExplorerAPI.command('locate_saved',{id:file.id});
+      const source=await window.ChuteyExplorerAPI.mediaSource(row);
+      if(token!==serial){void window.ChuteyExplorerAPI.command('release_media',{ticket:source.ticket}).catch(()=>{});return;}
+      mediaTicket=source.ticket;
+      const node=document.createElement(source.mime.startsWith('audio/')?'audio':'video');node.controls=true;node.preload='metadata';node.autoplay=false;node.crossOrigin='anonymous';
+      if(!node.canPlayType(source.mime))throw Error('This browser does not support the media container/codec.');
+      node.onerror=()=>{if(token===serial){errorText.textContent='Playback failed: unsupported codec or expired/disconnected media session. Reopen to retry.';errorText.hidden=false;}};
+      node.src=source.url;player.replaceChildren(node);player.hidden=false;
+    }catch(error){if(token===serial){errorText.textContent=error.code==='UNSUPPORTED_COMMAND'?'Local streaming needs the matching candidate worker/helper.':error.message;errorText.hidden=false;}}
+  }
   function imageTiles() {
-    return Array.from(document.querySelectorAll("#files .chutey-gallery-tile"))
-      .filter(tile => !tile.hidden && tile.__galleryFile && (isPreviewableImage(tile.__galleryFile) || fileKind(tile.__galleryFile) === "text"));
+    const viewingLocal=document.querySelector("#popup-local")?.hidden===false;
+    return Array.from(document.querySelectorAll("#files .chutey-gallery-tile,.popup-local-media"))
+      .filter(tile => !tile.hidden && tile.__galleryFile && Boolean(tile.__galleryFile.__local)===viewingLocal && (isPreviewableImage(tile.__galleryFile) || fileKind(tile.__galleryFile) === "text" || mediaFile(tile.__galleryFile)));
   }
   function activeFile() {
     return imageTiles().find(tile => tile.__galleryFile.id === activeId)?.__galleryFile;
@@ -93,11 +115,14 @@
   reader.querySelector('[data-text-next]').onclick=()=>{if(textNext!==null){textOffsets.push(textNext);void textPage(textNext,serial);}};
   reader.querySelector('[data-text-back]').onclick=()=>{if(textOffsets.length>1){textOffsets.pop();void textPage(textOffsets.at(-1),serial);}};
   function showImage(id) {
+    releaseMedia();
     const tiles = imageTiles();
     const index = tiles.findIndex(tile => tile.__galleryFile.id === id);
     if (index < 0) return;
     const file = tiles[index].__galleryFile;
     activeId = id;
+    lightbox.setAttribute("aria-label",mediaFile(file)?"Media preview":fileKind(file)==="text"?"Saved text preview":"Image preview");
+    lightbox.querySelector(".chutey-lightbox-shelf").hidden=Boolean(file.__local);
     const token = ++serial;
     errorText.hidden = true;
     errorText.textContent = "Image unavailable. The History entry is preserved.";
@@ -113,28 +138,29 @@
       if (token !== serial) return;
       preview.hidden = true; errorText.hidden = false;
     };
-    if(fileKind(file)==='text'){
+    if(mediaFile(file)){preview.hidden=true;void showMedia(file,token);}
+    else if(fileKind(file)==='text'){
       preview.hidden=true;reader.hidden=false;textFile=file;textOffsets=[0];textNext=null;
       void textPage(0,token);
     }else preview.src = fileUrl(file);
   }
   function openPreview(file, source) {
-    if (!isPreviewableImage(file) && fileKind(file)!=="text") return;
+    if (!isPreviewableImage(file) && fileKind(file)!=="text" && !mediaFile(file)) return;
     returnFocus = source;
     lightbox.hidden = false;
     document.body.classList.add("chutey-lightbox-open");
     showImage(file.id);
     lightbox.tabIndex = -1; lightbox.focus();
-    document.querySelectorAll('body > header,body > details,#chutey-popup-gallery').forEach(node=>{node.inert=true;});
+    document.querySelectorAll('body > header,body > details,#chutey-popup-gallery,#popup-local').forEach(node=>{node.inert=true;});
   }
   function closePreview() {
     if (lightbox.hidden) return;
     lightbox.hidden = true;
     document.body.classList.remove("chutey-lightbox-open");
-    ++serial;
+    ++serial; releaseMedia();
     preview.removeAttribute("src");
     activeId = null; textFile=null;reader.querySelector('pre').textContent='';
-    document.querySelectorAll('body > header,body > details,#chutey-popup-gallery').forEach(node=>{node.inert=false;});
+    document.querySelectorAll('body > header,body > details,#chutey-popup-gallery,#popup-local').forEach(node=>{node.inert=false;});
     if (returnFocus?.isConnected) returnFocus.focus({preventScroll:true});
     returnFocus = null;
   }
@@ -150,11 +176,12 @@
   next.addEventListener("click",() => move(1));
   document.addEventListener("keydown",event => {
     if (lightbox.hidden) return;
+    if(event.key!=="Escape" && event.target.closest("video,audio,input,select,textarea"))return;
     if (event.key === "Escape") { event.preventDefault(); closePreview(); }
     else if (event.key === "ArrowLeft") { event.preventDefault(); move(-1); }
     else if (event.key === "ArrowRight") { event.preventDefault(); move(1); }
     else if (event.key === "Tab") {
-      const controls = Array.from(lightbox.querySelectorAll("button:not(:disabled)"));
+      const controls = Array.from(lightbox.querySelectorAll("button:not(:disabled),pre[tabindex]")).filter(node=>node.getClientRects().length);
       const first = controls[0], last = controls[controls.length - 1];
       if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); }
       else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
@@ -219,8 +246,9 @@
     menu.querySelector("button").focus();
   }
   lightbox.addEventListener("contextmenu",event => {
+    if(reader.contains(event.target))return;
     const file = activeFile(), row = imageTiles().find(tile => tile.__galleryFile.id === activeId);
-    if (file && row) openMenu(event,file,row);
+    if (file && row && !file.__local) openMenu(event,file,row);
   });
   document.addEventListener("pointerdown",event => { if (!menu.hidden && !menu.contains(event.target)) dismissMenu(); },true);
   document.addEventListener("keydown",event => { if (event.key === "Escape" && !menu.hidden) { event.preventDefault(); event.stopImmediatePropagation(); dismissMenu(); } },true);
@@ -238,6 +266,47 @@
     } catch (error) { menu.querySelector("small").textContent = error.message || "Could not remove. Retry."; }
     finally { button.disabled = false; }
   });
+
+  // Explicit local browsing is scoped by the same native enrollment and grants
+  // as Shelf Explorer. References never import bytes or become Store IDs.
+  const local=document.createElement('section');local.id='popup-local';local.hidden=true;
+  local.innerHTML='<h2>Authorized local media</h2><p>Preview the original in an approved folder. No import or temporary movie copy.</p><button type="button" data-local-choose>Choose authorized folder…</button><button type="button" data-local-up>Up</button><button type="button" data-local-more hidden>More files</button><p role="status"></p><div id="popup-local-list"></div>';
+  document.querySelector('#chutey-popup-gallery').before(local);
+  const browse=document.createElement('button');browse.type='button';browse.className='secondary-button';browse.id='popup-local-toggle';browse.textContent='Local media';
+  document.querySelector('.topbar .actions').prepend(browse);
+  let localHandle=null,localParent=null,localOffset=null,localGeneration=0;
+  async function localLoad(handle,append=false){
+    const token=++localGeneration;local.querySelector('[role=status]').textContent='Loading approved folder…';
+    try{
+      const page=await window.ChuteyExplorerAPI.command('list',{handle,offset:append?localOffset:0,limit:100,sort:'name',query:''});
+      if(token!==localGeneration)return;
+      localHandle=handle;localParent=page.parent;localOffset=page.next_offset;
+      local.querySelector('[data-local-up]').disabled=!localParent;
+      local.querySelector('[data-local-more]').hidden=localOffset===null;
+      const list=local.querySelector('#popup-local-list');if(!append)list.replaceChildren();
+      for(const row of page.entries){
+        if(row.kind!=='directory' && (row.kind!=='file'||!mediaFile(row)))continue;
+        const node=document.createElement('button');node.type='button';node.textContent=(row.kind==='directory'?'▰ ':'▶ ')+row.name;
+        if(row.kind==='directory')node.onclick=()=>void localLoad(row.handle);
+        else{node.className='popup-local-media';node.__galleryFile={...row,__local:true,id:'local:'+row.handle};node.onclick=()=>openPreview(node.__galleryFile,node);}
+        list.append(node);
+      }
+      local.querySelector('[role=status]').textContent=page.name+' · approved local folder · MP4 / WebM / MP3';
+    }catch(error){if(token===localGeneration)local.querySelector('[role=status]').textContent=error.message;}
+  }
+  async function localConnect(choose=false){
+    try{
+      await window.ChuteyExplorerAPI.nativeSession(choose);
+      const roots=await window.ChuteyExplorerAPI.command('roots');
+      if(!roots.roots.length){local.querySelector('[role=status]').textContent='Choose a folder to authorize local media access.';return;}
+      await localLoad(roots.roots[0].handle);
+    }catch(error){local.querySelector('[role=status]').textContent=error.message;}
+  }
+  browse.onclick=()=>{local.hidden=!local.hidden;document.querySelector('#chutey-popup-gallery').hidden=!local.hidden;browse.textContent=local.hidden?'Local media':'Saved items';if(!local.hidden)void localConnect();};
+  local.querySelector('[data-local-choose]').onclick=()=>void localConnect(true);
+  local.querySelector('[data-local-up]').onclick=()=>{if(localParent)void localLoad(localParent);};
+  local.querySelector('[data-local-more]').onclick=()=>void localLoad(localHandle,true);
+  window.addEventListener('pagehide',()=>{++serial;releaseMedia();});
 
   const original = createRow;
   createRow = function galleryRow(file,index) {
@@ -275,7 +344,7 @@
     }
     // Image clicks have ONE deterministic action: open the popup preview.
     // Grid expansion was the competing, visually inconsistent second action.
-    if (isPreviewableImage(file) || fileKind(file)==="text") {
+    if (isPreviewableImage(file) || fileKind(file)==="text" || mediaFile(file)) {
       row.setAttribute("role", "button");
       row.setAttribute("aria-label", "Preview " + file.name);
       row.removeAttribute("aria-expanded");

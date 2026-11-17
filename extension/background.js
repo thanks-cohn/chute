@@ -301,16 +301,28 @@ chrome.runtime.onMessage.addListener((message, sender, respond) => {
     task.then(() => respond({ok:true}), () => respond({ok:false})).finally(() => explorerDragRegistrations.delete(message.id));
     return true;
   }
+  if(message?.type==='chutey-resolve-explorer-drag' && own){
+    (async()=>{
+      if(!/^explorer-[a-f0-9-]{36}$/.test(message.id||''))throw Error('Invalid drag reference.');
+      await explorerDragRegistrations.get(message.id);
+      const record=(await chrome.storage.session.get(message.id))[message.id];
+      if(!record||record.expires<Date.now())throw Error('Drag expired. Start again.');
+      return {ok:true,row:record.row};
+    })().then(respond,error=>respond({ok:false,error:error.message}));return true;
+  }
   if (message?.type !== "chutey-read-explorer-drag") return;
   (async () => {
     if (!/^explorer-[a-f0-9-]{36}$/.test(message.id || "")) throw Error("Invalid drag reference.");
     await explorerDragRegistrations.get(message.id);
     const record = (await chrome.storage.session.get(message.id))[message.id];
     if (!record || record.expires < Date.now() || (!own && !sender.tab?.active)) throw Error("This drag expired. Start a new drag.");
+    if(record.row.size>32*1024*1024)throw Error('Website drag is limited to 32 MiB. Use the website file picker with the original file; internal copies use Copy/Paste or Copy selected to Chutey.');
     const session = await chrome.runtime.sendNativeMessage("com.thankscohn.chute",{action:"explorer_resume"});
     if (!session?.ok) throw Error("The companion could not resume this drag.");
     const response = await fetch(BASE_URL+"/api/explorer/v1/content",{method:"POST",headers:{"Content-Type":"application/json",Authorization:"Bearer "+session.token},body:JSON.stringify({handle:record.row.handle,identity:record.row.identity,original:true})});
     if (!response.ok) throw Error("The source changed or is unavailable. Refresh the folder.");
+    const length=Number(response.headers.get('Content-Length'));
+    if(response.headers.get('Content-Length')===null || !Number.isSafeInteger(length) || length<0 || length>32*1024*1024)throw Error('Website drag supports only files up to 32 MiB. For larger files, use the website file picker with the original local file, or Copy selected to Chutey for an internal worker copy.');
     const bytes = new Uint8Array(await response.arrayBuffer());
     let binary = "";
     for (let offset=0;offset<bytes.length;offset+=32768) binary += String.fromCharCode(...bytes.subarray(offset,offset+32768));

@@ -8,7 +8,7 @@
     let response;
     try {
       response = await fetch(base + route, {method:"POST",cache:"no-store",signal,
-        headers:{"Content-Type":"application/json",Authorization:"Bearer "+token},body:JSON.stringify(body)});
+        headers:{"Content-Type":"application/json",Authorization:"Bearer "+token},keepalive:body.command==="release_media",body:JSON.stringify(body)});
     } catch (error) {
       const readOnly = route === "content" || ["roots","list","stat","preview","resume_location"].includes(body.command);
       if (!retry || !readOnly || error.name === "AbortError") throw error;
@@ -82,6 +82,23 @@
       const receipt = await response.json();
       if (!response.ok || receipt.state !== "COMMITTED") throw new Error(receipt.error?.message || "Copy did not commit. Check the destination before retrying.");
       return receipt;
+    },
+    async transfer(args,{onProgress=()=>{}}={}) {
+      const previous=(await chrome.storage.session.get({chuteyPendingTransfer:null})).chuteyPendingTransfer;
+      if(previous && previous.id!==args.id)throw Error('Check the previous transfer '+previous.id+' before starting another copy.');
+      const id=args.id || crypto.randomUUID().replaceAll('-','');
+      await chrome.storage.session.set({chuteyPendingTransfer:{id,issuedAt:Date.now()}});
+      let job;
+      try{job=await window.ChuteyExplorerAPI.command('transfer_start',{...args,id});}
+      catch(error){error.message+=' Check transfer '+id+' before retrying; its ID is retained.';throw error;}
+      while(['accepted','running'].includes(job.state)){
+        onProgress(job);await new Promise(resolve=>setTimeout(resolve,400));
+        job=await window.ChuteyExplorerAPI.command('transfer_status',{id});
+      }
+      if(job.state!=='COMMITTED')throw Error(job.error || 'Transfer did not commit. Check its retained job ID before retrying.');
+      await chrome.storage.session.set({chuteyLastTransferReceipt:{id,state:job.state,receipt:job.receipt}});
+      await chrome.storage.session.remove('chuteyPendingTransfer');
+      await window.ChuteyExplorerAPI.command('transfer_dismiss',{id}).catch(()=>{});return job.receipt;
     },
     async mediaSource(row) {
       const source = await window.ChuteyExplorerAPI.command("media_source",{handle:row.handle,identity:row.identity});

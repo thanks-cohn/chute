@@ -20,10 +20,10 @@ from .security import component
 CHUNK = 262144
 
 
-def digest(stream):
+def digest(stream,check=lambda:None):
     value = hashlib.sha256()
     while block := stream.read(CHUNK):
-        value.update(block)
+        check();value.update(block)
     return value.hexdigest()
 
 
@@ -65,11 +65,14 @@ class Transfers:
                     if (info.st_dev,info.st_ino,info.st_size,info.st_mtime_ns) != (after.st_dev,after.st_ino,after.st_size,after.st_mtime_ns):
                         raise ExplorerError('FILE_CHANGED', 'The source changed during copying.')
 
-    def to_live(self, capability, store):
+    def to_live(self, capability, store, *, authorize=lambda:None, item_id=None, progress=lambda n:None):
         with self.read(capability) as (row, stream):
             # Store owns its normal chunked intake and creates a genuine Store ID.
-            expected = digest(stream); stream.seek(0)
-            item = store.add_stream(row['name'], stream, row['size'], mime=row['mime'], source_path='local_explorer')
+            expected = digest(stream,authorize); stream.seek(0)
+            class Source:
+                def read(self,size):
+                    authorize();block=stream.read(size);progress(len(block));return block
+            item = store.add_stream(row['name'], Source(), row['size'], mime=row['mime'], source_path='local_explorer',expected_sha256=expected,check=authorize,item_id=item_id)
             found = store.get(item.id)
             with found[1].open('rb') as copied:
                 actual = digest(copied)
@@ -102,6 +105,9 @@ def receive(grant, destination, name, stream, size, *, expected_sha256=None, con
             kwargs = {'dir_fd':directory}
         def unlink(value):
             os.unlink(target(value), **kwargs)
+        import shutil
+        if shutil.disk_usage(directory).free < size+1024*1024:
+            raise ExplorerError('NO_SPACE','Insufficient destination disk space for this copy.')
         fd = os.open(target(stage), os.O_RDWR | os.O_CREAT | os.O_EXCL | getattr(os,'O_NOFOLLOW',0), 0o600, **kwargs)
         try:
             with os.fdopen(fd, 'w+b') as staging:
@@ -121,7 +127,7 @@ def receive(grant, destination, name, stream, size, *, expected_sha256=None, con
             check_fd = os.open(target(stage), os.O_RDONLY | getattr(os,'O_NOFOLLOW',0), **kwargs)
             with os.fdopen(check_fd,'rb') as check:
                 actual_info = os.fstat(check.fileno())
-                if (info.st_dev,info.st_ino,info.st_size) != (actual_info.st_dev,actual_info.st_ino,actual_info.st_size) or digest(check) != expected:
+                if (info.st_dev,info.st_ino,info.st_size) != (actual_info.st_dev,actual_info.st_ino,actual_info.st_size) or digest(check,authorize) != expected:
                     raise ExplorerError('VERIFY_FAILED', 'Staged copy failed independent readback.')
             authorize()
             stem, suffix = os.path.splitext(name)
@@ -142,7 +148,7 @@ def receive(grant, destination, name, stream, size, *, expected_sha256=None, con
             with grant.open(final_handle) as verify_fd:
                 final_info = os.fstat(verify_fd)
                 with os.fdopen(os.dup(verify_fd),'rb') as verify:
-                    if (info.st_dev,info.st_ino,info.st_size) != (final_info.st_dev,final_info.st_ino,final_info.st_size) or digest(verify) != expected:
+                    if (info.st_dev,info.st_ino,info.st_size) != (final_info.st_dev,final_info.st_ino,final_info.st_size) or digest(verify,authorize) != expected:
                         raise ExplorerError('UNCERTAIN', 'Publication needs reconciliation; do not retry automatically.')
             if not grant.windows: os.fsync(directory)
             return {'operation_id':operation,'state':'COMMITTED','name':final_name,'destination':destination,

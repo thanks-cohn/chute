@@ -10,7 +10,7 @@ if ($LASTEXITCODE -ne 0) { throw "venv failed" }
 $Py = Join-Path $Venv "Scripts\python.exe"
 & $Py -m pip install pyinstaller==6.22.3 Pillow==13.0.0 $Repo
 if ($LASTEXITCODE -ne 0) { throw "dependency installation failed" }
-& $Py -m PyInstaller --noconfirm --clean --onefile --console --hidden-import PIL.Image --name Chutey-Phase1-Isolated-Check --distpath $Dist --workpath (Join-Path $BuildRoot "work") --specpath $BuildRoot (Join-Path $Repo "scripts\phase1-isolated-worker-check.py")
+& $Py -m PyInstaller --noconfirm --clean --onefile --collect-data tzdata --console --hidden-import PIL.Image --name Chutey-Phase1-Isolated-Check --distpath $Dist --workpath (Join-Path $BuildRoot "work") --specpath $BuildRoot (Join-Path $Repo "scripts\phase1-isolated-worker-check.py")
 if ($LASTEXITCODE -ne 0) { throw "candidate build failed" }
 $Exe = Join-Path $Dist "Chutey-Phase1-Isolated-Check.exe"
 $SourceReceipt = Join-Path $Repo "SOURCE-COMMIT.txt"

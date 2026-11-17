@@ -129,6 +129,19 @@ class StoreTests(unittest.TestCase):
                 store.add_stream("broken.bin", io.BytesIO(b"12"), 10)
             self.assertEqual(store.list(), [])
 
+    def test_preexisting_stage_is_never_removed_and_digest_receipt_matches(self):
+        import hashlib
+        with tempfile.TemporaryDirectory() as temp:
+            store=Store(Path(temp));ident='a'*32
+            stage=store.files_dir/('.'+ident+'-proof.txt.part');stage.write_bytes(b'preserved pending original')
+            with self.assertRaises(FileExistsError):store.add_stream('proof.txt',io.BytesIO(b'new'),3,item_id=ident)
+            self.assertEqual(stage.read_bytes(),b'preserved pending original')
+            item=store.add_stream('fresh.txt',io.BytesIO(b'original bytes'),14)
+            receipt=store.upload_receipt(item.id)
+            self.assertEqual(receipt['state'],'COMMITTED');self.assertEqual(receipt['sha256'],hashlib.sha256(b'original bytes').hexdigest())
+            store.get(item.id)[1].write_bytes(b'changed')
+            self.assertEqual(store.upload_receipt(item.id)['state'],'UNCERTAIN')
+
 
 if __name__ == "__main__":
     unittest.main()

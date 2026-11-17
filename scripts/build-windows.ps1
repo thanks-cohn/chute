@@ -16,7 +16,7 @@ if (Test-Path $Venv) { Remove-Item -Recurse -Force $Venv }
 & $Python -m venv $Venv
 $Py = Join-Path $Venv "Scripts\python.exe"
 & $Py -m pip install --upgrade pip
-& $Py -m pip install pyinstaller Pillow==13.0.0 $Repo
+& $Py -m pip install pyinstaller==6.22.3 Pillow==13.0.0 $Repo
 
 Push-Location $Repo
 try {
@@ -26,6 +26,7 @@ try {
         --noconfirm `
         --clean `
         --onefile `
+        --collect-data tzdata `
         --windowed `
         --name Chute-NativeHost `
         --distpath $Dist `
@@ -42,6 +43,7 @@ try {
         --noconfirm `
         --clean `
         --onefile `
+        --collect-data tzdata `
         --windowed `
         --name Chute-Windows `
         --add-binary "$NativeExe;." `

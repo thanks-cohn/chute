@@ -106,7 +106,8 @@ def main():
                     expect(media).to_be_visible();page.wait_for_function('(tag)=>document.querySelector(".ex-preview-body "+tag)?.readyState>=1',arg=tag)
                     assert media.evaluate('node=>node.paused && node.src.includes("/api/explorer/v1/media/")')
                     media.evaluate('node=>node.play()');page.wait_for_function('(tag)=>document.querySelector(".ex-preview-body "+tag).currentTime>0',arg=tag)
-                    page.get_by_role('button',name='Close preview',exact=True).click()
+                    with page.expect_response(lambda response:'/api/explorer/v1/command' in response.url and response.request.post_data_json.get('command')=='release_media'):
+                        page.get_by_role('button',name='Close preview',exact=True).click()
                     assert not server.explorer_api.media
                 # Archived-worker compatibility: lack of media_source must
                 # retain the known-working small MP4 Blob fallback.

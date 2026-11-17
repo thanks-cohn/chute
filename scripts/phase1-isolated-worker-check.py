@@ -4,6 +4,7 @@ Suitable as a separate PyInstaller test executable on Windows. It never imports
 windows_app, opens the owner's files, binds 17891, or registers a Chrome host.
 """
 import io
+import time
 import json
 from pathlib import Path
 import tempfile
@@ -52,7 +53,28 @@ def main():
             with request(media['url'],method='HEAD') as response:assert response.read()==b''
             command('release_media',{'ticket':media['ticket']})
             assert not server.explorer_api.media
-            print(json.dumps({'result':'PASS','checks':['temporary approved root','canonical identity','real JPEG thumbnail','8 MiB range fixture','HEAD','ticket release'],
+            # Prove new dynamically reached modules/timezone data in the EXE.
+            export=command('history_export_create',{'scope':'all','timezone':'America/Chicago'})
+            for _ in range(200):
+                if export['state'] not in {'accepted','running'}:break
+                time.sleep(.01);export=command('history_export_status',{'id':export['id']})
+            assert export['state']=='ready',export
+            with request(export['url']) as response:
+                import zipfile
+                with zipfile.ZipFile(io.BytesIO(response.read())) as archive:
+                    assert archive.testzip() is None and len(archive.namelist())==3
+            command('history_export_cancel',{'id':export['id']})
+            raw='Packaged é😀 highlight'.encode()
+            with opener.open(Request(base+'/api/explorer/v1/highlights',raw,{'Origin':ORIGIN,'Authorization':'Bearer '+session.token,'Content-Type':'text/plain;charset=utf-8','X-Chute-Capture-ID':'a'*32}),timeout=10) as response:
+                capture=json.load(response)
+            assert capture['state']=='COMMITTED'
+            assert command('saved_text_page',{'id':'a'*32})['text'].endswith('Packaged é😀 highlight')
+            job=command('transfer_start',{'id':'b'*32,'kind':'local_to_live','handle':picture['handle'],'identity':picture['identity']})
+            for _ in range(300):
+                if job['state'] not in {'accepted','running'}:break
+                time.sleep(.01);job=command('transfer_status',{'id':job['id']})
+            assert job['state']=='COMMITTED',job
+            print(json.dumps({'result':'PASS','checks':['temporary approved root','canonical identity','real JPEG thumbnail','8 MiB range fixture','HEAD','ticket release','single ZIP64 export/timezone data','daily UTF-8 highlight','bounded text page','verified asynchronous copy'],
                 'installed_worker':'untouched','scope':'isolated API check; not Chrome or sustained playback acceptance'}))
         finally:
             server.shutdown();server.server_close();thread.join();engine.close()

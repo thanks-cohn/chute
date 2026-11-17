@@ -115,7 +115,7 @@ class ChuteHandler(BaseHTTPRequestHandler):
         self.send_header("Access-Control-Allow-Methods", "GET, DELETE, POST, OPTIONS")
         self.send_header(
             "Access-Control-Allow-Headers",
-            "Content-Type, X-Chute-Filename, X-Chute-Mime, X-Chute-Source",
+            "Content-Type, X-Chute-Filename, X-Chute-Mime, X-Chute-Source, X-Chute-Operation",
         )
 
     def _json(self, payload: object, status: HTTPStatus = HTTPStatus.OK) -> None:
@@ -161,7 +161,7 @@ class ChuteHandler(BaseHTTPRequestHandler):
     def log_request(self, code="-", size="-"):
         try: status=int(code)
         except (ValueError,TypeError): status=0
-        if self.command in {'GET','HEAD','OPTIONS'} and 200 <= status < 400:
+        if (self.command in {'GET','HEAD','OPTIONS'} or getattr(self,'_quiet_explorer_read',False)) and 200 <= status < 400:
             return
         # Route categories, not private file names, search text or media tickets.
         try: path=urlparse(getattr(self,'path','')).path
@@ -381,6 +381,8 @@ class ChuteHandler(BaseHTTPRequestHandler):
             return
 
         length_header = self.headers.get("Content-Length")
+        if self.headers.get('Transfer-Encoding') or len(self.headers.get_all('Content-Length',[]))>1:
+            self._json({'error':'A single known Content-Length is required'},HTTPStatus.BAD_REQUEST);return
         if length_header is None:
             self._json({"error": "Content-Length required"}, HTTPStatus.LENGTH_REQUIRED)
             return
@@ -399,6 +401,12 @@ class ChuteHandler(BaseHTTPRequestHandler):
         if custom_thumbnail and (mime or "").split(";", 1)[0].lower() != "image/webp":
             self._json({"error": "custom thumbnail must be image/webp"}, HTTPStatus.BAD_REQUEST)
             return
+        operation=self.headers.get('X-Chute-Operation')
+        if operation is not None and not re.fullmatch('[a-f0-9]{32}',operation):
+            self._json({'error':'Invalid import identity'},HTTPStatus.BAD_REQUEST);return
+        if operation and self.store.get(operation):
+            self._json({'error':'Import already exists. Check its receipt before retrying.'},HTTPStatus.CONFLICT);return
+        self.connection.settimeout(30)
         try:
             if custom_thumbnail:
                 item = self.store.add_custom_stream(
@@ -414,12 +422,12 @@ class ChuteHandler(BaseHTTPRequestHandler):
                     self.rfile,
                     size,
                     mime=mime,
-                    source_path=source,
+                    source_path=source,item_id=operation,
                 )
         except (OSError, ValueError) as exc:
-            self._json({"error": str(exc)}, HTTPStatus.BAD_REQUEST)
+            self._json({"error": str(exc) if isinstance(exc,ValueError) else 'File intake interrupted or destination disk/access failed. Check free space and reconcile before retrying.'}, HTTPStatus.BAD_REQUEST)
             return
-        self._json({"file": public_item(item, active=True)}, HTTPStatus.CREATED)
+        self._json({"file": public_item(item, active=True),"receipt":self.store.upload_receipt(item.id)}, HTTPStatus.CREATED)
 
     def _receive_image_provenance(self) -> None:
         origin = allowed_origin(self.headers.get("Origin"))

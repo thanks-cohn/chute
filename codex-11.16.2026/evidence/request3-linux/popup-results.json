@@ -1,0 +1,7 @@
+{
+  "scroll_surfaces": "one document; settings, gallery no inner scroll",
+  "densities": "120 full square cards in all four layouts",
+  "preview": "click, Escape, image-collapse, arrows; no X/Expand",
+  "trash": "live removed; archived presentation hidden; original preserved",
+  "shelf": "390 and 600px whole DRAG ME!, controls reachable"
+}

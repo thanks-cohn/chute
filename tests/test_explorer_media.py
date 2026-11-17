@@ -60,7 +60,7 @@ class MediaAPITests(unittest.TestCase):
                 self.assertEqual(int(response.headers['Content-Length']),len(expected))
                 self.assertEqual(response.headers['Content-Range'],f'bytes {start}-{start+len(expected)-1}/{3*1024**3}')
                 self.assertEqual(response.read(),expected)
-        for value in ['bytes=9999999999-','bytes=9-2','bytes=-0','bytes=0-1,3-4']:
+        for value in ['bytes=9999999999-','bytes=9-2','bytes=-0','bytes=0-1,3-4','bytes='+('9'*5000)+'-']:
             with self.assertRaises(HTTPError) as raised: self.request(source['url'],headers={'Range':value})
             self.assertEqual(raised.exception.code,416)
             self.assertEqual(raised.exception.headers['Content-Range'],f'bytes */{3*1024**3}')
@@ -121,7 +121,7 @@ class MediaAPITests(unittest.TestCase):
             chunks.append(data); source['revoked']=True
         handler=SimpleNamespace(command='GET',headers={'Origin':ORIGIN,'Authorization':'Bearer '+self.session.token},
             send_response=lambda *a:None,send_header=lambda *a:None,end_headers=lambda:None,
-            wfile=SimpleNamespace(write=write),close_connection=False)
+            wfile=SimpleNamespace(write=write),connection=SimpleNamespace(settimeout=lambda _:None),close_connection=False)
         before=len(os.listdir('/proc/self/fd')) if os.path.isdir('/proc/self/fd') else None
         self.adapter.content(handler,{key:self.row[key] for key in ('handle','identity')},media=source)
         self.assertEqual(sum(map(len,chunks)),262144)
@@ -184,3 +184,34 @@ class MediaAPITests(unittest.TestCase):
         row=self.command('locate_saved',{'id':'a'*32});self.assertEqual(row['highlight']['capture_id'],'a'*32)
         self.assertNotIn('path',row['highlight'])
         with self.assertRaises(HTTPError):self.command('saved_text_page',{'id':'a'*32,'path':'/etc/passwd'})
+
+    def test_job_http_authority_and_accepted_is_not_completed(self):
+        path=self.root/'copy.txt';path.write_bytes(b'actual copy')
+        grant=self.engine.grant_for(self.row['handle']);row=self.engine.execute('stat',handle=grant.handle(('copy.txt',)))['result']
+        args={'id':'c'*32,'kind':'local_to_live','handle':row['handle'],'identity':row['identity']}
+        for headers in ({'Authorization':'Bearer wrong'},{'Origin':'https://evil.test'}):
+            with self.assertRaises(HTTPError):self.request('/api/explorer/v1/command',{'command':'transfer_start','args':args},headers=headers)
+        self.assertIsNone(self.adapter.jobs)
+        job=self.command('transfer_start',args)
+        import time
+        for _ in range(300):
+            if job['state'] not in {'accepted','running'}:break
+            time.sleep(.01);job=self.command('transfer_status',{'id':job['id']})
+        self.assertEqual(job['state'],'COMMITTED')
+        self.assertEqual(job['receipt']['file']['id'],'c'*32)
+        self.assertEqual(self.server.store.get('c'*32)[1].read_bytes(),b'actual copy')
+        repeated=self.command('transfer_start',args);self.assertEqual(repeated['receipt'],job['receipt'])
+        self.assertEqual(len(self.server.store.list()),1)
+
+    def test_export_survives_same_origin_authenticated_session_renewal(self):
+        job=self.command('history_export_create',{'scope':'all','timezone':'UTC'})
+        import time
+        for _ in range(300):
+            if job['state']=='ready':break
+            time.sleep(.01);job=self.command('history_export_status',{'id':job['id']})
+        self.session=Session(ORIGIN);self.adapter=self.server.explorer_api=ExplorerAPI(self.engine,self.session)
+        renewed=self.command('history_export_status',{'id':job['id']})
+        self.assertEqual(renewed['state'],'ready')
+        self.assertEqual(renewed['url'],job['url'])
+        self.command('history_export_cancel',{'id':job['id']})
+        self.server.history_exports.close()

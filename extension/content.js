@@ -257,6 +257,8 @@
       } else {
         const response = await fetch(`${BASE_URL}/api/files/${encodeURIComponent(item.id)}`, {cache:"no-store"});
         if (!response.ok) throw new Error(`Chute returned ${response.status}`);
+        const size=Number(response.headers.get('Content-Length'));
+        if(response.headers.get('Content-Length')===null||!Number.isSafeInteger(size)||size<0||size>32*1024*1024){await response.body?.cancel();throw Error('For files larger than 32 MiB, use this website’s file picker with the original local file. Browser drag cannot stream a local File into arbitrary websites.');}
         blob = await response.blob();
       }
       const file = new File([blob], item.name, {

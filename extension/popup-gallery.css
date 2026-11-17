@@ -7,7 +7,7 @@ body.chutey-gallery-popup { width:390px; max-height:600px; overflow-y:auto; over
 .chutey-gallery-popup .settings { grid-template-columns:minmax(0,1fr); }
 .chutey-gallery-popup .settings > *,
 .chutey-gallery-popup .settings fieldset { min-width:0; max-width:100%; }
-.chutey-gallery-popup .settings label { display:flex; flex-wrap:wrap; align-items:center; gap:8px; }
+.chutey-gallery-popup .settings label { overflow-wrap:anywhere; display:flex; flex-wrap:wrap; align-items:center; gap:8px; }
 .chutey-gallery-popup .settings label span { flex:1; }
 .chutey-gallery-popup .settings select { width:100%; max-width:100%; }
 .chutey-gallery-popup [data-file-action-settings] label { display:grid; gap:6px; margin-bottom:10px; }
@@ -170,7 +170,7 @@ body.chutey-gallery-popup { width:390px; max-height:600px; overflow-y:auto; over
 .chutey-gallery-popup #files .chutey-gallery-tile .file-icon.has-thumbnail .chutey-shortcut-kind { display:none; }
 
 /* November 10: deliberately minimal popup ONLY (not the Shelf). */
-html:has(body.chutey-gallery-popup) { width:390px; height:590px; overflow-y:scroll; overflow-x:hidden; scrollbar-gutter:stable; }
+html:has(body.chutey-gallery-popup) { width:390px; max-width:100%; height:590px; overflow-y:scroll; overflow-x:hidden; scrollbar-gutter:stable; }
 html:has(body.chutey-gallery-popup)::-webkit-scrollbar { width:12px; }
 body.chutey-gallery-popup { width:100%; min-width:0; min-height:590px; height:auto; max-height:none; overflow:visible; background:#111610; }
 .chutey-gallery-popup .topbar { min-height:56px; padding:11px 14px; background:linear-gradient(180deg,#1c2419,#141a13); }
@@ -279,3 +279,14 @@ html:has(.chutey-lightbox-open) { overflow:hidden; }
 .chutey-lightbox-reader nav { display:flex; flex-wrap:wrap; gap:4px; }
 .chutey-lightbox-reader nav button { font-size:10px; }
 .chutey-lightbox-reader [data-text-position] { font-size:10px; overflow-wrap:anywhere; }
+
+#popup-local { padding:10px; font-size:12px; }
+#popup-local h2 { font-size:14px; }
+#popup-local-list { display:grid; gap:6px; margin-top:10px; }
+#popup-local button { max-width:100%; overflow-wrap:anywhere; color:#edf4e5; background:#253122; border:1px solid #5b7552; border-radius:6px; padding:8px; text-align:left; }
+#popup-local-toggle { font-size:11px; padding:5px 7px; }
+.chutey-lightbox-player { grid-column:2; grid-row:1; min-width:0; max-width:100%; }
+.chutey-lightbox-player[hidden] { display:none; }
+.chutey-lightbox-player video,.chutey-lightbox-player audio { width:100%; max-height:420px; }
+#chutey-popup-gallery[hidden] { display:none; }
+.chutey-lightbox-player { width:100%; }

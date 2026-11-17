@@ -12,7 +12,7 @@ function worker() {
     tabs:{query:async()=>[{id:10}]},
     storage:{session:{get:async key=>key===null?{...state}:{[key]:state[key]},set:async data=>Object.assign(state,data),remove:async keys=>{for(const key of keys)delete state[key];}}}
   };
-  vm.runInNewContext('const explorerDragRegistrations = '+source,{chrome,BASE_URL:'http://127.0.0.1:17891',relayDragOutStart:async()=>{},Date,Map,Uint8Array,String,btoa,fetch:async(url,options)=>{requests.push({url,options});return {ok:true,arrayBuffer:async()=>bytes.buffer};}});
+  vm.runInNewContext('const explorerDragRegistrations = '+source,{chrome,BASE_URL:'http://127.0.0.1:17891',relayDragOutStart:async()=>{},Date,Map,Uint8Array,String,btoa,fetch:async(url,options)=>{requests.push({url,options});return {ok:true,headers:{get:()=>String(bytes.length)},arrayBuffer:async()=>bytes.buffer};}});
   return (message,sender)=>new Promise((resolve,reject)=>{
     if (!listener(message,sender,resolve)) reject(Error('Unregistered message'));
   });
@@ -37,6 +37,9 @@ function worker() {
   send=worker();
   assert((await send({type:'chutey-read-explorer-drag',id},{tab:{id:11,active:true},url:'https://receiver.test'})).ok);
   assert.equal((await send({type:'chutey-read-explorer-drag',id},{tab:{id:12,active:false}})).ok,false);
+  const reference=await send({type:'chutey-resolve-explorer-drag',id},sender);
+  assert(reference.ok && reference.row.handle===row.handle);
+  await assert.rejects(send({type:'chutey-resolve-explorer-drag',id},{url:'https://evil.test'}));
   state[id].expires=0;
   assert.equal((await send({type:'chutey-read-explorer-drag',id},sender)).ok,false);
   console.log('PASS: first-drop byte relay, registration/drop race, suspended worker, active receiver, expiry; no Live pre-copy or leaked token');

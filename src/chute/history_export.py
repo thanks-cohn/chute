@@ -135,7 +135,7 @@ class HistoryExports:
                     if j['cancel'].is_set():raise InterruptedError()
                     digest.update(chunk)
             if j['cancel'].is_set():raise InterruptedError()
-            j.update(state='ready',phase='ready',size=j['path'].stat().st_size,sha256=digest.hexdigest())
+            j.update(state='ready',phase='ready',finished=time.monotonic(),size=j['path'].stat().st_size,sha256=digest.hexdigest())
         except InterruptedError:j.update(state='cancelled',phase='cancelled')
         except Exception as exc:
             j.update(state='failed',phase='failed',error=str(exc) if isinstance(exc,ExportError) else 'The single ZIP could not complete. Check free space and access, then retry; no history was changed.')
@@ -166,6 +166,6 @@ class HistoryExports:
 
     def expire(self):
         for ident,j in list(self.jobs.items()):
-            if time.monotonic()-j['created']>3600:
+            if j['state'] not in {'accepted','running'} and time.monotonic()-j.get('finished',j['created'])>3600:
                 j['cancel'].set()
                 if j['state'] not in {'accepted','running'}:shutil.rmtree(j['directory'],ignore_errors=True);del self.jobs[ident]

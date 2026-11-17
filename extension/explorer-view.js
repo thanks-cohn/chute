@@ -4,7 +4,7 @@
   const host = document.querySelector("#chutey-explorer-view");
   if (!host) return;
   const api = window.ChuteyExplorerAPI;
-  host.innerHTML = `<div class="ex-native"><button type="button" data-action="select" aria-label="Choose another Windows folder" title="Browse for another folder">▰ Browse</button><details class="ex-more-settings"><summary title="Folder access and transfers" aria-label="More file options">⚙ <span>Folder Access</span></summary><div class="ex-advanced-actions"><label><input type="checkbox" data-setting="thumbnails" checked> Show image thumbnails</label><button type="button" data-action="resume">Retry connection</button><button type="button" data-action="write">Allow saving here…</button><button type="button" data-action="live">Copy selected to Chutey</button><button type="button" data-action="reconcile">Check transfer</button><button type="button" data-action="revoke">Remove folder access</button></div></details></div><form class="ex-connect" hidden><label>Local read session <input type="password" autocomplete="off" aria-label="Local read session token" required></label><button title="Connect" aria-label="Connect">↗</button></form>
+  host.innerHTML = `<div class="ex-native"><button type="button" data-action="select" aria-label="Choose another Windows folder" title="Browse for another folder">▰ Browse</button><details class="ex-more-settings"><summary title="Folder access and transfers" aria-label="More file options">⚙ <span>Folder Access</span></summary><div class="ex-advanced-actions"><label><input type="checkbox" data-setting="thumbnails" checked> Show image thumbnails</label><button type="button" data-action="resume">Retry connection</button><button type="button" data-action="write">Allow saving here…</button><button type="button" data-action="live">Copy selected to Chutey</button><button type="button" data-action="reconcile">Check transfer</button><button type="button" data-action="cancel-transfer">Cancel copy</button><button type="button" data-action="review-transfer">Dismiss reviewed copy warning</button><button type="button" data-action="revoke">Remove folder access</button></div></details></div><form class="ex-connect" hidden><label>Local read session <input type="password" autocomplete="off" aria-label="Local read session token" required></label><button title="Connect" aria-label="Connect">↗</button></form>
     <div class="ex-toolbar"><button data-action="back" title="Back" aria-label="Back">‹</button><button data-action="forward" title="Forward" aria-label="Forward">›</button><button data-action="parent" title="Parent folder" aria-label="Parent folder">↑</button><button data-action="roots" title="Approved folders" aria-label="Approved folders">⌂</button><button data-action="refresh" title="Refresh" aria-label="Refresh">↻</button><span class="ex-breadcrumb">Local files</span><button data-action="grid" title="Toggle grid" aria-label="Toggle grid">▦</button></div>
     <div class="ex-filter"><input type="search" placeholder="Search this folder" aria-label="Search this folder"><select aria-label="Sort files"><option value="name">Name</option><option value="type">Type</option><option value="date">Date</option><option value="size">Size</option></select></div>
     <div class="ex-workspace"><aside class="ex-tree" aria-label="Folder navigator"></aside><div class="ex-column-resize" role="separator" tabindex="0" aria-label="Resize folders and files columns" aria-orientation="vertical" aria-valuemin="15" aria-valuemax="75" aria-valuenow="36" title="Drag to resize folders"></div><div class="ex-list" role="listbox" aria-label="Local files" aria-multiselectable="true" tabindex="0"></div></div>
@@ -266,13 +266,13 @@
   }
   async function copySelection() {
     const row = transferSelection();
-    clipboardFile = new File([await api.content(row,{original:true})],row.name,{type:row.mime || "application/octet-stream"});
+    clipboardFile = {handle:row.handle,identity:row.identity,name:row.name};
     say("Copied for Paste inside Chutey. This is not the Windows file clipboard.");
   }
   async function pasteSelection(destination = current) {
     if (!writable) throw Error("To save here, approve this folder in Folder Access settings.");
     if (!clipboardFile) throw Error("Copy a file in Chutey first, or paste actual files from your clipboard.");
-    const receipt = await api.receive(destination,clipboardFile);
+    const receipt = await api.transfer({kind:"local_copy",handle:clipboardFile.handle,identity:clipboardFile.identity,destination},{onProgress:transferProgress});
     await load(current,{remember:false}); say("Verified copy: " + receipt.name);
   }
   async function load(handle, {remember = true, append = false, recovery = true} = {}) {
@@ -321,7 +321,7 @@
           try {
             if (!selected.has(row.handle)) select(row);
             const source = transferSelection();
-            if (source.size > 32 * 1024 * 1024) throw Error("Use the file picker for files larger than 32 MiB.");
+
             const id = "explorer-" + crypto.randomUUID();
             event.dataTransfer.effectAllowed = "copy";
             const token = "CHUTE_ITEM:" + encodeURIComponent(JSON.stringify({id,name:source.name,mime:source.mime,source_kind:"local_explorer"}));
@@ -557,26 +557,26 @@
       if (!text.startsWith("CHUTE_ITEM:")) { say("No bytes saved. Drop actual files or a Live item; links alone are unsupported."); return; }
       const item = JSON.parse(decodeURIComponent(text.slice(11)));
       const receipt = item.source_kind === "local_explorer" ? await (async () => {
-        const data = await chrome.runtime.sendMessage({type:"chutey-read-explorer-drag",id:item.id});
-        if (!data?.ok) throw Error(data?.error || "The original is unavailable.");
-        return api.receive(destination,new File([Uint8Array.from(atob(data.base64),value => value.charCodeAt(0))],data.name,{type:data.mime}));
-      })() : await api.command("receive_from_live",{id:item.id,destination,operation_id:crypto.randomUUID().replaceAll("-","")});
+        const data=await chrome.runtime.sendMessage({type:'chutey-resolve-explorer-drag',id:item.id});
+        if(!data?.ok)throw Error(data?.error || 'The drag source expired.');
+        return api.transfer({kind:'local_copy',handle:data.row.handle,identity:data.row.identity,destination},{onProgress:transferProgress});
+      })() : await api.transfer({kind:"live_to_local",live_id:item.id,destination},{onProgress:transferProgress});
       if (receipt.state !== "COMMITTED") throw new Error("Copy did not commit. Check the destination before retrying.");
       say("Verified copy: " + receipt.name);
     }
     await load(current,{remember:false});
     say("Verified " + (files.length || 1) + " saved copy/copies.");
   }));
+  function transferProgress(job){say('Copying '+job.bytes.toLocaleString()+' / '+job.size.toLocaleString()+' bytes · '+job.id);}
   async function copyToLive(items) {
     for (const row of items) {
       if (row.kind !== "file") continue;
       say("Reading original bytes: " + row.name + "…");
-      const source = await api.command("prepare_export",{handle:row.handle,identity:row.identity});
-      const receipt = await api.command("export_to_live",{capability:source.capability});
+      const receipt=await api.transfer({kind:'local_to_live',handle:row.handle,identity:row.identity},{onProgress:transferProgress});
       if (receipt.state !== "COMMITTED") throw new Error("Live copy was not verified.");
       liveCopies.set(row.identity + row.handle,receipt.file);
     }
-    say("Original files verified in Live. You can drag them using the existing transport.");
+    say("Original files verified in Live.");
   }
   $(".ex-connect").onsubmit = safe(async event => { event.preventDefault(); api.connect($(".ex-connect input").value); $(".ex-connect input").value = ""; await connect(); });
   async function rememberView() {
@@ -590,12 +590,18 @@
   $(".ex-filter select").onchange = safe(() => current && load(current, {remember: false}));
   const actions = {
     reconcile: async () => {
+      const pending=(await chrome.storage.session.get({chuteyPendingTransfer:null})).chuteyPendingTransfer;
+      if(pending){const job=await api.command('transfer_status',{id:pending.id});say(job.state+' · '+job.bytes+'/'+job.size+' bytes · '+(job.error||'Inspect the verified receipt before retrying.'));return;}
+      const final=(await chrome.storage.session.get({chuteyLastTransferReceipt:null})).chuteyLastTransferReceipt;
+      if(final){say('Verified '+final.state+' · '+(final.receipt.size??final.receipt.file?.size)+' bytes · '+final.receipt.sha256);return;}
       const recent = await api.command("recent_transfers");
       const last = recent.operations.at(-1);
       if (!last) { say("No saved copy receipts for this approved folder."); return; }
       const receipt = await api.command("reconcile_transfer",{operation_id:last.operation_id});
       say(receipt.state === "COMMITTED" ? "Verified saved copy: " + receipt.name : "This copy needs destination review before retrying. Its completion is uncertain.");
     },
+    'review-transfer':async()=>{const pending=(await chrome.storage.session.get({chuteyPendingTransfer:null})).chuteyPendingTransfer;if(!pending)return;const job=await api.command('transfer_status',{id:pending.id});if(['accepted','running'].includes(job.state))throw Error('Copy still active. Cancel and wait first.');if(!confirm('Have you inspected the destination and recorded any partial or completed copy? This dismisses the warning only; no files are changed.'))return;if(job.state!=='UNCERTAIN')await api.command('transfer_dismiss',{id:pending.id});await chrome.storage.session.remove('chuteyPendingTransfer');say('Warning dismissed; original files and receipts preserved.');},
+    'cancel-transfer': async()=>{const pending=(await chrome.storage.session.get({chuteyPendingTransfer:null})).chuteyPendingTransfer;if(!pending)throw Error('No pending copy.');const job=await api.command('transfer_cancel',{id:pending.id});say('Cancellation requested · '+job.state);},
     live: () => copyToLive(rows.filter(row => selected.has(row.handle))),
     write: async () => {
       say("Choose the exact folder to authorize read and write access…");

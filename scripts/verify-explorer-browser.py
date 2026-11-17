@@ -21,6 +21,15 @@ from playwright.sync_api import sync_playwright, expect
 
 
 class FixtureHandler(ChuteHandler):
+    def _explorer_route(self):
+        # Fixture-only direct HTTP alias avoids DevTools buffering/disposal races.
+        if self.path.startswith('/api/explorer/') and self.headers.get('Origin') in (None,'http://127.0.0.1:17891'):
+            adapter=getattr(self.server,'explorer_api',None)
+            if adapter:
+                if self.headers.get('Origin') is None:self.headers['Origin']=adapter.session.origin
+                else:self.headers.replace_header('Origin',adapter.session.origin)
+        return super()._explorer_route()
+
     def do_GET(self):
         name = self.path.split("?", 1)[0].lstrip("/")
         asset = ROOT / "extension" / name
@@ -68,7 +77,7 @@ def main():
                     context.add_init_script("""window.chrome = {storage:{local:{get:async d=>Object.assign({},d,window.__local||{}),set:async x=>{window.__local=Object.assign(window.__local||{},x)}},sync:{get:async d=>d},session:{get:async d=>d,remove:async()=>{}},onChanged:{addListener(){}}},runtime:{getURL:path=>new URL(path,location.href).href,sendNativeMessage:async()=>({ok:true,explorer_protocol:'1.1',protocol:'1.1',read_only:true,token:window.__nativeSessionToken}),sendMessage:async()=>({}),onMessage:{addListener(){}},connectNative(){throw Error('fixture: no native host')}}};""")
                     origin = "chrome-extension://abcdefghijklmnopabcdefghijklmnop"
                     # Test-only transport: real browser/GUI/API, not extension enrollment proof.
-                    context.route("http://127.0.0.1:17891/api/explorer/**", lambda route: route.fulfill(response=route.fetch(headers={**route.request.headers, "origin": origin})))
+
                 else:
                     context = playwright.chromium.launch_persistent_context(str(root / "profile"),
                         executable_path=os.environ.get("CHUTE_TEST_CHROME") or playwright.chromium.executable_path,

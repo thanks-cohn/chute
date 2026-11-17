@@ -385,3 +385,6 @@ body:not(.chutey-gallery-popup) .file-tools { flex-wrap:wrap; }
 #history-export label { display:grid; gap:5px; margin:8px 0; }
 #history-export select,#history-export input { min-width:0; max-width:100%; }
 #export-status { overflow-wrap:anywhere; }
+
+.chutey-intake { padding:6px 9px; border-bottom:1px solid #30362a; }
+.chutey-intake button { margin:2px; font-size:11px; }

@@ -18,6 +18,9 @@ class ExplorerAPI:
         from .transfers import Transfers
         self.transfers = Transfers(engine)
         self.slots = threading.BoundedSemaphore(4)
+        self.media_slots = threading.BoundedSemaphore(2)
+        self.intake_slots = threading.BoundedSemaphore(1)
+        self.jobs = None
         self.media = {}
         self.media_lock = threading.Lock()
 
@@ -46,21 +49,24 @@ class ExplorerAPI:
 
     def route(self, handler):
         handler._explorer_headers_sent = False
-        if not self.slots.acquire(blocking=False):
+        handler._quiet_explorer_read = False
+        path=urlparse(handler.path).path
+        slots=self.media_slots if path.startswith('/api/explorer/v1/media/') else self.intake_slots if path.endswith('/receive') else self.slots
+        if not slots.acquire(blocking=False):
             handler.close_connection = True
             self.json(handler, {"state": "failed", "error": {"code": "BUSY", "message": "The companion is busy. Try browsing again shortly."}}, 429)
             return True
         try:
             return self._route(handler)
         finally:
-            self.slots.release()
+            slots.release()
 
     def _route(self, handler):
         path = urlparse(handler.path).path
         if not path.startswith("/api/explorer/"):
             return False
         try:
-            for field in ("Host", "Origin", "Authorization", "Content-Length", "Content-Type", "X-Chute-Destination", "X-Chute-Filename", "X-Chute-Operation", "X-Chute-Capture-ID", "X-Chute-Source"):
+            for field in ("Host", "Origin", "Range", "Authorization", "Content-Length", "Content-Type", "X-Chute-Destination", "X-Chute-Filename", "X-Chute-Operation", "X-Chute-Capture-ID", "X-Chute-Source"):
                 if len(handler.headers.get_all(field, [])) > 1:
                     raise ExplorerError("INVALID_ARGUMENT", "Duplicate request headers are not allowed.")
             expected_host = f"127.0.0.1:{handler.server.server_port}"
@@ -113,10 +119,9 @@ class ExplorerAPI:
                 if hasattr(self,"native_state"):
                     self.native_state('begin_transfer',{'operation_id':operation,'destination':destination})
                 handler.connection.settimeout(30)
-                with self.engine.lock:
-                    authorize=lambda: self.session.authorize(handler.headers.get("Origin",""),handler.headers.get("Authorization",""))
-                    authorize()
-                    receipt=receive(self.engine.grant_for(destination),destination,name,handler.rfile,size,authorize=authorize)
+                authorize=lambda: self.session.authorize(handler.headers.get("Origin",""),handler.headers.get("Authorization",""))
+                authorize()
+                receipt=receive(self.engine.grant_for(destination),destination,name,handler.rfile,size,authorize=authorize)
                 if hasattr(self,"native_state"):
                     self.native_state('finish_transfer',{'operation_id':operation,'receipt':receipt})
                     receipt['operation_id']=operation
@@ -143,17 +148,18 @@ class ExplorerAPI:
             if path == "/api/explorer/v1/command":
                 if set(body) - {"command", "args"} or not isinstance(body.get("command"), str) or not isinstance(body.get("args", {}), dict):
                     raise ExplorerError("INVALID_ARGUMENT", "Invalid command envelope.")
+                handler._quiet_explorer_read=body['command'] in {'capabilities','roots','list','stat','preview','search','saved_text_page','history_export_status','transfer_status','upload_receipt','resume_location','recent_transfers'}
                 if body["command"] == "capabilities":
                     from .protocol import catalog
                     capabilities = catalog()
-                    capabilities['commands'] += ['saved_text_page','history_export_create','history_export_status','history_export_cancel','locate_saved','open','reveal','media_source','release_media']
+                    capabilities['commands'] += ['upload_receipt','transfer_start','transfer_status','transfer_cancel','transfer_dismiss','saved_text_page','history_export_create','history_export_status','history_export_cancel','locate_saved','open','reveal','media_source','release_media']
                     capabilities['blocked'] = {key:value for key,value in capabilities['blocked'].items() if key not in {'open','reveal'}}
                     result={"state":"completed","result":{**capabilities,"transfer":{
                         "source_kind":"local_explorer","maximum_chunk_bytes":262144,
                         "original_bytes":True,"one_use_export":True,
                         "write_consent_required":True,"conflicts":["keep_both","skip"],
-                        "commands":["prepare_export","export_to_live","receive_from_live","reconcile_transfer"],
-                        "interop_enabled":False},"media":{"commands":["media_source","release_media"],"methods":["GET","HEAD"],"ranges":True,"ticket_limit":32,"ticket_seconds":600},"file_actions":{"commands":["locate_saved","open","reveal"],"system_platform":"windows","system_open":"previewable files only"}}}
+                        "commands":["prepare_export","export_to_live","receive_from_live","reconcile_transfer","transfer_start","transfer_status","transfer_cancel","transfer_dismiss"],"asynchronous_copy_jobs":True,"concurrent_jobs":1,
+                        "interop_enabled":False},"media":{"commands":["media_source","release_media"],"methods":["GET","HEAD"],"ranges":True,"ticket_limit":32,"ticket_seconds":600,"concurrent_streams":2,"chunk_bytes":262144},"file_actions":{"commands":["locate_saved","open","reveal"],"system_platform":"windows","system_open":"previewable files only"}}}
                 elif body['command'] in {'history_export_create','history_export_status','history_export_cancel'}:
                     from ..history_export import HistoryExports,ExportError
                     # Store-wide manager bounds simultaneous jobs across clients.
@@ -161,7 +167,7 @@ class ExplorerAPI:
                         if not hasattr(handler.server,'history_exports'):
                             handler.server.history_exports=HistoryExports(handler.server.store)
                     exports=handler.server.history_exports;args=body.get('args',{})
-                    owner=self.session.token
+                    owner=self.session.origin
                     try:
                         if body['command']=='history_export_create':value=exports.create(args,owner,self.session.origin)
                         else:
@@ -169,6 +175,21 @@ class ExplorerAPI:
                             value=exports.status(args['id'],owner) if body['command']=='history_export_status' else exports.cancel(args['id'],owner)
                     except ExportError as exc:raise ExplorerError('EXPORT_FAILED',str(exc))
                     result={'state':'completed','result':value}
+                elif body['command'] in {'transfer_start','transfer_status','transfer_cancel','transfer_dismiss'}:
+                    from .jobs import TransferJobs
+                    with self.engine.lock:
+                        if self.jobs is None:self.jobs=TransferJobs(self,handler.server.store)
+                    args=body.get('args',{})
+                    if body['command']=='transfer_start':value=self.jobs.start(args,handler.headers.get('Authorization',''))
+                    else:
+                        if set(args)!={'id'} or not isinstance(args['id'],str):raise ExplorerError('INVALID_ARGUMENT','A transfer job ID is required.')
+                        function={'transfer_status':self.jobs.status,'transfer_cancel':self.jobs.cancel,'transfer_dismiss':self.jobs.dismiss}[body['command']]
+                        value=function(args['id'])
+                    result={'state':'completed','result':value}
+                elif body['command']=='upload_receipt':
+                    args=body.get('args',{})
+                    if set(args)!={'id'}:raise ExplorerError('INVALID_ARGUMENT','An import ID is required.')
+                    result={'state':'completed','result':handler.server.store.upload_receipt(args['id'])}
                 elif body['command']=='saved_text_page':
                     from ..highlights import saved_text_page
                     args=body.get('args',{})
@@ -275,6 +296,7 @@ class ExplorerAPI:
                     result = self.engine.execute(body["command"], **body.get("args", {}))
                 self.json(handler, result, 200 if result["state"] == "completed" else 400)
             elif path == "/api/explorer/v1/content":
+                handler._quiet_explorer_read=True
                 if (set(body) - {"handle", "thumbnail", "identity", "original"} or not isinstance(body.get("handle"), str)
                         or not isinstance(body.get("identity"), str) or type(body.get("thumbnail", False)) is not bool or type(body.get("original", False)) is not bool):
                     raise ExplorerError("INVALID_ARGUMENT", "Expected a file handle.")
@@ -332,6 +354,7 @@ class ExplorerAPI:
             mime = "text/plain; charset=utf-8" if kind == "text" else media_mime(row)
             if original:
                 extra.append(("Content-Disposition", "attachment"))
+            handler.connection.settimeout(15)
             self.headers(handler, 206 if partial else 200, mime, end - start, extra)
             if handler.command == "HEAD":
                 return
@@ -344,6 +367,7 @@ class ExplorerAPI:
                 self.session.authorize(handler.headers.get("Origin", ""), authorization or handler.headers.get("Authorization", ""))
                 data = os.read(fd, min(262144, remaining))
                 if not data:
-                    break
+                    handler.close_connection=True
+                    raise ExplorerError("FILE_CHANGED","Media ended before the promised byte count.")
                 handler.wfile.write(data)
                 remaining -= len(data)

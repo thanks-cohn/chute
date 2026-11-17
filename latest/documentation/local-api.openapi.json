@@ -2,8 +2,8 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Chutey scoped local Explorer API",
-    "version": "1.0-development1",
-    "description": "Implemented contracts only; optional Phase 1 media commands marked. Independent automation enrollment, batch jobs and adapter registry are not implemented. See LOCAL-API.md. Development 1 adds authenticated locate_saved and distinct scoped Windows open/reveal actions, and audio sources. See LOCAL-API.md."
+    "version": "1.0-development1-request3",
+    "description": "Implemented Development 1 scoped engine. See LOCAL-API.md, HISTORY-EXPORT-API.md, DAILY-HIGHLIGHTS-API.md and DEVELOPMENT1-TRANSFER-MEDIA-API.md. Independent automation enrollment, resumable bulk jobs and Movie Mode adapter registry are future gated work."
   },
   "servers": [
     {
@@ -56,12 +56,21 @@
                       "release_media",
                       "locate_saved",
                       "open",
-                      "reveal"
+                      "reveal",
+                      "history_export_create",
+                      "history_export_status",
+                      "history_export_cancel",
+                      "saved_text_page",
+                      "transfer_start",
+                      "transfer_status",
+                      "transfer_cancel",
+                      "transfer_dismiss",
+                      "upload_receipt"
                     ]
                   },
                   "args": {
                     "type": "object",
-                    "description": "Command-specific parameters in LOCAL-API.md; media_source/release_media require the optional test worker."
+                    "description": "Command-specific parameters in the linked API documents. transfer_start and history_export_create return an inner asynchronous state; accepted/running are not completion."
                   }
                 }
               }
@@ -70,7 +79,7 @@
         },
         "responses": {
           "200": {
-            "description": "Completed receipt (not an asynchronous job acceptance)",
+            "description": "Outer dispatch receipt. For export/transfer jobs inspect inner result.state and poll status until verified ready/COMMITTED.",
             "content": {
               "application/json": {
                 "schema": {
@@ -479,6 +488,102 @@
           }
         }
       }
+    },
+    "/api/explorer/v1/highlights": {
+      "post": {
+        "summary": "Idempotent daily UTF-8 highlight capture",
+        "security": [
+          {
+            "SessionBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Origin"
+          },
+          {
+            "name": "X-Chute-Capture-ID",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{32}$"
+            }
+          },
+          {
+            "name": "X-Chute-Source",
+            "in": "header",
+            "schema": {
+              "type": "string",
+              "description": "Percent-encoded authorized source metadata"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "text/plain;charset=utf-8": {
+              "schema": {
+                "type": "string",
+                "format": "binary",
+                "maxLength": 4194304
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Durably committed capture; verify capture_id, input_size and input_sha256. Includes document_id, received_at, entry_offset and immutable file metadata.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HighlightReceipt"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid, too large, duplicate ID with different content, or recovery review required"
+          },
+          "403": {
+            "description": "Missing/expired enrolled session or wrong Origin"
+          }
+        }
+      }
+    },
+    "/api/explorer/v1/history-download/{capability}": {
+      "get": {
+        "summary": "One verified ZIP64 metadata archive; no multipart volumes",
+        "security": [],
+        "description": "Secret 256-bit one-hour download capability issued by authenticated history_export_create/status. Exact loopback Host; missing Origin allowed for native download, foreign Origin denied. 256-KiB bounded stream; no full JS archive Blob.",
+        "parameters": [
+          {
+            "name": "capability",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9_-]+$"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Single attachment: history.csv + history.json + manifest.json; Content-Length. Download completion is distinct from archive-ready.",
+            "content": {
+              "application/zip": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Expired, cancelled or unauthorized download"
+          }
+        }
+      }
     }
   },
   "components": {
@@ -521,7 +626,8 @@
             ]
           },
           "result": {
-            "type": "object"
+            "type": "object",
+            "description": "Command-specific result. transfer_* use TransferJob, history_export_* use HistoryExportJob, saved_text_page uses SavedTextPage. Read inner states before claiming completion."
           },
           "error": {
             "type": "object",
@@ -537,6 +643,234 @@
                 "type": "string"
               }
             }
+          }
+        }
+      },
+      "TransferJob": {
+        "type": "object",
+        "required": [
+          "id",
+          "state",
+          "kind",
+          "bytes",
+          "size"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{32}$"
+          },
+          "state": {
+            "enum": [
+              "accepted",
+              "running",
+              "COMMITTED",
+              "failed",
+              "cancelled",
+              "UNCERTAIN"
+            ]
+          },
+          "kind": {
+            "enum": [
+              "local_to_live",
+              "local_copy",
+              "live_to_local"
+            ]
+          },
+          "phase": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "bytes": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "size": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "error": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "receipt": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "description": "Verified SHA-256 and size/name/handle or immutable Store file metadata only when COMMITTED."
+          }
+        }
+      },
+      "HistoryExportJob": {
+        "type": "object",
+        "required": [
+          "id",
+          "state",
+          "count",
+          "scope",
+          "timezone",
+          "cutoff"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "state": {
+            "enum": [
+              "accepted",
+              "running",
+              "ready",
+              "failed",
+              "cancelled"
+            ]
+          },
+          "phase": {
+            "type": "string"
+          },
+          "count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "scope": {
+            "enum": [
+              "all",
+              "today",
+              "range"
+            ]
+          },
+          "timezone": {
+            "type": "string"
+          },
+          "from": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "to": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "cutoff": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "filename": {
+            "type": "string"
+          },
+          "size": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "sha256": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "url": {
+            "type": "string",
+            "description": "Relative one-hour download capability, only ready."
+          },
+          "error": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
+      "SavedTextPage": {
+        "type": "object",
+        "required": [
+          "text",
+          "offset",
+          "next",
+          "size",
+          "entry_offset",
+          "capture_id"
+        ],
+        "properties": {
+          "text": {
+            "type": "string"
+          },
+          "offset": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "next": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 0
+          },
+          "size": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "entry_offset": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "capture_id": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{32}$"
+          }
+        }
+      },
+      "HighlightReceipt": {
+        "type": "object",
+        "required": [
+          "state",
+          "capture_id",
+          "received_at",
+          "input_size",
+          "input_sha256",
+          "document_id",
+          "entry_offset",
+          "file"
+        ],
+        "properties": {
+          "state": {
+            "const": "COMMITTED"
+          },
+          "capture_id": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{32}$"
+          },
+          "document_id": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{32}$"
+          },
+          "received_at": {
+            "type": "string"
+          },
+          "input_size": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 4194304
+          },
+          "input_sha256": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "entry_offset": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "file": {
+            "type": "object",
+            "description": "Immutable QueueItem public metadata; capture ID distinct from daily document ID."
           }
         }
       }

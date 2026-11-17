@@ -10,19 +10,19 @@ Chutey metadata. Native enrollment is still required. No files are exported.
   time. IANA timezone data is packaged for Windows. Invalid/reversed dates fail.
   Returns a unique job `id`, `state`, `phase`, `count`, scope, timezone, dates,
   snapshot `cutoff` UTC, filename. Accepted/running is not completion.
-- `history_export_status`: `{id}`. Same originating authenticated session only.
+- `history_export_status`: `{id}`. Same enrolled origin, including a renewed authenticated session.
   States accepted → running → ready, failed or cancelled. Ready adds `size`,
   `sha256`, and relative `url`. Count is CSV events processed, not live cards.
 - `history_export_cancel`: `{id}`. Signals running work or removes the ready
   temporary ZIP; never changes source history. Idempotent while job retained.
-- `GET /api/explorer/v1/history-download/{capability}`: a one-hour, random 256-bit
+- `GET /api/explorer/v1/history-download/{capability}`: a one-hour after readiness, random 256-bit
   download capability. No general session token in URL. Exact loopback Host;
   rejects a foreign Origin; absent Origin supports Chrome's native downloader.
   Attachment is one verified ZIP, Content-Length and no-store. Keep URL private.
   Cancellation may interrupt a download; Chrome must report completion separately.
 
 One job builds at a time across clients; at most four undownloaded ready ZIPs.
-Jobs expire after one hour and temporary files are removed by bounded periodic
+Finished jobs expire after one hour and temporary files are removed by bounded periodic
 cleanup. Normal process exit removes owned files; an OS crash may leave a
 `chutey-history-export-*` temp directory (never treat it as a completed export).
 No splitting, sharding, per-file downloads or JS Blob of the ZIP. Browser Downloads

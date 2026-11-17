@@ -42,12 +42,12 @@ class Element {
   querySelectorAll(){return [];}
   setAttribute(k,v){this.attributes[k]=v;}
   removeAttribute(k){delete this.attributes[k];}
-  remove(){} append(){} focus(){} getBoundingClientRect(){return {bottom:150};}
+  remove(){} append(){} before(){} prepend(){} replaceChildren(){} focus(){} getBoundingClientRect(){return {bottom:150};}
 }
 (async()=>{
   const dial=new Element(),label=new Element(),size=new Element(),status=new Element(),grid=new Element(),body=new Element();
   dial.value="0";size.value="half";
-  const mapped={"#gallery-density":dial,"#gallery-density-value":label,"#shelf-viewer-size":size,"#status":status,"#files":grid};
+  const mapped={"#gallery-density":dial,"#gallery-density-value":label,"#shelf-viewer-size":size,"#status":status,"#files":grid,"#chutey-popup-gallery":new Element(),".topbar .actions":new Element()};
   const rows=[],settingWrites=[],sessionWrites=[],created=[];let opened=0,closed=0;
   const document={body,querySelector:key=>mapped[key]||null,
     querySelectorAll:()=>rows,addEventListener(){},

@@ -29,6 +29,10 @@ def main():
     page.locator('.settings-panel summary').click()
     assert scroll_check()=={'tracks':['HTML#'],'overflow':False},scroll_check()
     page.screenshot(path=str(out/'popup-settings-open.png'))
+    page.set_viewport_size({'width':312,'height':590})
+    assert scroll_check()=={'tracks':['HTML#'],'overflow':False},scroll_check()
+    page.screenshot(path=str(out/'popup-settings-125-percent-equivalent.png'))
+    page.set_viewport_size({'width':390,'height':590})
     page.locator('#clear-chute').scroll_into_view_if_needed();expect(page.locator('#clear-chute')).to_be_in_viewport()
     page.keyboard.press('End');page.locator('.chutey-gallery-tile').last.scroll_into_view_if_needed()
     assert page.evaluate('document.scrollingElement.scrollTop')>1000

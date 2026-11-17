@@ -162,6 +162,7 @@ async function fetchImagePayload(candidate) {
 }
 
 async function normalizedPayloads({ files = [], uri = "", html = "", text = "", source = null } = {}) {
+  if(String(text||'').startsWith('CHUTE_ITEM:'))throw Error('Use Copy selected to Chutey in File Explorer for this local reference. No file bytes were saved.');
   const actualFiles = Array.from(files || []).filter((file) => file instanceof Blob);
   if (actualFiles.length) {
     return actualFiles.map((file, index) => ({

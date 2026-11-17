@@ -94,3 +94,16 @@ def test_large_ledger_memory_and_cancel(tmp_path):
         job=exports.create({'scope':'all','timezone':'UTC'},'owner');exports.cancel(job['id'],'owner');job=done(exports,job)
         assert job['state']=='cancelled'
     finally:tracemalloc.stop();exports.close()
+
+def test_ready_lifetime_begins_after_build_and_foreign_owner_stays_denied(tmp_path):
+    exports=HistoryExports(Store(tmp_path))
+    try:
+        created=exports.create({'scope':'all','timezone':'UTC'},'origin')
+        for _ in range(1000):
+            job=exports.status(created['id'],'origin')
+            if job['state']=='ready':break
+            time.sleep(.01)
+        exports.jobs[job['id']]['created']-=7200
+        assert exports.status(job['id'],'origin')['state']=='ready'
+        with pytest.raises(ExportError):exports.status(job['id'],'foreign-origin')
+    finally:exports.close()

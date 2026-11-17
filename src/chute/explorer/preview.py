@@ -44,6 +44,7 @@ def preview_kind(row):
 def byte_range(value: str | None, size: int):
     if value is None:
         return 0, size, False
+    if len(value)>128:raise ExplorerError("INVALID_RANGE", "Requested byte range is unavailable.")
     match = re.fullmatch(r"bytes=(\d*)-(\d*)", value)
     if not match or not any(match.groups()) or size == 0:
         raise ExplorerError("INVALID_RANGE", "Requested byte range is unavailable.")
