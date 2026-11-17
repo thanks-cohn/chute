@@ -1,53 +1,58 @@
-# NECESSARY FIX — Image Copy in popup and Shelf previews; Shelf Open defaults to Windows file location
+# NECESSARY FIX — Popup image Copy actions; Shelf History Open defaults to Windows Explorer
 
-**Owner clarification:** November 17, 2026
-**Priority:** Required next Chutey Codex acceptance repair (interaction correctness).
-**Status:** Specification / source inspection only; NOT implemented.
-**Scope:** Chutey Chrome toolbar popup, Shelf History gallery, popup expanded lightbox, Shelf half/full (expanded/maximized) image preview.
-**Important:** This later clarification supersedes earlier notes wherever they imply that clicking a History **image** itself should reveal its folder. Image click PREVIEWS; the **Shelf Open button** REVEALS the Windows location by default.
+**Latest owner correction:** November 17, 2026
+**Priority:** Necessary next Codex repair, narrowly scoped
+**Status:** SPECIFICATION ONLY — not implemented
+**Scope boundaries:** (1) Chutey extension popup image context menu and its expanded/maximized popup preview, and (2) the separate **Shelf History Open BUTTON**. **No changes to Shelf image-click behavior or Shelf preview controls are authorized by this request.**
 
-## Exact owner's intent
+## Corrected owner intent — DO NOT CONFLATE POPUP WITH SHELF
 
-> "the extension pop out in chutey, you can right click and copy the images as well, AND the open button, opens ... in the local file explorer, UNLESS stated differently in the settings, this is only for the shelf! but click on the image expands it, instead of just trash in both the expanded and maximized it should allow one to copy the image!"
+The owner corrected an earlier assistant interpretation:
 
-### Final UX rules per surface
+> "this is only for the extension pop out, not the shelf! 'Clicking an image should enlarge/preview it.' i mean keep current functionality but i stated that to distinguish with what the open button should do in the same expanded pop out, the shelfs HISTORY open should default to the local windows opener or the like, UNLESS, the settings dictate differently!"
 
-| Surface/action | Expected behavior |
-|---|---|
-| Chrome toolbar popup: **single-click an image tile** | Opens/enlarges the image in Chutey's own popup preview/lightbox; no Windows Explorer launch |
-| Chrome toolbar popup: **right-click image tile** | Context menu offering **Copy image** AND **Trash It!** as separate, accurately labeled actions |
-| Chrome toolbar popup: **right-click enlarged image** | **Copy image** available alongside **Trash It!**; do not close preview unexpectedly on copy |
-| Shelf History: **single-click image card** | Opens/enlarges in-Shelf image preview; no automatic system Explorer launch |
-| Shelf History: **right-click image card** | **Copy image** available, with existing permitted actions preserved |
-| Shelf image preview: **expanded/half/full/maximized** | **Copy image** available in all modes (toolbar/button or image context menu), alongside existing actions; works after resizing and when maximized |
-| Shelf History: explicit **Open** button | **Default: reveal the item's real saved local folder in WINDOWS File Explorer, select/highlight image where supported.** If the user explicitly changes **Shelf Open** behavior in Settings, honor that choice. This applies ONLY to Shelf Open; do not globally change File Explorer row or popup image clicks |
-| Chutey File Explorer (separate tab) | Ordinary file click opens internal image/video preview per existing necessary-fix contract; Windows system Open/Reveal only when explicitly requested via its own controls |
+**Precisely:**
 
-**Copy semantics:** "Copy image" means actual picture pixels/bitmap/PNG-compatible clipboard content, ready for Ctrl+V into Paint or another image-capable program. NOT filename, local path, URL, thumbnail-link, or file-list clipboard copy by default. Do not mutate the file, remove it from History or create extra saved image copies. Show "Copied image" only after the clipboard operation is verified; failure needs actionable and accurate message. A right-click menu should work using mouse and keyboard equivalents (ContextMenu/Shift+F10). Avoid hijacking ordinary text/input right-click.
+| Surface | Action | Requirement |
+|---|---|---|
+| **Extension popup small image tile** | Click image | **KEEP CURRENT BEHAVIOR** — enlarge/preview the image in the popup. This is background context, **not a new requirement for Shelf** |
+| **Extension popup small image tile** | Right-click | Add **Copy Image** alongside existing **Trash It!** |
+| **Extension popup expanded / maximized image preview** | Right-click image / image actions | **Copy Image** must be available alongside **Trash It!** in BOTH expanded and maximized popup states. Leave preview open after copying |
+| **Extension popup expanded Open action**, if presented for the saved file | Click explicit Open | Treat this as a **separate file-location action**, not another invocation of thumbnail image enlargement. Use the real local saved location where supported. The existing arrow **↗ Open in Shelf** is specifically a *Shelf handoff*, not the same named Open-file/location action; do not silently repurpose it or claim the current build already has a local-file Open button |
+| **Shelf → History** | Click its explicit **Open** BUTTON | **By default, reveal/open the saved item's actual location in Windows File Explorer**, selecting the file when supported. **Only if Settings explicitly specifies an alternate target** should that button behave differently |
+| **Shelf → History image tile or image preview** | Click/expand/right-click | **NO CHANGE REQUESTED**. Preserve current Shelf behaviors and controls; do not impose the popup click/Copy changes on Shelf |
+| **Chutey File Explorer tab** | Select file | Keep independent File Explorer-preview repair contract; do not let these popup/Shelf History rules change it |
 
-### Existing source and why this matters (TEST reference 1e2b2bc6d5da0119e87bcbc0c52b86abe55dd122)
+**Context:** The user mentioned the popup's existing click-to-expand behavior to distinguish it from an **Open** button. It was NOT permission to change Shelf History image-click functionality. Also **Copy Image in expanded/maximized** here refers to the **extension popup**, NOT adding Copy controls to the Shelf half/full/maximized preview.
 
-- extension/popup-gallery.js creates popup lightbox, and right-click menu class .chutey-popup-menu that currently contains **only Trash It!**. Both popup cards and lightbox surface currently invoke that same trash-only menu. Expand this menu with separately wired Copy image; do not make copy delete/hide anything.
-- Popup image tile click already calls openPreview(file,row); preserve this behavior.
-- extension/shelf-gallery-preview.js creates the Shelf History image preview and supports expanded/restored half/full viewing, but its viewer toolbar contains only resize/close. Add a clear **Copy image** action in the half/full viewer and on its picture context menu.
-- extension/shelf.js creates History card "Open" and "Reveal" buttons, currently sending Open through ChuteyFileActions.saved(file,'open') and Reveal through saved(file,'reveal').
-- extension/file-actions.js currently has global default chuteyOpenTarget='system' meaning **Windows-associated application**, NOT reveal location. The owner now wants **Shelf-specific Open default = Windows Explorer reveal saved file location**, with an explicit Shelf-specific settings override. Do not silently reuse the unrelated File Explorer's click action or change popup tile behavior. Existing setting/older explicit preferences should be migrated/handled with care rather than overwritten unexpectedly.
-- The existing native API **clipboard_copy_image** supports converting guarded original PNG/JPEG/WebP/BMP/GIF images into Windows DIB/DIBV5/PNG clipboard formats, with size/pixel/memory caps, authenticated user gesture, guarded file handle+identity and verified clipboard write. A saved image can be resolved with **locate_saved**; evaluate using the existing API for popup/Shelf safely. Do not bypass consent/authorization, assume arbitrary images are supported, or feed arbitrary paths to a native command.
-- The native image clipboard implementation currently limits encoded input to 32 MiB and 8.5 million decoded pixels. Offer truthful errors for unsupported/large images; optional bounded downsample/copy fallback must be separately justified, not silent copying of a low-res thumbnail unless clearly labeled.
+## Copy Image means actual image pixels
 
-### Conflict resolution with earlier History location request
+- Copy decoded original image pixels to the Windows clipboard so Paste works in Paint/other compatible apps — **not a filename, path, URL, link, or thumbnail pointer**.
+- The file and dated History must be unchanged. Copy should never invoke Trash, Recall, or Hide.
+- Confirm a verified clipboard-write result before displaying "Copied Image"; show a specific actionable error otherwise.
+- Protect image decoder memory, user gesture and native permissions; don't bypass folder grants or silently downscale originals.
+- Include keyboard context menu invocation (ContextMenu / Shift+F10) and accessible focus.
 
-The user's latest, more precise instruction is: **the image itself enlarges when clicked; the Shelf Open button opens the local file location unless Settings override it**. Any earlier ambiguous "History click = Reveal" prose must be read as applying to the dedicated History Open/GO TO location action, not to the image-thumbnail click. Keep preview and location distinct. **Do not launch Windows Explorer when a user single-clicks an image to expand it.**
+## Existing exact TEST source inspected: 1e2b2bc6d5da0119e87bcbc0c52b86abe55dd122
 
-### Acceptance / regression tests
+- `extension/popup-gallery.js` currently preserves popup tile click-to-preview. The right-click `.chutey-popup-menu` (tile and lightbox) has ONLY **Trash It!**; extend it to Copy Image in the popup.
+- `extension/popup-gallery.js` currently includes an **↗ Open in Shelf** handoff control in the enlarged preview, NOT an explicitly named Windows file-location Open button. Do not mistake these controls for one another; keep the handoff unless separately told to change it.
+- `extension/shelf.js` currently creates Shelf History Open, Reveal, Trash and other item tools. **Only change the behavior of its explicit Open button**, giving it a Shelf-specific configurable default to Windows **file location**, not just launching the associated app.
+- `extension/file-actions.js` has a shared `chuteyOpenTarget:'system'` setting whose system option is the **Windows-associated application**, rather than reveal location. Codex must give the Shelf History Open button its own default/setting; never silently globally change File Explorer or popup thumbnail actions. Migrate/reconcile preexisting explicit user settings rather than clobbering them.
+- The existing guarded `locate_saved` and `clipboard_copy_image` native APIs can be evaluated/reused for saved popup images. Clipboard image input is currently bounded by supported formats and 32 MiB encoded/8.5-million-pixel limits; no unsafe bypass.
+- **Do not change `extension/shelf-gallery-preview.js` image click, resize or copy behavior under this task**. Earlier draft incorrectly proposed adding Copy to Shelf preview; that proposal is withdrawn.
 
-1. Popup tile single-click expands image; right-click tile shows Copy image and Trash It!; Copy puts real image pixels on Windows clipboard without deleting.
-2. Popup enlarged lightbox: right-click image offers Copy image and Trash It! and clipboard image pastes correctly into Paint; image stays enlarged after copy.
-3. Shelf History tile click expands image; both half/expanded and full/maximized image preview allow Copy image; show confirmation only on successful verified clipboard write.
-4. Shelf History Open button defaults to Windows Explorer **folder reveal** and selects actual saved image if supported, not Photos/Paint; changing **Shelf Open target** in Settings changes this button only, leaving popup tile clicks and Chutey File Explorer internal previews unchanged.
-5. Explicit Reveal/GO TO continues working. Missing/moved saved image shows real error; no guessing arbitrary path. History retention/Trash behavior is unaffected.
-6. Supported image formats (PNG/JPEG/WebP/BMP/GIF first frame), unsupported images, oversize/low-memory, clipboard busy, authorization failure and stale item give specific messages. No false "Copied" claims, no unbounded memory allocation or hidden file mutation.
-7. Test compact popup, Shelf narrow view, half/full and maximized preview, keyboard menu focus/return, Chrome restart, and existing stored user preferences.
-8. Test real Windows clipboard paste into Paint and another compatible app where available; avoid asserting image copy works based solely on internal mock tests.
+## Required acceptance
 
-**No worker reinstall, merge, GOLD promotion, History deletion or deployment is authorized by this document.**
+1. Popup image tile click continues to enlarge in the popup exactly as before; no Windows Explorer launch for that click.
+2. Right-click popup tile, expanded popup image, and maximized popup image → menu with **Copy Image** and **Trash It!**. Copy verified into real Windows clipboard and pasted into Paint; no deletion or viewer closure on copy.
+3. Popup's actual file **Open/location** action (if displayed) remains distinct from image-click enlargement and from the existing **↗ Open in Shelf** navigation; do not mislabel controls or accidentally change the handoff.
+4. **Shelf History Open BUTTON** defaults to revealing saved file in Windows Explorer. User's explicit alternate preference in Shelf Settings overrides this button alone.
+5. Shelf image tile click, half/full image preview, lightbox and gallery navigation behave exactly as before. No Shelf-wide Copy Image addition from this request.
+6. Chutey File Explorer click-to-preview remains governed by its separate necessary-fix document.
+7. Handle absent/moved local image, clipboard busy, unsupported format, low RAM and permission expiry truthfully; no auto-consent, unsafe path guessing, or unverified success.
+8. Tests on installed Windows Chrome popup (including enlarged/maximized) and Shelf History Open button with/without a Settings override.
+
+**Conflict resolution:** This latest correction supersedes any older documentation that says Shelf image clicks must newly enlarge, or that Copy Image must be added to Shelf expanded/full preview, under this popup-specific feature request.
+
+No install, merge, release, archive deletion, GOLD tag changes or owner-device changes authorized by writing this specification.
