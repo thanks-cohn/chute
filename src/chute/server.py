@@ -50,6 +50,26 @@ class ChuteHandler(BaseHTTPRequestHandler):
     def _explorer_route(self) -> bool:
         if not urlparse(self.path).path.startswith("/api/explorer/"):
             return False
+        if urlparse(self.path).path.startswith('/api/explorer/v1/history-download/'):
+            from .history_export import ExportError
+            try:
+                if self.command!='GET' or self.headers.get('Host')!=f'127.0.0.1:{self.server.server_port}' or len(self.headers.get_all('Host',[]))!=1:
+                    raise ExportError('Invalid download request.')
+                exports=getattr(self.server,'history_exports',None)
+                if exports is None:raise ExportError('Archive unavailable.')
+                job=exports.download(urlparse(self.path).path.rsplit('/',1)[-1])
+                if self.headers.get('Origin') not in (None,job['origin']):raise ExportError('Unapproved download origin.')
+                self.send_response(200)
+                if self.headers.get('Origin'):self.send_header('Access-Control-Allow-Origin',job['origin'])
+                self.send_header('Content-Type','application/zip');self.send_header('Content-Length',str(job['size']))
+                self.send_header('Content-Disposition','attachment; filename="'+job['filename']+'"')
+                self.send_header('Cache-Control','no-store');self.send_header('X-Content-Type-Options','nosniff');self.end_headers()
+                with job['path'].open('rb') as archive:
+                    while chunk:=archive.read(256*1024):
+                        if job['cancel'].is_set():self.close_connection=True;break
+                        self.wfile.write(chunk)
+            except ExportError as exc:self._json({'error':str(exc)},HTTPStatus.FORBIDDEN)
+            return True
         native = getattr(self.server, "native_explorer", None)
         if urlparse(self.path).path == "/api/explorer/native/session":
             import secrets
@@ -489,6 +509,8 @@ class ChuteServer(ThreadingHTTPServer):
         super().__init__(address, ChuteHandler)
         self.store = store
         self.explorer_api = None
+        import threading
+        self.history_exports_lock = threading.Lock()
 
 
 def serve(host: str = DEFAULT_HOST, port: int = DEFAULT_PORT, root: Path | None = None, *, explorer_root: Path | None = None, explorer_origin: str | None = None) -> None:

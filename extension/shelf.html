@@ -27,7 +27,12 @@
     <button id="chutey-tab-history" class="chutey-tab is-active" type="button" role="tab" aria-controls="chutey-history-view" aria-selected="true" tabindex="0">History</button>
     <button id="chutey-tab-explorer" class="chutey-tab" type="button" role="tab" aria-controls="chutey-explorer-view" aria-selected="false" tabindex="-1">File Explorer</button>
   </nav>
-  <details class="chutey-presentation-options"><summary>Image and background settings</summary><div class="chutey-shared-options"><fieldset data-presentation-settings></fieldset><fieldset data-file-action-settings></fieldset></div></details>
+  <details class="chutey-presentation-options"><summary>Image and background settings</summary><div class="chutey-shared-options"><fieldset data-presentation-settings></fieldset><fieldset data-file-action-settings></fieldset><fieldset id="history-export"><legend>History Export</legend>
+<label>Scope <select id="export-scope"><option value="all">From the beginning (All history)</option><option value="today">Today</option><option value="range">Selected date range</option></select></label>
+<div id="export-dates" hidden><label>From <input id="export-from" type="date"></label><label>To <input id="export-to" type="date"></label></div>
+<p id="export-timezone"></p><p>Metadata only, CSV and JSON in exactly one ZIP. Files and History stay unchanged.</p>
+<button id="export-history" type="button" class="secondary-button">Export History</button> <button id="export-cancel" type="button" class="secondary-button" hidden>Cancel export</button>
+<p id="export-status" role="status" aria-live="polite"></p></fieldset></div></details>
   <section id="chutey-history-view" role="tabpanel" aria-labelledby="chutey-tab-history">
   <div class="history-nav">
     <button id="history-prev" class="icon-button" type="button" title="Older day">‹</button>
@@ -79,5 +84,6 @@
   <script src="explorer-api.js"></script>
   <script src="explorer-view.js"></script>
   <script src="shelf-gallery-preview.js"></script>
+  <script src="history-export.js"></script>
 </body>
 </html>

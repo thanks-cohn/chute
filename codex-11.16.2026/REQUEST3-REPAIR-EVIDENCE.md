@@ -30,3 +30,24 @@ Executed Linux Chromium HTTP fixtures (native enrollment simulated):
 
 Actual installed Chrome, OS zoom/touch, Windows native shell and owner acceptance
 remain pending. These HTTP fixtures do not claim Windows installation validation.
+
+## 3C — completed after 3A, before 3D implementation
+
+Shelf Settings owns the sole export UI; popup has none. Uses authenticated native
+command sessions and a scoped download capability, one ZIP64 temporary archive,
+streamed CSV+JSON representations of complete chronological event snapshots,
+CRC checks + SHA-256 before ready. Save As uses native browser Downloads, not a
+whole-archive JS Blob. Cancellation and failures clean owned temporary output.
+
+`tests/test_history_export.py`: 8 passed. Includes DST fall-back, local/UTC
+midnight, removed/recall/clear events, empty Today, invalid dates/timezone/extra
+path input, Unicode/quotes/newlines/formulas, URL-secret/local-path redaction,
+foreign job owner, ZIP64 structures with reduced stdlib size boundary, concurrent
+appends excluded from snapshot, disk-error cleanup, cancellation and 15,000-event
+stress. Traced peak Python allocation: 925,575 bytes (not whole-process RSS).
+`verify-history-export-browser.py`: real single browser ZIP download, actual
+CSV/JSON/event counts and unmodified source logs; Shelf-only placement passed.
+Screenshot `/tmp/chutey-request3c/shelf-export.png`. Native enrollment simulated.
+Actual >4-GiB ZIP, Windows destination filesystem limits and installed Chrome
+Save As remain owner acceptance checks; the size rule uses Python ZIP64 rather
+than an arbitrary split limit. See HISTORY-EXPORT-API.md for implemented contracts.

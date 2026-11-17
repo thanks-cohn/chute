@@ -130,7 +130,7 @@ class ExplorerAPI:
                 if body["command"] == "capabilities":
                     from .protocol import catalog
                     capabilities = catalog()
-                    capabilities['commands'] += ['locate_saved','open','reveal','media_source','release_media']
+                    capabilities['commands'] += ['history_export_create','history_export_status','history_export_cancel','locate_saved','open','reveal','media_source','release_media']
                     capabilities['blocked'] = {key:value for key,value in capabilities['blocked'].items() if key not in {'open','reveal'}}
                     result={"state":"completed","result":{**capabilities,"transfer":{
                         "source_kind":"local_explorer","maximum_chunk_bytes":262144,
@@ -138,6 +138,21 @@ class ExplorerAPI:
                         "write_consent_required":True,"conflicts":["keep_both","skip"],
                         "commands":["prepare_export","export_to_live","receive_from_live","reconcile_transfer"],
                         "interop_enabled":False},"media":{"commands":["media_source","release_media"],"methods":["GET","HEAD"],"ranges":True,"ticket_limit":32,"ticket_seconds":600},"file_actions":{"commands":["locate_saved","open","reveal"],"system_platform":"windows","system_open":"previewable files only"}}}
+                elif body['command'] in {'history_export_create','history_export_status','history_export_cancel'}:
+                    from ..history_export import HistoryExports,ExportError
+                    # Store-wide manager bounds simultaneous jobs across clients.
+                    with handler.server.history_exports_lock:
+                        if not hasattr(handler.server,'history_exports'):
+                            handler.server.history_exports=HistoryExports(handler.server.store)
+                    exports=handler.server.history_exports;args=body.get('args',{})
+                    owner=self.session.token
+                    try:
+                        if body['command']=='history_export_create':value=exports.create(args,owner,self.session.origin)
+                        else:
+                            if set(args)!={'id'} or not isinstance(args['id'],str):raise ExportError('An export ID is required.')
+                            value=exports.status(args['id'],owner) if body['command']=='history_export_status' else exports.cancel(args['id'],owner)
+                    except ExportError as exc:raise ExplorerError('EXPORT_FAILED',str(exc))
+                    result={'state':'completed','result':value}
                 elif body["command"] == "locate_saved":
                     from .security import RootGrant
                     import re

@@ -10,7 +10,8 @@
     "contextMenus",
     "sidePanel",
     "storage",
-    "nativeMessaging"
+    "nativeMessaging",
+    "downloads"
   ],
   "host_permissions": [
     "http://*/*",
