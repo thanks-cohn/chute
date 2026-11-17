@@ -1,0 +1,51 @@
+name: P0 disposable Windows MV3 loading diagnostic
+on:
+  push:
+    branches: [fix/chutey-media-worker-2026-11-17]
+    paths: [.github/workflows/chutey-p0-browser-probe.yml]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  probe:
+    runs-on: windows-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install playwright==1.65.2
+      - run: python -m playwright install chromium
+      - name: Compare ephemeral browser profiles and inspect registration
+        shell: python
+        run: |
+          import json, os, re, tempfile
+          from pathlib import Path
+          from playwright.sync_api import sync_playwright
+          def safe(v):
+              return re.sub(r'chrome-extension://[a-p]{32}', '[extension]', str(v))[:1800]
+          with sync_playwright() as p:
+              for kind,binary in [('Chrome',r'C:\Program Files\Google\Chrome\Application\chrome.exe'),('Playwright Chromium',p.chromium.executable_path)]:
+                  for headless in (True,False):
+                      report={'browser':kind,'headless':headless}
+                      with tempfile.TemporaryDirectory(prefix='chutey-browser-probe-') as folder:
+                          context=None
+                          try:
+                              context=p.chromium.launch_persistent_context(folder,executable_path=binary,headless=headless,ignore_default_args=['--disable-extensions'],args=['--enable-unsafe-extension-debugging'],timeout=30000)
+                              cdp=context.browser.new_browser_cdp_session()
+                              registered=cdp.send('Extensions.loadUnpacked',{'path':str(Path('extension').resolve())})
+                              report['registered']=bool(registered.get('id'));report['version']=context.browser.version
+                              page=context.new_page()
+                              try:
+                                  page.goto('chrome-extension://'+registered['id']+'/popup.html',timeout=15000)
+                                  report['background']=bool(page.evaluate('()=>chrome.runtime.sendMessage({type:"chute-diagnostics"})'))
+                              except Exception as e:report['page_error']=safe(e)
+                              report['workers']=len(context.service_workers)
+                              page.goto('chrome://extensions')
+                              info=page.evaluate('()=>new Promise(resolve=>chrome.developerPrivate.getExtensionsInfo({includeDisabled:true,includeTerminated:true},resolve))')
+                              report['extension_info']=[{'name':x.get('name'),'state':x.get('state'),'disableReasons':x.get('disableReasons'),'manifestErrors':[safe(v.get('message','')) for v in x.get('manifestErrors',[])],'runtimeErrors':[safe(v.get('message','')) for v in x.get('runtimeErrors',[])]} for x in info if x.get('name')=='Chutey']
+                          except Exception as e:report['error']=safe(e)
+                          finally:
+                              if context:context.close()
+                      print(json.dumps(report),flush=True)
