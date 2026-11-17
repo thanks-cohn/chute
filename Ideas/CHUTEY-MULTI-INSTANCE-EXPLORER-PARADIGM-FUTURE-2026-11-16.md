@@ -15,6 +15,19 @@
 - A user who never invokes "Make Me Chutey!" retains exactly the simple one-Chutey experience: one mascot, one usual location, one explorer.
 - An initial new Chutey may use the same mascot artwork; different colors/names/skins later are optional presentation, not separate workers.
 
+## OWNER RULE — INDEPENDENT MASCOT VISIBILITY MODES, EXPLORER NEVER AUTO-HIDES
+
+**This is a strict distinction.** Each Chutey has two different visual surfaces: (a) its **collapsed mascot**, which may appear/disappear according to its visibility setting, and (b) its **expanded native miniature Explorer window**, which **always stays open, visible and ALWAYS ON TOP** until the user explicitly minimizes or closes **that specific window**. The mascot's ten-second timer must NEVER hide, minimize, remove, move behind normal applications, or alter an expanded Explorer. The Explorer must remain a usable drag-and-drop target indefinitely, including when other mascots are hidden.
+
+**Per-Chutey mascot visibility preferences (the existing three-mode concept):**
+1. **Auto-hide after 10 seconds (default):** When collapsed and idle, the mascot disappears after 10 seconds. A pointer approaching the **consistent bottom-right screen hotspot** reveals **all eligible hidden auto-hide mascots together**, at their saved Drop Off positions (not necessarily all stacked in that corner). They stay visible for 10 seconds of inactivity and then disappear again. Repeat on the next hotspot visit; never require relaunch. User interaction/hover, right-click menu, Pick Me Up/Drop Off and drag-and-drop pause/reset the idle timer; don't hide while actively interacting.
+2. **Always visible:** The collapsed mascot remains visible continuously at its own saved screen position, including after 10 seconds. Hotspot interactions must not inadvertently hide it. Expanding still shows the Explorer on top.
+3. **Right-click-controlled / manual visibility mode:** Preserve the owner's existing *right-click* visibility/context-menu concept rather than silently treating it as auto-hide or always visible. Right-click must still open the Chutey action menu and must not cause immediate accidental disappearance. Whether context-menu access is also offered through the hotspot should be resolved against actual established UX before implementation; do **not** invent a global desktop-right-click hook.
+
+**Multiple-window behavior:** With four Chuteys, each can independently choose Auto-hide, Always visible or right-click/manual mode. The single bottom-right hotspot reveals eligible hidden mascots in the 10-second Auto-hide mode; it does **not** toggle, close, occlude or collapse any of the four expanded Explorer windows. Any Explorer already open stays visibly above ordinary apps and accepts drops. Expanding or minimizing one Chutey never minimizes its siblings. Use one shared worker and one shared bounded scheduler.
+
+**Acceptance:** Test four instances with mixed modes, 10s expiration, repeated bottom-right summon, visible placement, per-instance idle reset while mouse/drag/menu active, and expanded Explorers remaining on top and fully droppable for minutes/hours despite mascot timers. Simultaneous open windows don't auto-hide on hotspot leave; moving pointer to hotspot doesn't cause new Explorer windows to open or the old ones to vanish. Test multi-monitor and off-screen placement recovery. The 10s rule is **mascot-only**.
+
 ## OWNER RULE — EVERY CHUTEY OPENS IN ITS OWN ASSIGNED DIRECTORY BY DEFAULT
 
 **Mandatory default:** Every Chutey's own miniature Explorer opens directly in **that instance's assigned default location** when expanded, opened anew, or restored from its mascot. **Not** a shared/global directory; **not** another Chutey's folder; **not** a previously browsed folder. This applies to Primary Chutey, clones created by right-clicking an existing Chutey, and new instances created from right-clicking a folder.
@@ -69,6 +82,8 @@ ChuteyInstance {
   explorerWindowState: collapsed | expanded | minimized
   explorerWindowGeometry: optional position/size
   appearancePreference: optional instance-specific skin
+  mascotVisibilityMode: autoHide10s | alwaysVisible | rightClickManual
+  // Explorer topmost and visibility are NOT controlled by mascot auto-hide timers
 }
 ```
 
@@ -87,7 +102,7 @@ Service-wide resources are shared:
 2. User can **right-click a folder inside Chutey Explorer → Make Me Chutey!** to spawn a Chutey bound to that folder; OR **right-click the mascot itself → Make Me Chutey!** to spawn an independent Chutey initially using the source mascot's assigned folder.
 3. Chutey #2 appears at a sensible non-overlapping nearby screen position with its own Explorer, while **Chutey #1 and its Explorer can remain visible, expanded and always-on-top**. #2's drop destination is that chosen folder, #1's default destination unchanged. Both receive independent drag-and-drop.
 4. Drop a file onto #1's mascot -> verified save to its assigned primary destination. Drop onto #2's mascot -> verified save to its assigned folder. Drop into either expanded Explorer background -> current browsed folder; on a child folder -> child folder. Copy from one Chutey Explorer to another when both roots are authorized.
-5. Close/minimize one Explorer -> only that Explorer collapses into its mascot. Assign/reposition one -> other unaffected. Hotspot/group-summon semantics (show all vs primary plus chooser) require owner UX approval before implementation.
+5. Close/minimize one Explorer -> only that Explorer collapses into its mascot. Assign/reposition one -> other unaffected. In the Auto-hide mode, moving the pointer to the consistent bottom-right hotspot temporarily summons all eligible hidden mascots at their saved positions for 10 idle seconds. Expanded always-on-top Explorers NEVER auto-hide.
 6. On restart, show intended primary/secondary instances without unprompted duplicate spawning; missing permissions show clear reconnect/reauthorize instead of silently writing elsewhere.
 7. Later management actions, when requested: Rename Chutey; Open Explorer; Assign destination; Show All Chuteys; Hide/Remove this *instance only* (must not delete files/history); maybe change appearance. Don't build these unrequested controls prematurely.
 
