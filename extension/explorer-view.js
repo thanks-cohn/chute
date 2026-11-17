@@ -115,7 +115,7 @@
         try {
           const source = await api.mediaSource(meta);
           if (id !== pinnedId) { void api.command("release_media",{ticket:source.ticket}).catch(() => {}); return; }
-          pinnedTicket=source.ticket;pinnedSource=source;video.src=source.url;stopPinnedLease=window.ChuteyMediaPlayback.lease(source,api,error=>{pinnedStatus.textContent='Continuation: '+error.message;});
+          pinnedTicket=source.ticket;pinnedSource=source;video.src=source.url;stopPinnedLease=window.ChuteyMediaPlayback.lease(source,api,error=>{if(window.ChuteyMediaPlayback.terminal(error)){stopPinned();say('Playback stopped: '+error.message);}else pinnedStatus.textContent='Continuation: '+error.message;});
         } catch (error) {
           if (id !== pinnedId) return;
           // The installed worker remains supported for bounded small clips.
@@ -683,8 +683,8 @@
       const receipt = await api.command("reconcile_transfer",{operation_id:last.operation_id});
       say(receipt.state === "COMMITTED" ? "Verified saved copy: " + receipt.name : "This copy needs destination review before retrying. Its completion is uncertain.");
     },
-    'review-transfer':async()=>{const pending=(await chrome.storage.session.get({chuteyPendingTransfer:null})).chuteyPendingTransfer;if(!pending)return;const job=await api.command('transfer_status',{id:pending.id});if(['accepted','running'].includes(job.state))throw Error('Copy still active. Cancel and wait first.');if(!confirm('Have you inspected the destination and recorded any partial or completed copy? This dismisses the warning only; no files are changed.'))return;if(job.state!=='UNCERTAIN')await api.command('transfer_dismiss',{id:pending.id});await chrome.storage.session.remove('chuteyPendingTransfer');say('Warning dismissed; original files and receipts preserved.');},
-    'cancel-transfer': async()=>{const pending=(await chrome.storage.session.get({chuteyPendingTransfer:null})).chuteyPendingTransfer;if(!pending)throw Error('No pending copy.');const job=await api.command('transfer_cancel',{id:pending.id});say('Cancellation requested · '+job.state);},
+    'review-transfer':async()=>{if(!confirm('Have you reviewed the destination? Dismiss only the warning; files and durable job evidence are preserved.'))return;await api.dismissPending({reviewed:true});say('Reviewed warning dismissed; durable evidence preserved.');},
+    'cancel-transfer':async()=>{const job=await api.cancelPending();say(job?'Cancellation requested · '+job.state:'No pending copy.');},
     live: () => copyToLive(rows.filter(row => selected.has(row.handle))),
     write: async () => {
       say("Choose the exact folder to authorize read and write access…");

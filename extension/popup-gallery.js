@@ -83,7 +83,7 @@
       const row=file.__local ? file : await window.ChuteyExplorerAPI.command('locate_saved',{id:file.id});
       const source=await window.ChuteyExplorerAPI.mediaSource(row);
       if(token!==serial){void window.ChuteyExplorerAPI.command('release_media',{ticket:source.ticket}).catch(()=>{});return;}
-      mediaTicket=source.ticket;stopLease=window.ChuteyMediaPlayback.lease(source,window.ChuteyExplorerAPI,error=>{errorText.textContent='Playback continuation: '+error.message;errorText.hidden=false;});
+      mediaTicket=source.ticket;stopLease=window.ChuteyMediaPlayback.lease(source,window.ChuteyExplorerAPI,error=>{if(window.ChuteyMediaPlayback.terminal(error))releaseMedia();errorText.textContent='Playback continuation: '+error.message;errorText.hidden=false;});
       const node=document.createElement(source.mime.startsWith('audio/')?'audio':'video');node.controls=true;node.preload='metadata';node.autoplay=false;node.crossOrigin='anonymous';
       if(!node.canPlayType(source.mime))throw Error('This browser does not support the media container/codec.');
       node.onerror=async()=>{const message=await window.ChuteyMediaPlayback.failure(node,source);if(token===serial){releaseMedia();errorText.textContent=message;errorText.hidden=false;}};

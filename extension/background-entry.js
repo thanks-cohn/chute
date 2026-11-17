@@ -1,5 +1,6 @@
 importScripts(
   "background-native.js",
+  "background-media-origin.js",
   "background-status.js",
   "background-highlights.js",
   "background.js",

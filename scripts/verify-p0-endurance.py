@@ -280,7 +280,13 @@ def run(args):
                         values=page.evaluate(BURST_JS,{'width':width,'root':root_handle,'thumbnail':None});mode_record['widths'].append({'width':width,'latency':summary([v['ms'] for v in values]),'errors':dict(Counter(v.get('code') for v in values if not v['ok']))})
                 assert len({json.dumps(v['ack'].get('effective_limits'),sort_keys=True) for v in report['bursts']})>1,'Performance modes must apply distinct budgets'
                 command(page,'performance_set',{'mode':'balanced'})
-                preview(page,'movie.mp4');main=page.locator('.ex-pinned-body video');expect(main).to_be_visible();page.wait_for_function('document.querySelector(".ex-pinned-body video")?.readyState>=1')
+                preview(page,'movie.mp4');main=page.locator('.ex-pinned-body video')
+                try:
+                    expect(main).to_be_visible();page.wait_for_function('document.querySelector(".ex-pinned-body video")?.readyState>=1')
+                except Exception:
+                    report['startup_playback_status']=page.locator('.ex-pinned-player').inner_text()[:300]
+                    report['media_diagnostics']=command(page,'media_diagnostics')
+                    page.screenshot(path=str(out/'playback-start-failed.png'));save();raise
                 popup.goto(entry+'/popup.html');popup.locator('#popup-local-toggle').click();popup.get_by_role('button',name='▶ movie.webm',exact=True).click();second=popup.locator('.chutey-lightbox-player video');expect(second).to_be_visible();popup.wait_for_function('document.querySelector(".chutey-lightbox-player video")?.readyState>=1')
                 for media in (main,second):media.evaluate(INSTALL_OBSERVERS);media.evaluate('n=>{n.muted=true;return n.play()}')
                 started=time.monotonic();last_times=[0,0];stalled_since=[None,None];iteration=0;latencies=[];copy_jobs=[];mode_history=[];last_copy=-999;branch_open=False

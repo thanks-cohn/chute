@@ -11,7 +11,8 @@
     "sidePanel",
     "storage",
     "nativeMessaging",
-    "downloads"
+    "downloads",
+    "declarativeNetRequestWithHostAccess"
   ],
   "host_permissions": [
     "http://*/*",

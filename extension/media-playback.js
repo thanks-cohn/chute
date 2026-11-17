@@ -24,13 +24,14 @@
       return 'Media reading was interrupted while the local source remains available. Retry playback.';
     }catch{return 'The local companion is disconnected or not responding. Reconnect before retrying playback.';}
   }
+  const terminal=error=>['STREAM_EXPIRED','UNAUTHORIZED','MEDIA_CONSENT_REQUIRED','EXPLORER_DISABLED','CONSENT_INVALID','NEEDS_SELECTION'].includes(error?.code);
   function lease(source,api,onError){
     let stopped=false,busy=false;
     const renew=async()=>{if(stopped||busy)return;busy=true;
       try{await api.nativeSession(false);if(!stopped)await api.command('renew_media',{ticket:source.ticket});}
-      catch(error){if(!stopped)onError?.(error);}finally{busy=false;}};
+      catch(error){if(!stopped){if(terminal(error)){stopped=true;clearInterval(timer);}onError?.(error);}}finally{busy=false;}};
     const timer=setInterval(renew,45000);
     return ()=>{stopped=true;clearInterval(timer);};
   }
-  window.ChuteyMediaPlayback=Object.freeze({failure,lease});
+  window.ChuteyMediaPlayback=Object.freeze({failure,lease,terminal});
 })();

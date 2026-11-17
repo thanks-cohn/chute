@@ -170,6 +170,10 @@
       await admission(()=>finishPending({id},job));return job.receipt;
     },
     async mediaSource(row) {
+      if(globalThis.location?.protocol==='chrome-extension:'){
+        const transport=await chrome.runtime.sendMessage({type:'chutey-media-origin-ready'});
+        if(!transport?.ok){const error=Error(transport?.error||'The scoped Chrome media transport is unavailable. Reload the matching extension.');error.code='MEDIA_TRANSPORT_UNAVAILABLE';throw error;}
+      }
       const source = await window.ChuteyExplorerAPI.command("media_source",{handle:row.handle,identity:row.identity});
       if (!/^\/api\/explorer\/v1\/media\/[A-Za-z0-9_-]+$/.test(source.url)) throw new Error("Invalid local media response.");
       return {...source,url:"http://127.0.0.1:17891" + source.url};
