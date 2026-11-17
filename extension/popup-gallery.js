@@ -73,7 +73,7 @@
   const player=document.createElement('div');player.className='chutey-lightbox-player';player.hidden=true;
   lightbox.querySelector('.chutey-lightbox-stage').append(player);
   function releaseMedia(){
-    player.querySelectorAll('video,audio').forEach(node=>{node.pause();node.removeAttribute('src');node.load();});player.replaceChildren();player.hidden=true;
+    player.querySelectorAll('video,audio').forEach(node=>{node.onerror=null;node.pause();node.removeAttribute('src');node.load();});player.replaceChildren();player.hidden=true;
     if(mediaTicket){void window.ChuteyExplorerAPI.command('release_media',{ticket:mediaTicket}).catch(()=>{});mediaTicket=null;}
   }
   async function showMedia(file,token){
@@ -85,7 +85,7 @@
       mediaTicket=source.ticket;
       const node=document.createElement(source.mime.startsWith('audio/')?'audio':'video');node.controls=true;node.preload='metadata';node.autoplay=false;node.crossOrigin='anonymous';
       if(!node.canPlayType(source.mime))throw Error('This browser does not support the media container/codec.');
-      node.onerror=()=>{if(token===serial){errorText.textContent='Playback failed: unsupported codec or expired/disconnected media session. Reopen to retry.';errorText.hidden=false;}};
+      node.onerror=async()=>{const message=await window.ChuteyMediaPlayback.failure(node,source);if(token===serial){releaseMedia();errorText.textContent=message;errorText.hidden=false;}};
       node.src=source.url;player.replaceChildren(node);player.hidden=false;
     }catch(error){if(token===serial){errorText.textContent=error.code==='UNSUPPORTED_COMMAND'?'Local streaming needs the matching candidate worker/helper.':error.message;errorText.hidden=false;}}
   }

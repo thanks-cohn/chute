@@ -31,7 +31,7 @@ class ExplorerAPI:
         handler.send_header("Vary", "Origin")
         handler.send_header("Access-Control-Allow-Headers", "Authorization, Content-Type, Range, X-Chute-Destination, X-Chute-Filename, X-Chute-Operation, X-Chute-Capture-ID, X-Chute-Source")
         handler.send_header("Access-Control-Allow-Methods", "POST, GET, HEAD, OPTIONS")
-        handler.send_header("Access-Control-Expose-Headers", "Content-Range, Accept-Ranges")
+        handler.send_header("Access-Control-Expose-Headers", "Content-Range, Accept-Ranges, X-Chutey-Error")
         handler.send_header("Cache-Control", "no-store")
         handler.send_header("X-Content-Type-Options", "nosniff")
         handler.send_header("Content-Security-Policy", "default-src 'none'; sandbox")
@@ -43,7 +43,8 @@ class ExplorerAPI:
 
     def json(self, handler, value, status=200):
         body = json.dumps(value, ensure_ascii=False).encode()
-        self.headers(handler, status, "application/json; charset=utf-8", len(body))
+        extra=[('X-Chutey-Error',value['error']['code'])] if isinstance(value,dict) and isinstance(value.get('error'),dict) and 'code' in value['error'] else []
+        self.headers(handler, status, "application/json; charset=utf-8", len(body),extra)
         if handler.command != "HEAD":
             handler.wfile.write(body)
 

@@ -45,7 +45,7 @@ def test_recovery_after_partial_daily_write_and_metadata_crash(tmp_path,monkeypa
     with h._db() as db:
         row=db.execute('SELECT * FROM captures JOIN days USING(day)').fetchone();path=h._document(row['day'],row['document']);path.write_bytes(bytes(row['payload'])[:9])
     restarted=Store(tmp_path);assert restarted.get('d'*32)
-    assert restarted.highlights.lookup('d'*32)['path'].read_text()=='2026-11-16 12:00:00-06:00\nRecover é😀'
+    assert restarted.highlights.lookup('d'*32)['path'].read_text(encoding='utf-8')=='2026-11-16 12:00:00-06:00\nRecover é😀'
     assert len(restarted.list())==1 and len(restarted.history_day('2026-11-16'))==1
 
 def test_changed_original_preserved_and_bad_parameters(tmp_path,monkeypatch):

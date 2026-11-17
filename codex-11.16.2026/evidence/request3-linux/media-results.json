@@ -2,8 +2,8 @@
   "platform": "linux",
   "resource_snapshot": {
     "event": "runtime_resources",
-    "pid": 82887,
-    "disk_free_bytes": 62263889920
+    "pid": 88037,
+    "disk_free_bytes": 62255202304
   },
   "browser": "156.0.8078.79",
   "scope": "Real browser and real filesystem guards; test-only HTTP native enrollment; installed extension/owner acceptance pending",
@@ -23,7 +23,7 @@
     {
       "name": "small.webm",
       "size": 1242705,
-      "sha256": "f4a38c1eb3a1c48374dfb48922e8d780bb3a12ffb71b7493d0ed8434b2361097",
+      "sha256": "7d280e0dec705b194af18583a88ab81ae9a2af5ac5dbd397aecaddf3cd6ba283",
       "format": "webm",
       "large": false,
       "surface": "Shelf",
@@ -59,7 +59,7 @@
     {
       "name": "large.webm",
       "size": 67078232,
-      "sha256": "8c4338e6eda8e8a4b5d29c6b27e9e086207c200c877ad8b3d968f287d588aef7",
+      "sha256": "c8ffcb3963cf0836d49506082ef2c2ab09111dde1266a8863ad51fd5d0ea40b2",
       "format": "webm",
       "large": true,
       "surface": "Shelf",
@@ -95,7 +95,7 @@
     {
       "name": "small.webm",
       "size": 1242705,
-      "sha256": "f4a38c1eb3a1c48374dfb48922e8d780bb3a12ffb71b7493d0ed8434b2361097",
+      "sha256": "7d280e0dec705b194af18583a88ab81ae9a2af5ac5dbd397aecaddf3cd6ba283",
       "format": "webm",
       "large": false,
       "surface": "Popup",
@@ -131,7 +131,7 @@
     {
       "name": "large.webm",
       "size": 67078232,
-      "sha256": "8c4338e6eda8e8a4b5d29c6b27e9e086207c200c877ad8b3d968f287d588aef7",
+      "sha256": "c8ffcb3963cf0836d49506082ef2c2ab09111dde1266a8863ad51fd5d0ea40b2",
       "format": "webm",
       "large": true,
       "surface": "Popup",
@@ -160,15 +160,15 @@
       "sha256": "b87703965d5d8bc3df86683f6b86be212e0bc4065bd0b96e20c2741b1b9f1a28",
       "format": "mp4",
       "large": false,
-      "copy_seconds": 0.4377
+      "copy_seconds": 0.4301
     },
     {
       "name": "small.webm",
       "size": 1242705,
-      "sha256": "f4a38c1eb3a1c48374dfb48922e8d780bb3a12ffb71b7493d0ed8434b2361097",
+      "sha256": "7d280e0dec705b194af18583a88ab81ae9a2af5ac5dbd397aecaddf3cd6ba283",
       "format": "webm",
       "large": false,
-      "copy_seconds": 0.4318
+      "copy_seconds": 0.4312
     },
     {
       "name": "small.mp3",
@@ -176,7 +176,7 @@
       "sha256": "3abda8d171d0d16d1d1e23fb63f8aa3b90ac217095521326d7b1aec671d1ea64",
       "format": "mp3",
       "large": false,
-      "copy_seconds": 0.4218
+      "copy_seconds": 0.424
     },
     {
       "name": "large.mp4",
@@ -184,15 +184,15 @@
       "sha256": "f5c673d3d9ce225f0bd46b983ad642f9c382ee833126b5e4b7fd2cd439c74854",
       "format": "mp4",
       "large": true,
-      "copy_seconds": 0.4727
+      "copy_seconds": 0.5041
     },
     {
       "name": "large.webm",
       "size": 67078232,
-      "sha256": "8c4338e6eda8e8a4b5d29c6b27e9e086207c200c877ad8b3d968f287d588aef7",
+      "sha256": "c8ffcb3963cf0836d49506082ef2c2ab09111dde1266a8863ad51fd5d0ea40b2",
       "format": "webm",
       "large": true,
-      "copy_seconds": 0.4962
+      "copy_seconds": 0.488
     },
     {
       "name": "large.mp3",
@@ -200,13 +200,13 @@
       "sha256": "c1d698c4b129d9a32e25b609c862056df7e9fa5c6e7ee3fc38bc01cc0d82f057",
       "format": "mp3",
       "large": true,
-      "copy_seconds": 0.4598
+      "copy_seconds": 0.4611
     }
   ],
   "simultaneous_copy_stream_browse_health": [
     {
       "job_state": "running",
-      "listing_seconds": 0.016296729998430237,
+      "listing_seconds": 0.0125596010038862,
       "range": {
         "status": 206,
         "size": 2048
@@ -215,7 +215,7 @@
     },
     {
       "job_state": "running",
-      "listing_seconds": 0.013395511996350251,
+      "listing_seconds": 0.011421992996474728,
       "range": {
         "status": 206,
         "size": 2048
@@ -224,7 +224,7 @@
     },
     {
       "job_state": "running",
-      "listing_seconds": 0.0165488330021617,
+      "listing_seconds": 0.013324446998012718,
       "range": {
         "status": 206,
         "size": 2048
@@ -233,7 +233,7 @@
     },
     {
       "job_state": "running",
-      "listing_seconds": 0.01290137800242519,
+      "listing_seconds": 0.01407125200057635,
       "range": {
         "status": 206,
         "size": 2048
@@ -242,7 +242,7 @@
     },
     {
       "job_state": "running",
-      "listing_seconds": 0.01222713099559769,
+      "listing_seconds": 0.010207421000814065,
       "range": {
         "status": 206,
         "size": 2048
@@ -251,7 +251,7 @@
     },
     {
       "job_state": "running",
-      "listing_seconds": 0.014076015999307856,
+      "listing_seconds": 0.013242353998066392,
       "range": {
         "status": 206,
         "size": 2048
@@ -260,7 +260,7 @@
     },
     {
       "job_state": "running",
-      "listing_seconds": 0.010204052996414248,
+      "listing_seconds": 0.013416417998087127,
       "range": {
         "status": 206,
         "size": 2048
@@ -269,7 +269,7 @@
     },
     {
       "job_state": "running",
-      "listing_seconds": 0.00999682800465962,
+      "listing_seconds": 0.011220383996260352,
       "range": {
         "status": 206,
         "size": 2048
@@ -278,7 +278,7 @@
     },
     {
       "job_state": "running",
-      "listing_seconds": 0.01377712600515224,
+      "listing_seconds": 0.01142536699626362,
       "range": {
         "status": 206,
         "size": 2048
@@ -286,9 +286,9 @@
       "health": 200
     }
   ],
-  "directory_latency_max_seconds": 0.014631259000452701,
-  "traced_python_peak_bytes": 2729632,
-  "elapsed_seconds": 11.875,
+  "directory_latency_max_seconds": 0.014171043003443629,
+  "traced_python_peak_bytes": 2756013,
+  "elapsed_seconds": 11.649,
   "browser_file_import": {
     "name": "large.mp3",
     "size": 36003047,

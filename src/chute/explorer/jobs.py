@@ -13,7 +13,7 @@ class TransferJobs:
         # Durable status survives worker restart. Old handles are never reused.
         for path in sorted(self.directory.glob('*.json'))[-64:]:
             try:
-                job=json.loads(path.read_text());ident=job['id']
+                job=json.loads(path.read_text(encoding="utf-8"));ident=job['id']
                 if not re.fullmatch('[a-f0-9]{32}',ident) or job.get('origin')!=api.session.origin:continue
                 if job['state'] in {'accepted','running'}:job.update(state='UNCERTAIN',error='Worker interrupted. Inspect the preserved destination before starting a new copy.')
                 self.jobs[ident]=job
@@ -51,9 +51,16 @@ class TransferJobs:
             self.jobs[ident]=j;self.active=ident
             threading.Thread(target=self._run,args=(j,),daemon=True).start();return self.status(ident)
 
-    def _best_persist(self,j):
-        try:self._persist(j)
-        except OSError:j.update(state='UNCERTAIN',error='Receipt persistence failed. Check free disk space and inspect the destination before retrying.')
+    def _finish(self,j,state,**values):
+        # Publish a terminal state and release capacity in ONE critical section,
+        # only after its receipt is durable. Slow Windows fsync exposed a race
+        # where clients saw COMMITTED while the queue still reported BUSY.
+        with self.lock:
+            final={**j,**values,'state':state}
+            try:self._persist(final)
+            except OSError:final.update(state='UNCERTAIN',error='Receipt persistence failed. Inspect the destination before retrying.')
+            j.update(final)
+            if self.active==j['id']:self.active=None
 
     def status(self,ident):
         with self.lock:
@@ -106,11 +113,12 @@ class TransferJobs:
                         def read(self,size):check();block=stream.read(size);progress(len(block));return block
                     receipt=receive(self.api.engine.grant_for(a['destination']),a['destination'],row['name'],Source(),row['size'],expected_sha256=expected,authorize=check)
                     committed=receipt['state']=='COMMITTED'
-            committed=True;j.update(state='COMMITTED',phase='complete',receipt=receipt,bytes=j['size']);self._persist(j)
+            committed=True;self._finish(j,'COMMITTED',phase='complete',receipt=receipt,bytes=j['size'])
         except ExplorerError as exc:
-            j.update(state='UNCERTAIN' if committed or exc.code=='UNCERTAIN' or self._published_live(j) else 'cancelled' if exc.code=='CANCELLED' else 'failed',error=str(exc));self._best_persist(j)
+            self._finish(j,'UNCERTAIN' if committed or exc.code=='UNCERTAIN' or self._published_live(j) else 'cancelled' if exc.code=='CANCELLED' else 'failed',error=str(exc))
         except Exception:
-            j.update(state='UNCERTAIN' if committed or self._published_live(j) else 'failed',error='Copy interrupted or destination disk/access failed. Inspect its receipt and destination before retrying.');self._best_persist(j)
+            self._finish(j,'UNCERTAIN' if committed or self._published_live(j) else 'failed',error='Copy interrupted or destination disk/access failed. Inspect its receipt and destination before retrying.')
         finally:
             j.pop('authorization',None);j.pop('args',None)
-            with self.lock:self.active=None
+            with self.lock:
+                if self.active==j['id']:self.active=None

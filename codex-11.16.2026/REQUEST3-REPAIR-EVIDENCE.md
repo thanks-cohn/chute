@@ -154,3 +154,28 @@ Upstream owner documentation about future multi-instance/compact Explorer is
 preserved by merge; it remains explicitly held Development 2 work, untouched by
 this implementation. The new Windows workflow builds on an ephemeral runner and
 never executes a self-installing binary on the owner's machine.
+
+### First Windows CI gate and corrections
+
+Run 43991855855 (source 7dcbf49) failed before packaging; no failed binaries were
+published. Four failing assertions were investigated rather than skipped:
+- Two native-copy tests exposed a real final-state/capacity race under slower
+  Windows fsync. Terminal status is now published under the job lock ONLY after
+  its durable receipt and capacity release. A deliberately blocked final write
+  regression proves a client cannot see completion early or get spurious BUSY
+  on its next copy. Old worker-thread cleanup cannot clear a newer job's slot.
+- The UTF-8 recovery file was correctly encoded; its test used Windows' default
+  cp1252 reader. The test now explicitly decodes UTF-8. Persisted job JSON also
+  explicitly reads UTF-8 to protect Unicode names after restart.
+- Windows READ_ATTRIBUTES can enumerate a locked file while data access is denied.
+  The profile-sibling test now verifies readable metadata or an honest blocked
+  row AND independently asserts actual byte reads remain sharing-denied. No
+  security bypass or production code relaxation was introduced for that test.
+
+Shared media diagnostics now probe an erroring stream with a bounded HEAD and
+safe X-Chutey-Error code. Available-source codec/damaged-file failures are distinct
+from expired tickets, revoked sessions, missing/changed files and disconnected
+workers. Real Chromium rejects a damaged MP4 with a decode-specific message;
+the positive twelve media cases still pass. Cleanup detaches error callbacks and
+uses existing release operations. Actual File bytes retain precedence over an
+incidental opaque text sideband; opaque-reference-only mascot drops stay blocked.

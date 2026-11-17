@@ -56,8 +56,15 @@ class WindowsBrowseTests(unittest.TestCase):
             listing=self.command('list',handle=self.grant.id)
             rows={row['name']:row for row in listing['entries']}
             self.assertEqual(rows['visible.txt']['kind'],'file')
-            self.assertEqual(rows['NTUSER.DAT']['kind'],'blocked')
-            self.assertEqual(rows['NTUSER.DAT']['error']['code'],'FILE_IN_USE')
+            locked=rows['NTUSER.DAT']
+            # Windows may permit READ_ATTRIBUTES despite deny-sharing on data.
+            # Listing metadata is allowed; actual file bytes must remain denied.
+            if locked['kind']=='blocked':self.assertEqual(locked['error']['code'],'FILE_IN_USE')
+            else:
+                self.assertEqual(locked['kind'],'file');self.assertTrue(locked['identity'])
+            with self.assertRaises(OSError) as denied:
+                with self.grant.open(locked['handle']):self.fail('Locked byte read unexpectedly succeeded')
+            self.assertIn(denied.exception.winerror,(32,33))
         finally:close(handle)
 
     def test_reparse_junction_blocked(self):

@@ -104,6 +104,11 @@ def main():
     large=next(i for i in files if i['large'] and i['format']=='mp3');page.locator('.chutey-intake input[type=file]').set_input_files(str(approved/large['name']))
     expect(page.locator('.chutey-intake [role=status]')).to_contain_text('Verified '+large['name'],timeout=20000)
     saved=store.list()[0];assert saved.size==large['size'] and sha(store.get(saved.id)[1])==large['sha256']
+    (approved/'unsupported-codec.mp4').write_bytes(b'Not an MP4 decoder stream')
+    page.locator('#popup-local-toggle').click()
+    page.get_by_role('button',name='▶ unsupported-codec.mp4',exact=True).click()
+    expect(page.locator('.chutey-lightbox-error')).to_contain_text('source is available, but Chrome could not decode',timeout=15000)
+    page.keyboard.press('Escape')
     assert not errors,errors
     report={'platform':sys.platform,'resource_snapshot':__import__('chute.runtime_log',fromlist=['resource_snapshot']).resource_snapshot(),'browser':browser.version,'scope':'Real browser and real filesystem guards; test-only HTTP native enrollment; installed extension/owner acceptance pending','media':results,'copies':files,'simultaneous_copy_stream_browse_health':concurrency,'directory_latency_max_seconds':max(latencies),'traced_python_peak_bytes':peak,'elapsed_seconds':round(time.monotonic()-started,3),'browser_file_import':{'name':large['name'],'size':saved.size,'sha256':large['sha256']}}
     (out/'results.json').write_text(json.dumps(report,indent=2));print(json.dumps(report,indent=2));browser.close()

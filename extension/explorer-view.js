@@ -78,7 +78,7 @@
   function closePreview() {
     ++previewId; abort?.abort(); abort = null; previewRow = null;
     if (mediaTicket) { void api.command("release_media",{ticket:mediaTicket}).catch(() => {}); mediaTicket = null; }
-    $(".ex-preview-body").querySelectorAll("video,audio").forEach(video => { video.pause(); video.removeAttribute("src"); video.load(); });
+    $(".ex-preview-body").querySelectorAll("video,audio").forEach(video => { video.onerror=null; video.pause(); video.removeAttribute("src"); video.load(); });
     $(".ex-preview-body").replaceChildren();
     for (const url of urls) URL.revokeObjectURL(url); urls = []; preview.hidden = true;
   }
@@ -129,7 +129,12 @@
           if (id !== previewId) return;
           const url = URL.createObjectURL(blob); urls.push(url); video.src = url;
         }
-        video.onerror = () => { if (id === previewId) body.textContent = "Media unavailable: unsupported codec, expired media session, or disconnected companion. Select the file again to retry."; };
+        video.onerror = async () => {
+          const message=await window.ChuteyMediaPlayback.failure(video,{url:video.src});
+          if(id!==previewId)return;
+          if(mediaTicket){void api.command('release_media',{ticket:mediaTicket}).catch(()=>{});mediaTicket=null;}
+          body.textContent=message;
+        };
         body.replaceChildren(video); return;
       }
       // Non-video previews retain the existing bounded content API.
