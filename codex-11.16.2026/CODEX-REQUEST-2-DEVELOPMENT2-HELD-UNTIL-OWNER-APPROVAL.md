@@ -42,8 +42,8 @@ Repository: `thanks-cohn/chute`
 
 ### 6. Pick Me Up, Drop Off and memory
 - Deliberately **Pick Me Up** then **Drop Off** moves existing mascot and remembers screen placement; distinguish mascot repositioning from file drag/drop.
-- Re-expand in the current session at last visited Explorer directory, with last opened/previewed file selected (do not auto-play).
-- Optional setting remembers Explorer selection/location across restarts, subject to permissions; assigned save destination is separate from last browsed directory.
+- **Owner-corrected opening default:** Every time the existing Chutey is freshly expanded or restored from its collapsed mascot, open its Explorer in **its currently assigned default destination directory**, not the last browsed directory. Inside an already expanded Explorer, ordinary folder navigation is independent and must not silently reassign the mascot's saved drop destination. Do not auto-play media.
+- A last-browsed folder/selection may be tracked as separate optional session information but **must not override the assigned destination as the default opening folder**, including across restarts. The assigned default is persistent and changes only through explicit Assign / Make Chutey Location! action, subject to permissions.
 
 ## Scope boundary, test and delivery
 - The scope is the **one existing mascot**, its reusable menu, its movable/resizable always-on-top legal-pad Explorer and verified drop destinations. No unrelated future features.
