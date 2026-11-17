@@ -133,8 +133,11 @@ Suggested **Settings → Experimental** entries; all opt-in and disabled by defa
 | `family_integrations` — Connected Extensions | Conditional REDOWN/Click2Cloud tabs/actions | User consent, extension allowlists |
 | `mascot_cross_app_events` — Mascot Events | Opt-in shared verified events | Notification dedupe, privacy |
 | `shared_capture_coordination` — Coordinated Screenshots | Fair multi-app scheduling | Real cross-extension coordinator |
+| `adaptive_icon_renditions` — Refined Small Icons | High-quality mini-renditions for landing-page images eligible after 60 seconds | 16/25 candidate batches, local cache, safe deletion; [full spec](ADAPTIVE_ICON_RENDITIONS.md) |
 
 **Flags above are conceptual settings names. They do not exist in the current code.** Some changes, particularly New Tab override, may need a separate Chrome package/manifest and cannot be enabled by a runtime switch alone.
+
+**Additional future experiment:** [Adaptive Icon Renditions & Smart Cache](ADAPTIVE_ICON_RENDITIONS.md). Keep conversion selective, cache deletion reversible by regeneration, and current gallery/worker untouched.
 
 **Implementation order (proposed):**
 1. Preserve and stabilize existing Chutey worker/Chrome functionality and backups; no new feature can excuse false saves or worker regressions.
