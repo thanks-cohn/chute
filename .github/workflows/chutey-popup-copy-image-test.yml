@@ -1,0 +1,34 @@
+name: Chutey Copy Image TEST package
+
+on:
+  push:
+    branches:
+      - fix/chutey-popup-copy-image-2026-11-18
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  popup-copy-image:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate popup JavaScript
+        run: node --check extension/popup-gallery.js
+      - name: Test popup Copy Image action and original gallery behavior
+        run: node scripts/verify-popup-gallery.cjs
+      - name: Validate manifest and build extension-only ZIP
+        run: |
+          python scripts/build-chrome-store.py
+          test -s dist/chrome-store/chute-chrome-2.6.1.1.zip
+          unzip -p dist/chrome-store/chute-chrome-2.6.1.1.zip manifest.json | grep -F '"version": "2.6.1.1"'
+          unzip -p dist/chrome-store/chute-chrome-2.6.1.1.zip popup-gallery.js | grep -F 'clipboard_copy_image'
+      - name: Upload isolated Chrome extension (keep existing Windows worker)
+        uses: actions/upload-artifact@v4
+        with:
+          name: Chutey-Copy-Image-TEST-2.6.1.1
+          path: dist/chrome-store/chute-chrome-2.6.1.1.zip
+          if-no-files-found: error
+          retention-days: 7
