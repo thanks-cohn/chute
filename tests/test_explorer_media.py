@@ -3,8 +3,10 @@ import io
 import json
 import os
 from pathlib import Path
+import socket
 import tempfile
 import threading
+import time
 import unittest
 from urllib.error import HTTPError
 from urllib.request import Request, ProxyHandler, build_opener
@@ -51,6 +53,7 @@ class MediaAPITests(unittest.TestCase):
         root = self.engine.execute('roots')['result']['roots'][0]['handle']
         self.row = next(row for row in self.engine.execute('list',handle=root)['result']['entries'] if row['name']=='movie.webm')
     def tearDown(self):
+        for client in getattr(self,'media_clients',[]):client.close()
         self.server.shutdown(); self.server.server_close(); self.thread.join()
         if self.adapter.jobs:
             for job in list(self.adapter.jobs.jobs.values()):
@@ -152,6 +155,93 @@ class MediaAPITests(unittest.TestCase):
         self.assertEqual(sum(map(len,chunks)),262144)
         self.assertTrue(handler.close_connection)
         if before is not None:self.assertEqual(len(os.listdir('/proc/self/fd')),before)
+
+    def blocked_media_reader(self,source):
+        """An authorized browser that receives headers, then stops consuming."""
+        client=socket.socket()
+        self.addCleanup(client.close)
+        if not hasattr(self,'media_clients'):self.media_clients=[]
+        self.media_clients.append(client)
+        client.setsockopt(socket.SOL_SOCKET,socket.SO_RCVBUF,1024)
+        client.settimeout(3)
+        client.connect(('127.0.0.1',self.server.server_port))
+        client.sendall((f'GET {source["url"]} HTTP/1.1\r\n'
+                        f'Host: 127.0.0.1:{self.server.server_port}\r\n'
+                        f'Origin: {ORIGIN}\r\nConnection: close\r\n\r\n').encode())
+        headers=b''
+        while b'\r\n\r\n' not in headers:
+            chunk=client.recv(1)
+            self.assertTrue(chunk,'Media response ended before its headers')
+            headers+=chunk
+        self.assertIn(b' 200 ',headers.split(b'\r\n',1)[0])
+        return client
+
+    def assert_media_senders_stopped(self,sources):
+        deadline=time.monotonic()+2
+        while self.server.performance.active['media'] and time.monotonic()<deadline:
+            time.sleep(.01)
+        self.assertEqual(self.server.performance.active['media'],0,
+                         'Cancelled blocked readers retained media admission slots')
+        for source in sources:self.assertFalse(source.get('connections'))
+
+    def test_release_interrupts_blocked_senders_and_allows_immediate_retry(self):
+        sources=[self.source(),self.source()]
+        states=[self.adapter.media[source['ticket']] for source in sources]
+        for source in sources:self.blocked_media_reader(source)
+        self.assertEqual(self.server.performance.active['media'],2)
+        # Let TCP backpressure block the writes; clients stay open throughout.
+        time.sleep(.05)
+        for source in sources:self.command('release_media',{'ticket':source['ticket']})
+        self.assert_media_senders_stopped(states)
+        self.assertFalse(self.adapter.media)
+        retry=self.source()
+        with self.request(retry['url'],headers={'Range':'bytes=0-9'}) as response:
+            self.assertEqual(response.status,206)
+            self.assertEqual(response.read(),b'0123456789')
+
+    def test_access_revocation_interrupts_blocked_senders(self):
+        sources=[self.source(),self.source()]
+        states=[self.adapter.media[source['ticket']] for source in sources]
+        for source in sources:self.blocked_media_reader(source)
+        time.sleep(.05)
+        self.adapter.revoke_media()
+        self.assert_media_senders_stopped(states)
+        self.assertFalse(self.adapter.media)
+        with self.assertRaises(HTTPError) as error:self.request(sources[0]['url'])
+        self.assertEqual(json.load(error.exception)['error']['code'],'STREAM_EXPIRED')
+
+    def test_external_policy_revocation_stops_senders_but_preserves_saved_media(self):
+        from chute.explorer.native import NativeExplorer
+        sources=[self.source(),self.source()]
+        states=[self.adapter.media[source['ticket']] for source in sources]
+        for source in sources:self.blocked_media_reader(source)
+        item=self.server.store.add_stream('saved.mp4',io.BytesIO(b'saved movie'),11,mime='video/mp4')
+        saved_row=self.command('locate_saved',{'id':item.id})
+        saved=self.command('media_source',{key:saved_row[key] for key in ('handle','identity')})
+        native=object.__new__(NativeExplorer)
+        native.adapters={ORIGIN:self.adapter};native.lock=threading.RLock()
+        native.descriptors={ORIGIN:{}};native.store=None
+        time.sleep(.05)
+        result=native.state(ORIGIN,'media_policy_set',{'allowed':False})
+        self.assertFalse(result['allowed'])
+        self.assert_media_senders_stopped(states)
+        with self.request(saved['url'],headers={'Range':'bytes=0-4'}) as response:
+            self.assertEqual(response.read(),b'saved')
+        with self.assertRaises(HTTPError):self.source()
+
+    def test_revocation_between_lookup_and_sender_registration_is_rejected(self):
+        from unittest.mock import patch
+        source=self.source()
+        state=self.adapter.media[source['ticket']]
+        content=self.adapter.content
+        def revoke_then_start(*args,**kwargs):
+            self.adapter.revoke_external_media()
+            return content(*args,**kwargs)
+        with patch.object(self.adapter,'content',side_effect=revoke_then_start):
+            with self.assertRaises(HTTPError) as error:self.request(source['url'])
+        self.assertEqual(error.exception.code,403)
+        self.assertEqual(json.load(error.exception)['error']['code'],'UNAUTHORIZED')
+        self.assert_media_senders_stopped([state])
 
     def test_large_audio_uses_same_bounded_stream_api(self):
         path=self.root/'large.mp3'

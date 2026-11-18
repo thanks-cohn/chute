@@ -1,0 +1,45 @@
+{
+  "scope": "FAKE Win32 API, actual production methods; Python allocations only, NOT Windows RSS or acceptance",
+  "at_utc": "2026-11-18T01:02:19.486423+00:00",
+  "python": "3.12.14",
+  "platform": "linux",
+  "source_commit": "9cde0e854a9a51604c49ec72084850fbd92a9c9c",
+  "source_from_working_tree": false,
+  "source_sha256": {
+    "src/chute/explorer/windows_fs.py": "7772a12588630b4774e6f24c2350141911cf2a04643112bc44c516235082e832",
+    "src/chute/explorer/native.py": "335e04abc0c68a3c2249194bccf099d72be98c6e0c089ca9a1cce75f01e3b1eb",
+    "src/chute/explorer/grant_store.py": "453947612f6f7fa4bc05bec556c74bed97a93eab221729239aa9232f49a199cb"
+  },
+  "operations": {
+    "WindowsFS.handle_identity": {
+      "measured_calls": 2000,
+      "warmup_calls": 1,
+      "elapsed_seconds": 0.256258,
+      "pointer_types_before": 21,
+      "pointer_types_after": 2021,
+      "retained_pointer_types": 2000,
+      "retained_tracemalloc_bytes_after_gc": 14937328,
+      "peak_tracemalloc_bytes": 14947864
+    },
+    "private_write": {
+      "measured_calls": 200,
+      "warmup_calls": 1,
+      "elapsed_seconds": 0.17892,
+      "pointer_types_before": 2022,
+      "pointer_types_after": 2222,
+      "retained_pointer_types": 200,
+      "retained_tracemalloc_bytes_after_gc": 1132144,
+      "peak_tracemalloc_bytes": 1148339
+    },
+    "dpapi": {
+      "measured_calls": 200,
+      "warmup_calls": 1,
+      "elapsed_seconds": 0.015256,
+      "pointer_types_before": 2223,
+      "pointer_types_after": 2423,
+      "retained_pointer_types": 200,
+      "retained_tracemalloc_bytes_after_gc": 1093312,
+      "peak_tracemalloc_bytes": 1123323
+    }
+  }
+}

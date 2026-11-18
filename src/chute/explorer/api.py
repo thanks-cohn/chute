@@ -1,8 +1,10 @@
 """Opt-in read adapter on the existing Chute server. No enrollment over HTTP."""
 from __future__ import annotations
 
+import contextlib
 import json
 import os
+import socket
 import threading
 import secrets
 import time
@@ -38,8 +40,52 @@ class ExplorerAPI:
     def revoke_media(self):
         with self.media_lock:
             self.media_context['revoked']=True
-            for source in self.media.values():source['revoked']=True
+            connections=self._revoke_sources_locked(self.media.values())
             self.media.clear()
+        self._shutdown_media_connections(connections)
+
+    def revoke_external_media(self):
+        with self.media_lock:
+            connections=self._revoke_sources_locked(source for source in self.media.values()
+                                                     if source.get('permission_scope')!='saved_store')
+        self._shutdown_media_connections(connections)
+
+    @staticmethod
+    def _revoke_sources_locked(sources):
+        connections={}
+        for source in sources:
+            source['revoked']=True
+            connections.update(source.get('connections',{}))
+        return tuple(connections.values())
+
+    @staticmethod
+    def _shutdown_media_connections(connections):
+        # A browser may stop reading without closing its TCP connection. Wake a
+        # blocked send now; the response's finally blocks retain ownership of its
+        # file descriptor, connection cleanup and admission slot.
+        for connection in connections:
+            try:connection.shutdown(socket.SHUT_RDWR)
+            except OSError:pass
+
+    @contextlib.contextmanager
+    def _media_response(self,handler,media):
+        if media is None:
+            yield
+            return
+        connection=handler.connection
+        with self.media_lock:
+            # Registration and revocation share a lock so a release between the
+            # route lookup and this response cannot leave an untracked sender.
+            if media['revoked'] or self.media_context['revoked']:
+                raise ExplorerError('UNAUTHORIZED','Media access was explicitly revoked.')
+            if time.monotonic()>=media['expires']:
+                raise ExplorerError('STREAM_EXPIRED','The media session expired. Select the file again.')
+            media.setdefault('connections',{})[id(connection)]=connection
+        try:
+            yield
+        finally:
+            with self.media_lock:
+                media['connections'].pop(id(connection),None)
 
     def _performance(self,handler):
         with handler.server.performance_lock:
@@ -355,7 +401,8 @@ class ExplorerAPI:
                         raise ExplorerError("INVALID_ARGUMENT", "A media ticket is required.")
                     with self.media_lock:
                         released = self.media.pop(args["ticket"],None)
-                        if released: released["revoked"] = True
+                        connections=self._revoke_sources_locked([released]) if released else ()
+                    self._shutdown_media_connections(connections)
                     self.media_events.append({"event":"release","at":time.monotonic()})
                     result = {"state":"completed", "result":{"released":True}}
                 elif body["command"] == "prepare_export":
@@ -420,7 +467,7 @@ class ExplorerAPI:
 
     def content(self, handler, body, *, authorization=None, media=None):
         grant = self.engine.grant_for(body["handle"])
-        with grant.open(body["handle"]) as fd:
+        with self._media_response(handler,media), grant.open(body["handle"]) as fd:
             row = self.engine._record(grant, grant.parts(body["handle"]), os.fstat(fd), fd=fd)
             if body.get("identity") != row["identity"]:
                 raise ExplorerError("FILE_CHANGED", "The file changed; refresh its preview.")

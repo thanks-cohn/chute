@@ -90,54 +90,81 @@
   host.append(pinned);
   const pinnedBody=pinned.querySelector('.ex-pinned-body'),pinnedStatus=pinned.querySelector('[role=status]');
   let pinnedId=0,pinnedTicket=null,pinnedSource=null,pinnedRow=null,stopPinnedLease=null,pinnedUrls=[];
-  function stopPinned(){++pinnedId;stopPinnedLease?.();stopPinnedLease=null;
-    pinned.querySelectorAll('video,audio').forEach(n=>{n.onerror=null;n.pause();n.removeAttribute('src');n.load();});
+  let pinnedState='idle',pinnedAbort=null,pinnedLoadTimer=null;
+  function playbackState(state,message){pinnedState=state;pinned.dataset.playbackState=state;pinnedStatus.textContent=message;}
+  function clearPinnedLoad(){clearTimeout(pinnedLoadTimer);pinnedLoadTimer=null;}
+  function releasePinnedResources(){
+    clearPinnedLoad();pinnedAbort?.abort();pinnedAbort=null;stopPinnedLease?.();stopPinnedLease=null;
+    pinned.querySelectorAll('video,audio').forEach(n=>{
+      n.onerror=n.onloadedmetadata=n.onloadeddata=n.oncanplay=n.onplaying=n.onpause=n.onwaiting=n.onended=null;
+      n.pause();n.removeAttribute('src');n.load();
+    });
     if(pinnedTicket)void api.command('release_media',{ticket:pinnedTicket}).catch(()=>{});
-    pinnedTicket=null;pinnedRow=null;pinnedBody.replaceChildren();pinned.hidden=true;host.classList.remove('ex-has-pinned');
+    pinnedTicket=null;pinnedSource=null;
     for(const url of pinnedUrls)URL.revokeObjectURL(url);pinnedUrls=[];
+  }
+  function stopPinned(){++pinnedId;releasePinnedResources();pinnedRow=null;pinnedBody.replaceChildren();pinned.hidden=true;host.classList.remove('ex-has-pinned');playbackState('idle','');}
+  function failPinned(id,message){
+    if(id!==pinnedId)return null;
+    ++pinnedId;releasePinnedResources();pinnedBody.textContent=message;
+    playbackState('failed','Failed. Select this file again to retry.');return pinnedId;
   }
   pinned.querySelector('button').onclick=stopPinned;
   async function showPinned(row){
-    if(pinnedRow?.identity===row.identity&&pinnedRow?.handle===row.handle)return;
+    const existing=pinnedBody.querySelector('video,audio');
+    if(pinnedRow?.identity===row.identity&&pinnedRow?.handle===row.handle&&existing&&!existing.error&&existing.readyState>=2&&['ready','playing','paused','ended'].includes(pinnedState))return;
     stopPinned();const id=pinnedId;pinnedRow=row;pinned.hidden=false;host.classList.add('ex-has-pinned');
-    pinned.querySelector('strong').textContent=row.name;pinnedStatus.textContent='Playback stays here while you browse. Stop explicitly to release access.';
+    pinned.querySelector('strong').textContent=row.name;playbackState('loading','Loading media…');
     const body=pinnedBody;body.textContent='Loading media…';
-    const signal=new AbortController().signal;
+    pinnedAbort=new AbortController();const signal=pinnedAbort.signal;
+    pinnedLoadTimer=setTimeout(()=>failPinned(id,'Loading media timed out. Select the same file to retry.'),10000);
     try{
-      const meta=await api.command('preview',{handle:row.handle});
+      const meta=await api.command('preview',{handle:row.handle},{signal});
       if(id!==pinnedId)return;
       if(meta.identity!==row.identity)throw Error('The source changed; refresh the file.');
       const audio=meta.preview==='audio';
-      if (meta.preview === "video" || audio) {
-        const video = document.createElement(audio ? 'audio':'video'); video.controls = true; video.preload = "metadata";
-        video.autoplay = false; video.crossOrigin = "anonymous"; video.setAttribute("referrerpolicy","no-referrer");
-        if (!video.canPlayType(meta.mime)) { body.textContent = "This browser does not support this video container or codec."; return; }
-        try {
-          const source = await api.mediaSource(meta);
-          if (id !== pinnedId) { void api.command("release_media",{ticket:source.ticket}).catch(() => {}); return; }
-          pinnedTicket=source.ticket;pinnedSource=source;video.src=source.url;stopPinnedLease=window.ChuteyMediaPlayback.lease(source,api,error=>{if(window.ChuteyMediaPlayback.terminal(error)){stopPinned();say('Playback stopped: '+error.message);}else pinnedStatus.textContent='Continuation: '+error.message;});
-        } catch (error) {
-          if (id !== pinnedId) return;
-          // The installed worker remains supported for bounded small clips.
-          // Never materialize a whole movie as a Blob on an older companion.
-          if (error.code !== "UNSUPPORTED_COMMAND" || meta.size > 32 * 1024 * 1024 || meta.preview === "unavailable") {
-            body.textContent = error.code === "UNSUPPORTED_COMMAND" ? "This companion supports only small audio/video previews. Range streaming requires the separate test worker; the installed worker has not been changed." : error.message;
-            return;
-          }
-          const blob = await api.content(meta,{signal});
-          if (id !== pinnedId) return;
-          const url = URL.createObjectURL(blob); pinnedUrls.push(url); video.src = url;
-        }
-        video.onerror = async () => {
-          const message=await window.ChuteyMediaPlayback.failure(video,pinnedSource||{url:video.src});
+      if(meta.preview!=='video'&&!audio)throw Error('Preview unavailable for this media format. Use Reveal / GO TO to locate the file.');
+      const video=document.createElement(audio?'audio':'video');video.controls=true;video.preload='metadata';
+      video.autoplay=false;video.crossOrigin='anonymous';video.setAttribute('referrerpolicy','no-referrer');
+      if(!video.canPlayType(meta.mime))throw Error('This browser does not support this video container or codec.');
+      // Register every event before assigning src, including cached/immediate failures.
+      video.onloadedmetadata=()=>{if(id===pinnedId){
+        // preload=metadata may deliberately stop before loadeddata until Play.
+        if(video.paused){clearPinnedLoad();playbackState('ready','Media metadata loaded. Press Play.');}
+        else pinnedStatus.textContent='Loading media… Metadata received.';
+      }};
+      video.onloadeddata=()=>{if(id===pinnedId){clearPinnedLoad();playbackState('ready','Ready. Press Play.');}};
+      video.onplaying=()=>{if(id===pinnedId){clearPinnedLoad();playbackState('playing','Playing. Browsing keeps this player open.');}};
+      video.onpause=()=>{if(id===pinnedId){clearPinnedLoad();if(!video.ended)playbackState('paused','Paused. Press Play to continue.');}};
+      video.onwaiting=()=>{if(id===pinnedId&&!video.paused){clearPinnedLoad();playbackState('loading','Buffering media…');pinnedLoadTimer=setTimeout(()=>failPinned(id,'Media buffering timed out. Select the same file to retry.'),10000);}};
+      video.onended=()=>{if(id===pinnedId)playbackState('ended','Finished. Press Play to replay.');};
+      video.onerror=async()=>{
+        if(id!==pinnedId)return;
+        const diagnostic=window.ChuteyMediaPlayback.failure(video,pinnedSource||{url:video.src},{released:true});
+        const failedId=failPinned(id,'Media playback failed. Select the same file to retry.');
+        const message=await diagnostic;
+        if(failedId===pinnedId&&pinnedState==='failed')body.textContent=message;
+      };
+      let mediaUrl;
+      try{
+        // Do not abort ticket issuance: a late response must still be released.
+        const source=await api.mediaSource(meta);
+        if(id!==pinnedId){void api.command('release_media',{ticket:source.ticket}).catch(()=>{});return;}
+        pinnedTicket=source.ticket;pinnedSource=source;mediaUrl=source.url;
+        stopPinnedLease=window.ChuteyMediaPlayback.lease(source,api,error=>{
           if(id!==pinnedId)return;
-          if(pinnedTicket){void api.command('release_media',{ticket:pinnedTicket}).catch(()=>{});pinnedTicket=null;}stopPinnedLease?.();
-          body.textContent=message;
-        };
-        body.replaceChildren(video); return;
+          if(window.ChuteyMediaPlayback.terminal(error))failPinned(id,error.message);
+          else pinnedStatus.textContent='Continuation: '+error.message;
+        });
+      }catch(error){
+        if(id!==pinnedId)return;
+        if(error.code!=='UNSUPPORTED_COMMAND'||meta.size>32*1024*1024)throw error;
+        const blob=await api.content(meta,{signal});
+        if(id!==pinnedId)return;
+        mediaUrl=URL.createObjectURL(blob);pinnedUrls.push(mediaUrl);
       }
-      body.textContent='Preview unavailable for this media format. Use Reveal / GO TO to locate the file; browser codec support varies.';
-    }catch(error){if(id===pinnedId)body.textContent=error.message;}
+      body.replaceChildren(video);video.src=mediaUrl;
+    }catch(error){if(id===pinnedId)failPinned(id,error.message);}
   }
   function isMedia(row){return /^(video|audio)\//.test(row.mime||'')||/\.(mp4|webm|mp3|m4a|wav|flac|oga)$/i.test(row.name||'');}
   async function showPreview(row, {intentionalMedia = false} = {}) {

@@ -14,22 +14,25 @@ from .security import RootGrant, component
 CONSENT_VERSION = 1
 
 
+class _DataBlob(ctypes.Structure):
+    # Persisting a new view must not add a fresh permanent POINTER target type.
+    _fields_ = [('size', W.DWORD), ('data', ctypes.POINTER(ctypes.c_ubyte))]
+
+
 def dpapi(data: bytes, origin: str, *, decrypt=False) -> bytes:
     """Current-user DPAPI with origin/schema entropy; UI is forbidden."""
     if os.name != 'nt':
         raise ExplorerError('UNSUPPORTED_PLATFORM', 'Protected consent requires Windows.')
-    class Blob(ctypes.Structure):
-        _fields_ = [('size', W.DWORD), ('data', ctypes.POINTER(ctypes.c_ubyte))]
     def blob(value):
         buffer = (ctypes.c_ubyte * len(value)).from_buffer_copy(value)
-        return Blob(len(value), buffer)
+        return _DataBlob(len(value), buffer)
     source = blob(data)
     entropy = blob(('chute-explorer-consent-v1:' + origin).encode())
-    output = Blob()
+    output = _DataBlob()
     crypt = ctypes.WinDLL('crypt32', use_last_error=True)
     function = crypt.CryptUnprotectData if decrypt else crypt.CryptProtectData
-    function.argtypes = [ctypes.POINTER(Blob), ctypes.c_void_p, ctypes.POINTER(Blob),
-                         ctypes.c_void_p, ctypes.c_void_p, W.DWORD, ctypes.POINTER(Blob)]
+    function.argtypes = [ctypes.POINTER(_DataBlob), ctypes.c_void_p, ctypes.POINTER(_DataBlob),
+                         ctypes.c_void_p, ctypes.c_void_p, W.DWORD, ctypes.POINTER(_DataBlob)]
     function.restype = W.BOOL
     if not function(ctypes.byref(source), None, ctypes.byref(entropy), None, None, 1, ctypes.byref(output)):
         raise ExplorerError('CONSENT_INVALID', 'Saved approval cannot be unlocked. Select the folder again.')

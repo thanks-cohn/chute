@@ -12,6 +12,12 @@ from .api import ExplorerAPI
 from .protocol import ExplorerError
 
 
+class _SecurityAttributes(ctypes.Structure):
+    # Reuse the target type: ctypes.POINTER retains each distinct Structure
+    # class permanently, including writes made by periodic session renewal.
+    _fields_=[('length',W.DWORD),('descriptor',ctypes.c_void_p),('inherit',W.BOOL)]
+
+
 def control_path():
     return Path(os.environ.get('LOCALAPPDATA', Path.home())) / 'Chute' / 'explorer-control.json'
 
@@ -21,16 +27,14 @@ def private_write(path, data):
     path.parent.mkdir(parents=True,exist_ok=True)
     kernel=ctypes.WinDLL('kernel32',use_last_error=True)
     advapi=ctypes.WinDLL('advapi32',use_last_error=True)
-    class SA(ctypes.Structure):
-        _fields_=[('length',W.DWORD),('descriptor',ctypes.c_void_p),('inherit',W.BOOL)]
     descriptor=ctypes.c_void_p()
     convert=advapi.ConvertStringSecurityDescriptorToSecurityDescriptorW
     convert.argtypes=[W.LPCWSTR,W.DWORD,ctypes.POINTER(ctypes.c_void_p),ctypes.c_void_p]
     if not convert('D:P(A;;FA;;;OW)(A;;FA;;;SY)',1,ctypes.byref(descriptor),None):
         raise ctypes.WinError(ctypes.get_last_error())
-    sa=SA(ctypes.sizeof(SA),descriptor,False)
+    sa=_SecurityAttributes(ctypes.sizeof(_SecurityAttributes),descriptor,False)
     create=kernel.CreateFileW
-    create.argtypes=[W.LPCWSTR,W.DWORD,W.DWORD,ctypes.POINTER(SA),W.DWORD,W.DWORD,W.HANDLE]; create.restype=W.HANDLE
+    create.argtypes=[W.LPCWSTR,W.DWORD,W.DWORD,ctypes.POINTER(_SecurityAttributes),W.DWORD,W.DWORD,W.HANDLE]; create.restype=W.HANDLE
     # Fresh random filename avoids inheriting a pre-existing file's ACL.
     temporary=path.with_name('explorer-'+secrets.token_hex(16)+'.tmp')
     handle=create(str(temporary),0x40000000,0,ctypes.byref(sa),1,0x80,None)
@@ -181,9 +185,7 @@ class NativeExplorer:
                     if self.store and not getattr(adapter,'store_only',False):self.store.save(origin,descriptor)
                     self.descriptors[origin]=descriptor;adapter.media_allowed=args['allowed']
                     if not args['allowed']:
-                        with adapter.media_lock:
-                            for source in adapter.media.values():
-                                if source.get('permission_scope')!='saved_store':source['revoked']=True
+                        adapter.revoke_external_media()
                 return {'allowed':getattr(adapter,'media_allowed',True),'scope':'saved_store' if getattr(adapter,'store_only',False) else 'approved_folder','migrated':self.descriptors.get(origin,{}).get('media_policy_migrated',False)}
             if getattr(adapter,'store_only',False):
                 if command=='remember_location':return {'remembered':False,'reason':'SAVED_STORE_SCOPE'}

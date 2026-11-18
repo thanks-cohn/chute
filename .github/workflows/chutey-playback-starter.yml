@@ -1,0 +1,85 @@
+name: Chutey targeted playback and memory repair TEST
+on:
+  workflow_dispatch:
+    inputs:
+      idle_seconds:
+        description: 'Real Explorer idle duration (7200 for two hours; 30 is only smoke coverage)'
+        default: '30'
+        required: true
+  push:
+    branches: [fix/chutey-p0-playback-starter]
+    paths: ['src/**', 'extension/**', 'tests/**', 'scripts/**', '.github/workflows/chutey-playback-starter.yml']
+permissions:
+  contents: read
+jobs:
+  paired:
+    runs-on: windows-latest
+    timeout-minutes: 165
+    env:
+      PYTHONPATH: src
+      PYTHONIOENCODING: utf-8
+      CHUTE_QUIET: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Focused dependencies
+        run: python -m pip install -e . pytest==9.2.0 Pillow==13.0.0 playwright==1.65.2
+      - name: Metadata retention, streaming cleanup, authorization and range regressions
+        run: python -m pytest -q tests/test_windows_fs_resources.py tests/test_explorer_media.py tests/test_explorer_native.py tests/test_p0_media_performance.py --junitxml=playback-windows-tests.xml
+      - name: Shared extension regression contracts
+        run: |
+          node scripts/verify-worker-boot.cjs
+          node scripts/verify-explorer-api.cjs
+          node scripts/verify-media-origin.cjs
+          node scripts/verify-media-diagnostics.cjs
+      - name: Fixture encoder
+        shell: pwsh
+        run: |
+          if (-not (Get-Command ffmpeg -ErrorAction SilentlyContinue)) { choco install ffmpeg --no-progress -y; if ($LASTEXITCODE -ne 0) { throw 'FFmpeg failed' } }
+      - name: Build matching Windows setup, helper and Chrome ZIP
+        shell: pwsh
+        run: |
+          ./scripts/build-windows.ps1
+          if ($LASTEXITCODE -ne 0) { throw 'Worker build failed' }
+          python scripts/build-chrome-store.py
+          if ($LASTEXITCODE -ne 0) { throw 'Chrome build failed' }
+          python scripts/verify-packaged-explorer-host.py dist/windows/Chute-NativeHost.exe dist/windows/Chute-NativeHost.exe
+          if ($LASTEXITCODE -ne 0) { throw 'Native framing failed' }
+      - name: Actual paired Chrome and packaged worker lifecycle and memory checks
+        env:
+          IDLE_SECONDS: ${{ inputs.idle_seconds || '30' }}
+        run: python scripts/verify-playback-starter.py --transport installed --cycles 12 --idle-seconds $env:IDLE_SECONDS --output dist/playback-evidence
+      - name: Package exact TEST candidate
+        shell: pwsh
+        run: |
+          $ErrorActionPreference='Stop'
+          New-Item -ItemType Directory -Force dist/playback-pair | Out-Null
+          Copy-Item dist/windows/Chute-Windows.exe dist/playback-pair/Chutey-Playback-Starter-TEST.exe
+          Copy-Item dist/windows/Chute-NativeHost.exe dist/playback-pair/
+          Copy-Item dist/chrome-store/chute-chrome-2.6.1.zip dist/playback-pair/Chutey-Chrome-Playback-Starter-TEST.zip
+          Copy-Item latest/documentation/P0-PLAYBACK-STARTER-HANDOFF.md dist/playback-pair/START-HERE.md
+          Copy-Item -Recurse dist/playback-evidence dist/playback-pair/evidence
+          Copy-Item playback-windows-tests.xml dist/playback-pair/
+          git rev-parse HEAD | Out-File dist/playback-pair/SOURCE-COMMIT.txt -Encoding ascii
+          'TEST ONLY. Review evidence/results.json for actual duration. Owner Windows and long-session acceptance are separate gates. NOT GOLD.' | Set-Content dist/playback-pair/ACCEPTANCE-STATUS.txt
+          $base=(Resolve-Path dist/playback-pair).Path
+          $lines=@(Get-ChildItem $base -Recurse -File | Sort-Object FullName | ForEach-Object { "$((Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLower())  $($_.FullName.Substring($base.Length+1).Replace('\','/'))" })
+          [IO.File]::WriteAllLines((Join-Path $base 'SHA256SUMS.txt'),[string[]]$lines,[Text.Encoding]::UTF8)
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Chutey-Playback-Starter-TEST-${{ github.sha }}-${{ github.run_id }}
+          path: dist/playback-pair/
+          if-no-files-found: error
+          retention-days: 90
+      - name: Retain failure evidence without calling it a passing package
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Chutey-Playback-Starter-FAILED-${{ github.sha }}-${{ github.run_id }}
+          path: |
+            playback-windows-tests.xml
+            dist/playback-evidence/
+            dist/windows/*.exe
+            dist/chrome-store/*.zip

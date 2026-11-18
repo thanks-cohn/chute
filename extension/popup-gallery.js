@@ -69,26 +69,30 @@
   const next = lightbox.querySelector(".chutey-lightbox-next");
   let activeId = null, returnFocus = null, serial = 0;
   const mediaFile=file=>/^(video|audio)\//.test(file.mime||'') || /\.(mp4|webm|mp3)$/i.test(file.name||'');
-  let mediaTicket=null,stopLease=null;
+  let mediaTicket=null,stopLease=null,mediaLoadTimer=null;
   const player=document.createElement('div');player.className='chutey-lightbox-player';player.hidden=true;
   lightbox.querySelector('.chutey-lightbox-stage').append(player);
   function releaseMedia(){
-    stopLease?.();stopLease=null;
-    player.querySelectorAll('video,audio').forEach(node=>{node.onerror=null;node.pause();node.removeAttribute('src');node.load();});player.replaceChildren();player.hidden=true;
+    clearTimeout(mediaLoadTimer);mediaLoadTimer=null;stopLease?.();stopLease=null;
+    player.querySelectorAll('video,audio').forEach(node=>{node.onerror=node.onloadedmetadata=node.onloadeddata=node.onplaying=null;node.pause();node.removeAttribute('src');node.load();});player.replaceChildren();player.hidden=true;
     if(mediaTicket){void window.ChuteyExplorerAPI.command('release_media',{ticket:mediaTicket}).catch(()=>{});mediaTicket=null;}
   }
   async function showMedia(file,token){
+    mediaLoadTimer=setTimeout(()=>{if(token===serial){++serial;releaseMedia();errorText.textContent='Loading media timed out. Select the same file to retry.';errorText.hidden=false;}},10000);
     try{
       await window.ChuteyExplorerAPI.nativeSession(false);
+      if(token!==serial)return;
       const row=file.__local ? file : await window.ChuteyExplorerAPI.command('locate_saved',{id:file.id});
+      if(token!==serial)return;
       const source=await window.ChuteyExplorerAPI.mediaSource(row);
       if(token!==serial){void window.ChuteyExplorerAPI.command('release_media',{ticket:source.ticket}).catch(()=>{});return;}
       mediaTicket=source.ticket;stopLease=window.ChuteyMediaPlayback.lease(source,window.ChuteyExplorerAPI,error=>{if(window.ChuteyMediaPlayback.terminal(error))releaseMedia();errorText.textContent='Playback continuation: '+error.message;errorText.hidden=false;});
       const node=document.createElement(source.mime.startsWith('audio/')?'audio':'video');node.controls=true;node.preload='metadata';node.autoplay=false;node.crossOrigin='anonymous';
       if(!node.canPlayType(source.mime))throw Error('This browser does not support the media container/codec.');
-      node.onerror=async()=>{const message=await window.ChuteyMediaPlayback.failure(node,source);if(token===serial){releaseMedia();errorText.textContent=message;errorText.hidden=false;}};
+      node.onloadedmetadata=node.onloadeddata=node.onplaying=()=>{if(token===serial){clearTimeout(mediaLoadTimer);mediaLoadTimer=null;}};
+      node.onerror=async()=>{if(token!==serial)return;const diagnostic=window.ChuteyMediaPlayback.failure(node,source,{released:true});const failed=++serial;releaseMedia();errorText.textContent='Media playback failed. Select the same file to retry.';errorText.hidden=false;const message=await diagnostic;if(failed===serial)errorText.textContent=message;};
       node.src=source.url;player.replaceChildren(node);player.hidden=false;
-    }catch(error){if(token===serial){errorText.textContent=error.code==='UNSUPPORTED_COMMAND'?'Local streaming needs the matching candidate worker/helper.':error.message;errorText.hidden=false;}}
+    }catch(error){if(token===serial){releaseMedia();errorText.textContent=error.code==='UNSUPPORTED_COMMAND'?'Local streaming needs the matching candidate worker/helper.':error.message;errorText.hidden=false;}}
   }
   function imageTiles() {
     const viewingLocal=document.querySelector("#popup-local")?.hidden===false;

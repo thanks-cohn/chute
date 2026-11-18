@@ -14,6 +14,14 @@ from pathlib import Path
 from .protocol import ExplorerError
 
 
+class _FileInformation(ctypes.Structure):
+    # POINTER caches its target class for the process lifetime. A local class
+    # here would retain a fresh structure/pointer type on every metadata read.
+    _fields_ = [('attributes',W.DWORD),('created',W.FILETIME),('accessed',W.FILETIME),
+                ('written',W.FILETIME),('volume',W.DWORD),('size_high',W.DWORD),
+                ('size_low',W.DWORD),('links',W.DWORD),('index_high',W.DWORD),('index_low',W.DWORD)]
+
+
 def validate_root(path):
     raw = str(path)
     if raw.startswith(('\\\\', '//')) or ':' in raw[2:] or not Path(raw).is_absolute():
@@ -56,9 +64,7 @@ class WindowsFS:
         create.argtypes = [W.LPCWSTR,W.DWORD,W.DWORD,ctypes.c_void_p,W.DWORD,W.DWORD,W.HANDLE]
         create.restype = W.HANDLE
         close = kernel.CloseHandle; close.argtypes = [W.HANDLE]; close.restype = W.BOOL
-        class Info(ctypes.Structure):
-            _fields_ = [('attributes',W.DWORD),('created',W.FILETIME),('accessed',W.FILETIME),('written',W.FILETIME),('volume',W.DWORD),('size_high',W.DWORD),('size_low',W.DWORD),('links',W.DWORD),('index_high',W.DWORD),('index_low',W.DWORD)]
-        get = kernel.GetFileInformationByHandle; get.argtypes=[W.HANDLE,ctypes.POINTER(Info)]; get.restype=W.BOOL
+        get = kernel.GetFileInformationByHandle; get.argtypes=[W.HANDLE,ctypes.POINTER(_FileInformation)]; get.restype=W.BOOL
         final = kernel.GetFinalPathNameByHandleW; final.argtypes=[W.HANDLE,W.LPWSTR,W.DWORD,W.DWORD]; final.restype=W.DWORD
         handles=[]
         paths=list(reversed(self.root.parents)) + [self.root]
@@ -77,7 +83,7 @@ class WindowsFS:
                 if handle == ctypes.c_void_p(-1).value:
                     raise ctypes.WinError(ctypes.get_last_error())
                 handles.append(handle)
-                info=Info()
+                info=_FileInformation()
                 if not get(handle,ctypes.byref(info)):
                     raise ctypes.WinError(ctypes.get_last_error())
                 if info.attributes & 0x400 or (not last or directory) and not info.attributes & 0x10:
@@ -121,14 +127,10 @@ class WindowsFS:
         Windows DirEntry.stat may report zero dev/ino; CRT fstat and path stat
         can also differ. Do not compare those representations for authorization.
         """
-        class Info(ctypes.Structure):
-            _fields_=[('attributes',W.DWORD),('created',W.FILETIME),('accessed',W.FILETIME),
-                      ('written',W.FILETIME),('volume',W.DWORD),('size_high',W.DWORD),
-                      ('size_low',W.DWORD),('links',W.DWORD),('index_high',W.DWORD),('index_low',W.DWORD)]
         kernel=ctypes.WinDLL('kernel32',use_last_error=True)
         get=kernel.GetFileInformationByHandle
-        get.argtypes=[W.HANDLE,ctypes.POINTER(Info)];get.restype=W.BOOL
-        info=Info()
+        get.argtypes=[W.HANDLE,ctypes.POINTER(_FileInformation)];get.restype=W.BOOL
+        info=_FileInformation()
         if not get(handle,ctypes.byref(info)): raise ctypes.WinError(ctypes.get_last_error())
         return f'{info.volume}:{(info.index_high<<32)|info.index_low}:{(info.written.dwHighDateTime<<32)|info.written.dwLowDateTime}:{(info.size_high<<32)|info.size_low}'
 
