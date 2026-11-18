@@ -56,18 +56,20 @@
 - Three independent UI surfaces: **Extension popup image click** = preserve enlargement; **Shelf File Explorer image click** = expand internal preview pane; **Shelf History Open BUTTON** = reveal Windows local saved location by default, subject to Shelf-specific Settings. Shelf History image clicks remain unchanged. Do not mix these with popup Copy Image.
 - Reference: Necessary-fixes/POPUP_SHELF_COPY_IMAGE_AND_SHELF_OPEN_DEFAULT_2026-11-17.md
 
-## Workstream P1-B — TWO independently resizable FULL-HEIGHT preview panes + independent keyboard navigation (LATEST OWNER CORRECTION)
-**CRITICAL: NOT A SHARED SPLITTER.** The prior draft erroneously required a single shared image/video divider with heights summing to 100%. That is explicitly superseded by the owner's clarification. The user wants TWO separate draggable boundaries, and EITHER pane can fill the entire Shelf height.
+## Workstream P1-B — Simple independent TOP-LAYER preview resize + click-to-navigate (OWNER'S FINAL RULE)
 
-- **Top image/document pane:** anchored at TOP; drag its **BOTTOM edge** independently anywhere from top to bottom of Shelf (0%–100% image height). At full size image preview fills the entire Shelf, regardless of video pane's stored height.
-- **Bottom pinned video pane:** anchored at BOTTOM; drag its **TOP edge** independently anywhere from bottom to top of Shelf (0%–100% video height). At full size video fills entire Shelf, regardless of image pane's stored height.
-- **No coupled heights:** dragging video shorter/longer does not auto-resize image. Dragging image does not auto-resize video. Store TWO independent height ratios, not one shared allocation.
-- **User scenarios:** (A) pull video top edge all the way up → full-height video; (B) pull video top edge down to midpoint → half-height video, independently size image to fill the other half; (C) pull video top edge all the way down and image bottom edge down to Shelf bottom → FULL-HEIGHT IMAGE preview. Either pane can reach every Shelf boundary; don't cap at toolbar, list top, 120px or 220px.
-- **Overlap/focus:** Independent sizes can sum to >100% and visually overlap. Use clear foreground/focus ownership, accessible front/back controls and visible grips/recovery controls, retaining both saved sizes. One full-size opaque pane may cover the other; don't claim both full-height panes can be simultaneously visible in a single viewport. Avoid click-through or unreachable handles.
-- **Playback stability:** resizing/collapsing/foregrounding either pane MUST NOT stop pinned video, reset its playback position, create extra player nodes or leak tickets. Explicit Stop/Close releases the stream. Retain current image state.
-- **Independent Left/Right focus rule:** click TOP pane once → Left/Right moves through non-video files of the current directory in displayed order, skipping all videos, without changing bottom video. Click BOTTOM pane once → Left/Right moves ONLY through video files in that directory, skipping images/documents, without changing top image. Native media seek/volume controls have their normal keyboard behavior while those controls are focused.
-- Keep file tree and list usable/recoverable when preview isn't covering them, support keyboard pointer/screen reader interactions, pagination/sort/search, persist independently sized panes after reopen, and avoid opening Windows Explorer from internal preview clicks.
-- **Reference:** https://github.com/thanks-cohn/chute/issues/30 and Necessary-fixes/FOCUSED_PREVIEW_NAVIGATION_TOP_NONVIDEO_BOTTOM_VIDEO_LEFT_RIGHT_2026-11-17.md. **These rules supersede all earlier shared-splitter wording.**
+**No shared image/video splitter, no complex layout choreography.** Image/document preview and pinned video preview are just TWO independently sized **TOP-LAYER overlays** in Shelf File Explorer, each with its own visible draggable edge/divider. Either overlay can take up **the ENTIRE Shelf height**, beyond ordinary toolbar/file-list/workspace limitations. Each edge moves from compact to 100% height without resizing the other pane. Remember both custom sizes. Provide a straightforward way to retract a panel and access the Shelf beneath; avoid hidden grips, click-through, and arbitrary fixed height clamps.
+
+**Keyboard behavior is controlled by one click on the preview pane itself:**
+- Click IMAGE/DOCUMENT preview → Left/Right goes through only **non-video previewable** files in the currently browsed directory, respecting display ordering/filter/pagination. SKIP videos.
+- Click VIDEO preview → Left/Right goes through only **video** files in the currently browsed directory, respecting display ordering/filter/pagination. SKIP images/documents.
+- Only last-focused pane's gallery navigates. Ordinary file list/search/menu keyboard controls and focused native media seek/volume must remain functional.
+
+Resizing, focusing or changing an image must not restart or destroy video playback. Keep one pinned player/ticket, release superseded ticket on video switching, preserve separate image state, maintain approved-folder boundaries. Clicking file rows opens internal preview, never Windows Explorer automatically.
+
+**Acceptance:** Drag either preview grip from small to FULL Shelf height, without automatically changing the other size. Click top preview then arrows navigate JPG→PNG→PDF; click bottom video then arrows navigate MP4→WebM. Video keeps playing while image pane resizes, overlays return to Explorer with an obvious retract action.
+
+**References:** https://github.com/thanks-cohn/chute/issues/30 and Necessary-fixes/FOCUSED_PREVIEW_NAVIGATION_TOP_NONVIDEO_BOTTOM_VIDEO_LEFT_RIGHT_2026-11-17.md. This rule supersedes all earlier instructions describing a common splitter, forced 50/50, or special pane-stacking animations.
 
 ## Workstream P1-C — Compact More menu instead of clipboard row
 - Remove full permanent six-button Copy toolbar, its divider and consumed height at every window size.
