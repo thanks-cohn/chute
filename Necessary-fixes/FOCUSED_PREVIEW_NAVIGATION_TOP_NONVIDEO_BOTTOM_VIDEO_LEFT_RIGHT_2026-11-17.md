@@ -8,7 +8,7 @@
 
 > "the bottom video panel, when clicked should be able to go left and right as well BUT it does this for the videos inside the directory, the top one simply does regular iteration and skips over video, to go thru the videos in a directory you just click the bottom video panel once and then use the left and right arrow keys"
 
-The two previews are arranged **IMAGE/DOCUMENT ON TOP and VIDEO ON BOTTOM**, each a separate overlay/panel in Shelf File Explorer. **Both TOP and BOTTOM edges of EACH preview can be independently dragged** for any custom size, up to full Shelf height. Do NOT stack video above the image, anchor both at Shelf bottom, or couple them as a fixed 50/50 splitter. Dragging a preview down to zero visible height **COLLAPSES but does not close** it: its grabber remains accessible, and resizing back restores the SAME panel. **Only X closes**; collapsing video preserves playback, position and ticket. Each panel has **independent, click-to-focus keyboard gallery navigation**. The user should never need to move the mouse to each file or open Windows Explorer just to advance within a category.
+The two previews are a **single ordered vertical stack** inside Shelf File Explorer: IMAGE/DOCUMENT upper preview, VIDEO lower preview anchored to Shelf bottom. When both first open they have **equal 50/50 heights**, and they never overlap. Adjust TWO boundaries: image TOP edge `I`, and video TOP edge `V` which is also image BOTTOM edge, with `0 ≤ I ≤ V ≤ Shelf bottom`. Raising video boundary grows video and takes available area from image; lowering to bottom COLLAPSES video (does not close). Raising the image top edge grows image only ABOVE video; image fills the whole Shelf only when its top is at Shelf top and video has collapsed to bottom. Handle remains draggable to restore the SAME video/player/position. **Only X closes** either panel. Each panel has independent, click-to-focus keyboard gallery navigation. The panels are NOT overlapping independent top-layer rectangles; this paragraph supersedes previous inaccurate instructions.
 
 | Where user clicks to activate | ArrowLeft | ArrowRight | Which files count |
 |---|---|---|---|
@@ -28,7 +28,7 @@ The two previews are arranged **IMAGE/DOCUMENT ON TOP and VIDEO ON BOTTOM**, eac
 8. Typing in search, editing names, menu use, keyboard-focused splitter, native media controls, or another UI surface must keep their normal key meanings. Do not hijack Ctrl/Shift/Alt combinations unexpectedly.
 9. The top pane should skip video files even when they're present in the same sorted directory; it can preview ordinary non-video image/text/PDF types as supported. Do not silently introduce a new policy for audio files without examining existing behavior; the requested video gallery is video-only.
 10. If the current directory changes while a video remains pinned, its existing video can keep playing as already designed. Left/Right gallery navigation should use an explicitly defined directory scope (the current directory) and never silently jump into another directory or create arbitrary grants. If the current playing file is not in the current directory, choose a predictable first eligible video in the displayed order and show the behavior. No cross-directory traversal.
-11. Works whether panels are compact, half-size, overlapping or each expanded to **full Shelf height**. The **IMAGE panel is ABOVE and VIDEO panel BELOW**. Both the TOP and BOTTOM edges of each can be dragged to set size independently; no shared splitter. With video collapsed and image enlarged, image can fill Shelf. Restore video by dragging its still-visible edge: the same playback survives. Dragging never closes; ONLY an individual X closes. Keep handles accessible at extremes.
+11. **Initial 50/50 with both open**. The IMAGE preview is ABOVE and VIDEO BELOW; they never overlap. Drag image TOP edge up/down and drag the shared image-BOTTOM/video-TOP boundary up/down. Video top at Shelf bottom means video collapsed; pull it UP again to restore without restarting playback. Image fills Shelf only when image top is Shelf top and video top is Shelf bottom. X is the ONLY close action. Drag never closes a panel.
 
 12. Maintain keyboard accessibility; show visible Previous/Next arrow actions in the pinned player as an alternative to shortcuts, plus a status (e.g. Video 2 of 6), with disabled boundaries. Top preview controls have their own separate state.
 
@@ -37,7 +37,7 @@ The two previews are arranged **IMAGE/DOCUMENT ON TOP and VIDEO ON BOTTOM**, eac
 - extension/explorer-view.js::navigatePreview(delta) (around lines 243–262) currently filters to all files, **not non-video files**, and only advances the top preview gallery. It can dispatch to showPreview for a video, which then invokes showPinned, so the top arrows are not category-separated.
 - extension/explorer-view.js::showPinned(row) (around lines 100–140) creates the bottom player but has **no independent video gallery iterator** and the pane is not made a focusable navigation target. Re-selecting the same pinned file returns early, including after a loading stall.
 - The host keydown listener (around lines 561–571) routes Left/Right only to navigatePreview when the top preview is visible, and ignores events from video/audio controls. There is no explicit focus owner for top vs bottom gallery.
-- The existing pinned-video region is created independently of the top overlay. Preserve that independence while adding **two independent full-height edge resize controls** per updated Issue #30. Do NOT build a coupled image/video shared splitter.
+- The existing video and image preview DOM are separate overlays, but Issue #30 requires a **non-overlapping upper-image/lower-video vertical stack with two adjustable boundaries**, equal halves initially. Move the shared video-top/image-bottom boundary to adjust adjacent heights; preserve independent player lifecycle while changing layout.
 
 ## Acceptance tests
 
@@ -50,7 +50,7 @@ The two previews are arranged **IMAGE/DOCUMENT ON TOP and VIDEO ON BOTTOM**, eac
 
 ## Related required work
 
-- Issue #30 — top IMAGE/document preview, bottom VIDEO preview; EACH has draggable top/bottom edges, can independently occupy the full Shelf, and can collapse/re-expand without closing; only X closes; click panel and Left/Right navigates its file category.
+- Issue #30 — IMAGE above VIDEO, no overlap, equal initial heights; draggable image top and shared image-bottom/video-top boundaries, reversible collapse; only X closes; click pane and Left/Right navigates its file category.
 - Necessary-fixes/FILE_EXPLORER_CLICK_PREVIEWS_HISTORY_CLICK_REVEALS_LOCATION_2026-11-17.md.
 - Necessary-fixes/EXPLORER_PREVIEW_GENERIC_UNSUPPORTED_OR_OVERSIZE_ERRORS_2026-11-17.md.
 - P0 owner-stalled 10-second MP4 and memory/resource growth investigation.
