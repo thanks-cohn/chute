@@ -243,14 +243,15 @@
   const copyImage = menu.querySelector('[data-action="copy-image"]');
   const trashItem = menu.querySelector('[data-action="trash"]');
   const menuStatus = menu.querySelector("small");
-  let menuFile = null, menuReturn = null;
+  let menuFile = null, menuReturn = null, menuRow = null;
   function dismissMenu() {
     menu.hidden = true;
     if (menuReturn?.isConnected) menuReturn.focus({preventScroll:true});
   }
   function openMenu(event,file,row) {
     event.preventDefault(); event.stopPropagation();
-    menuFile = file; menuReturn = lightbox.hidden ? row : lightbox; menu.hidden = false;
+    menuFile = file; menuRow = lightbox.hidden ? row : imageTiles().find(tile => tile.__galleryFile.id === file.id);
+    menuReturn = lightbox.hidden ? row : lightbox; menu.hidden = false;
     copyImage.hidden = !isPreviewableImage(file) || Boolean(file.__local);
     copyImage.textContent = "🖼 Copy Image";
     menuStatus.textContent = file.active ? "Live only · kept in dated History" : "Hide here only · History unchanged";
@@ -313,7 +314,7 @@
       if (file.active) {
         await api("/api/files/"+encodeURIComponent(file.id),{method:"DELETE"});
         await chrome.runtime.sendMessage({type:"chute-count-changed"}).catch(() => {});
-      } else { hiddenArchive.add(file.id); if (menuReturn) menuReturn.hidden = true; }
+      } else { hiddenArchive.add(file.id); if (menuRow) menuRow.hidden = true; }
       dismissMenu(); closePreview();
       await resetHistory();
       imageTiles()[0]?.focus({preventScroll:true});
