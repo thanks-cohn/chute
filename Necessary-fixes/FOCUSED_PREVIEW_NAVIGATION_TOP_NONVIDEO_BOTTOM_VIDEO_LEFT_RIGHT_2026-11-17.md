@@ -28,7 +28,7 @@ The TWO preview panels must have **independent, focus-controlled keyboard galler
 8. Typing in search, editing names, menu use, keyboard-focused splitter, native media controls, or another UI surface must keep their normal key meanings. Do not hijack Ctrl/Shift/Alt combinations unexpectedly.
 9. The top pane should skip video files even when they're present in the same sorted directory; it can preview ordinary non-video image/text/PDF types as supported. Do not silently introduce a new policy for audio files without examining existing behavior; the requested video gallery is video-only.
 10. If the current directory changes while a video remains pinned, its existing video can keep playing as already designed. Left/Right gallery navigation should use an explicitly defined directory scope (the current directory) and never silently jump into another directory or create arbitrary grants. If the current playing file is not in the current directory, choose a predictable first eligible video in the displayed order and show the behavior. No cross-directory traversal.
-11. Works whether both panes occupy 50/50, one pane is collapsed, or the combined preview is expanded all the way to the top of the Chutey window. Preserve both independent pane sizes (Issue #30); pane resizing must not activate/deactivate navigation or restart video.
+11. Works whether the panes are each 50%, collapsed, overlapping, or either reaches 100% of the Shelf height. The **top image pane's BOTTOM edge** and the **bottom video pane's TOP edge** are moved INDEPENDENTLY from 0% to 100%; their heights need not sum to 100%. Preserve both sizes (Issue #30), provide recoverable overlap/focus controls, and never restart video just because either edge moves.
 12. Maintain keyboard accessibility; show visible Previous/Next arrow actions in the pinned player as an alternative to shortcuts, plus a status (e.g. Video 2 of 6), with disabled boundaries. Top preview controls have their own separate state.
 
 ## Source-confirmed gap in tested runtime 1e2b2bc6d5da0119e87bcbc0c52b86abe55dd122
@@ -36,7 +36,7 @@ The TWO preview panels must have **independent, focus-controlled keyboard galler
 - extension/explorer-view.js::navigatePreview(delta) (around lines 243–262) currently filters to all files, **not non-video files**, and only advances the top preview gallery. It can dispatch to showPreview for a video, which then invokes showPinned, so the top arrows are not category-separated.
 - extension/explorer-view.js::showPinned(row) (around lines 100–140) creates the bottom player but has **no independent video gallery iterator** and the pane is not made a focusable navigation target. Re-selecting the same pinned file returns early, including after a loading stall.
 - The host keydown listener (around lines 561–571) routes Left/Right only to navigatePreview when the top preview is visible, and ignores events from video/audio controls. There is no explicit focus owner for top vs bottom gallery.
-- The existing pinned-video region is created independently of the top overlay and must be adapted to the new unified, resizable split preview specification in Issue #30.
+- The existing pinned-video region is created independently of the top overlay. Preserve that independence while adding **two independent full-height edge resize controls** per updated Issue #30. Do NOT build a coupled image/video shared splitter.
 
 ## Acceptance tests
 
@@ -49,7 +49,7 @@ The TWO preview panels must have **independent, focus-controlled keyboard galler
 
 ## Related required work
 
-- Issue #30 — Full-height outer preview + unrestricted image/video inner divider.
+- Issue #30 — **two independent pane edges**: image bottom edge reaches Shelf bottom; video top edge reaches Shelf top; each pane independently reaches full Shelf height (not a shared divider).
 - Necessary-fixes/FILE_EXPLORER_CLICK_PREVIEWS_HISTORY_CLICK_REVEALS_LOCATION_2026-11-17.md.
 - Necessary-fixes/EXPLORER_PREVIEW_GENERIC_UNSUPPORTED_OR_OVERSIZE_ERRORS_2026-11-17.md.
 - P0 owner-stalled 10-second MP4 and memory/resource growth investigation.
