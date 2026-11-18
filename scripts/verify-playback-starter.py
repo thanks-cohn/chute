@@ -291,13 +291,23 @@ def exercise(context, page, entry, report, args):
     sample('idle_start')
     idle_start = time.monotonic()
     while time.monotonic() - idle_start < args.idle_seconds:
-        page.wait_for_timeout(min(10000, (args.idle_seconds - (time.monotonic() - idle_start)) * 1000))
+        page.wait_for_timeout(max(0, min(10000, (args.idle_seconds - (time.monotonic() - idle_start)) * 1000)))
         assert cleaned(), 'Closed media resources returned while Explorer was idle'
         sample('idle')
     report['idle_wall_seconds'] = round(time.monotonic() - idle_start, 3)
+    preview('clip-a.mp4')
+    media = media_ready()
+    media.evaluate('n=>n.play()')
+    until(page, lambda: media.evaluate('n=>n.currentTime>0.1'))
+    stop()
+    page.locator('.ex-row', has=page.locator('.ex-name', has_text='child')).dblclick()
+    expect(page.locator('.ex-name')).to_have_text(['document.txt'])
+    page.get_by_role('button', name='Parent folder', exact=True).click()
+    expect(page.locator('.ex-row')).to_have_count(7)
+    sample('replayed_and_browsed_after_idle')
     assert not errors, errors
     report['page_errors'] = errors
-    report['checks'].append(f'Explorer idle for {report["idle_wall_seconds"]} real seconds; no media tickets or active stream slots')
+    report['checks'].append(f'Closed-player Explorer idle for {report["idle_wall_seconds"]} real seconds with 10-second control sampling; no media tickets or active stream slots; playback and browsing work afterward')
     report['duration_seconds'] = round(time.monotonic() - started, 3)
     report['memory_scope'] = ('Worker is a separate packaged process only for installed transport. Browser memory sums CDP-visible processes; RSS can double count shared pages. Windows private bytes are separately reported. No forced garbage collection or working-set trimming.')
     report['result'] = 'PASS'
