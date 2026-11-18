@@ -1,5 +1,8 @@
 # Targeted playback and memory repair — TEST candidate
 
+Actual outcomes, package hashes and open acceptance gates are recorded in
+[`P0-PLAYBACK-STARTER-RESULTS.md`](P0-PLAYBACK-STARTER-RESULTS.md).
+
 Branch: `fix/chutey-p0-playback-starter`, based on reference branch
 `fix/chutey-media-worker-2026-11-17` at
 `9cde0e854a9a51604c49ec72084850fbd92a9c9c`.

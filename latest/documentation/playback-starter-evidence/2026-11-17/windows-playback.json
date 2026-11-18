@@ -1,0 +1,733 @@
+{
+  "result": "PASS",
+  "transport": "installed",
+  "checks": [
+    "Same-file retry after simulated metadata BUSY",
+    "30 MB MP4 play, pause, seek, finish, replay; four images and directory browsing during playback",
+    "Media GET failure cleans up; selecting the same MP4 retries successfully",
+    "Hung metadata request times out, cancels and permits same-file retry",
+    "Ticket arriving after explicit Stop is released without creating a player",
+    "12 play/switch/close/navigate/return cycles: no orphaned media slots or tickets",
+    "Popup local MP4 playback, explicit Escape closure, same-file reopen and page close release resources",
+    "Closed-player Explorer idle for 30.047 real seconds with 10-second control sampling; no media tickets or active stream slots; playback and browsing work afterward"
+  ],
+  "samples": [
+    {
+      "label": "before_cycles",
+      "seconds": 24.797,
+      "worker": {
+        "event": "runtime_resources",
+        "pid": 4400,
+        "disk_free_bytes": 32439971840,
+        "memory_total_bytes": 17174360064,
+        "memory_available_bytes": 13719793664,
+        "commit_limit_bytes": 20261367808,
+        "commit_available_bytes": 17064394752,
+        "process_rss_bytes": 39108608,
+        "process_peak_rss_bytes": 40079360,
+        "process_private_bytes": 26525696,
+        "process_cpu_seconds": 0.75,
+        "python_threads": 3
+      },
+      "media_lane": {
+        "completed": 10,
+        "busy": 0,
+        "active": 0,
+        "p50_ms": 16,
+        "p95_ms": 125,
+        "p99_ms": 125,
+        "worst_ms": 141
+      },
+      "active_leases": 0,
+      "browser_cdp_process_memory_sum": {
+        "rss_bytes": 638410752,
+        "private_bytes": 310071296
+      },
+      "browser_cdp_process_count": 9,
+      "shelf_js_heap": {
+        "usedSize": 4779512,
+        "totalSize": 8003584,
+        "embedderHeapUsedSize": 11219160,
+        "backingStorageSize": 223560
+      }
+    },
+    {
+      "label": "closed_cycle_1",
+      "seconds": 25.437,
+      "worker": {
+        "event": "runtime_resources",
+        "pid": 4400,
+        "disk_free_bytes": 32439967744,
+        "memory_total_bytes": 17174360064,
+        "memory_available_bytes": 13707382784,
+        "commit_limit_bytes": 20261367808,
+        "commit_available_bytes": 17055416320,
+        "process_rss_bytes": 39174144,
+        "process_peak_rss_bytes": 40079360,
+        "process_private_bytes": 26583040,
+        "process_cpu_seconds": 0.8125,
+        "python_threads": 3
+      },
+      "media_lane": {
+        "completed": 12,
+        "busy": 0,
+        "active": 0,
+        "p50_ms": 16,
+        "p95_ms": 125,
+        "p99_ms": 125,
+        "worst_ms": 141
+      },
+      "active_leases": 0,
+      "browser_cdp_process_memory_sum": {
+        "rss_bytes": 648929280,
+        "private_bytes": 314327040
+      },
+      "browser_cdp_process_count": 9,
+      "shelf_js_heap": {
+        "usedSize": 4949008,
+        "totalSize": 8265728,
+        "embedderHeapUsedSize": 13148824,
+        "backingStorageSize": 230332
+      }
+    },
+    {
+      "label": "closed_cycle_2",
+      "seconds": 26.14,
+      "worker": {
+        "event": "runtime_resources",
+        "pid": 4400,
+        "disk_free_bytes": 32439967744,
+        "memory_total_bytes": 17174360064,
+        "memory_available_bytes": 13695422464,
+        "commit_limit_bytes": 20261367808,
+        "commit_available_bytes": 17042866176,
+        "process_rss_bytes": 39190528,
+        "process_peak_rss_bytes": 40079360,
+        "process_private_bytes": 26583040,
+        "process_cpu_seconds": 0.875,
+        "python_threads": 3
+      },
+      "media_lane": {
+        "completed": 14,
+        "busy": 0,
+        "active": 0,
+        "p50_ms": 63,
+        "p95_ms": 125,
+        "p99_ms": 125,
+        "worst_ms": 141
+      },
+      "active_leases": 0,
+      "browser_cdp_process_memory_sum": {
+        "rss_bytes": 660156416,
+        "private_bytes": 325206016
+      },
+      "browser_cdp_process_count": 9,
+      "shelf_js_heap": {
+        "usedSize": 5217356,
+        "totalSize": 8265728,
+        "embedderHeapUsedSize": 15556144,
+        "backingStorageSize": 237342
+      }
+    },
+    {
+      "label": "closed_cycle_3",
+      "seconds": 26.781,
+      "worker": {
+        "event": "runtime_resources",
+        "pid": 4400,
+        "disk_free_bytes": 32439967744,
+        "memory_total_bytes": 17174360064,
+        "memory_available_bytes": 13693677568,
+        "commit_limit_bytes": 20261367808,
+        "commit_available_bytes": 17043533824,
+        "process_rss_bytes": 39223296,
+        "process_peak_rss_bytes": 40079360,
+        "process_private_bytes": 26583040,
+        "process_cpu_seconds": 0.953125,
+        "python_threads": 3
+      },
+      "media_lane": {
+        "completed": 16,
+        "busy": 0,
+        "active": 0,
+        "p50_ms": 63,
+        "p95_ms": 125,
+        "p99_ms": 125,
+        "worst_ms": 141
+      },
+      "active_leases": 0,
+      "browser_cdp_process_memory_sum": {
+        "rss_bytes": 660516864,
+        "private_bytes": 324673536
+      },
+      "browser_cdp_process_count": 9,
+      "shelf_js_heap": {
+        "usedSize": 5272504,
+        "totalSize": 8527872,
+        "embedderHeapUsedSize": 18226688,
+        "backingStorageSize": 243265
+      }
+    },
+    {
+      "label": "closed_cycle_4",
+      "seconds": 27.484,
+      "worker": {
+        "event": "runtime_resources",
+        "pid": 4400,
+        "disk_free_bytes": 32439967744,
+        "memory_total_bytes": 17174360064,
+        "memory_available_bytes": 13689565184,
+        "commit_limit_bytes": 20261367808,
+        "commit_available_bytes": 17039712256,
+        "process_rss_bytes": 39231488,
+        "process_peak_rss_bytes": 40079360,
+        "process_private_bytes": 26587136,
+        "process_cpu_seconds": 0.984375,
+        "python_threads": 3
+      },
+      "media_lane": {
+        "completed": 18,
+        "busy": 0,
+        "active": 0,
+        "p50_ms": 78,
+        "p95_ms": 125,
+        "p99_ms": 125,
+        "worst_ms": 141
+      },
+      "active_leases": 0,
+      "browser_cdp_process_memory_sum": {
+        "rss_bytes": 664506368,
+        "private_bytes": 327856128
+      },
+      "browser_cdp_process_count": 9,
+      "shelf_js_heap": {
+        "usedSize": 5410076,
+        "totalSize": 8527872,
+        "embedderHeapUsedSize": 20560904,
+        "backingStorageSize": 249480
+      }
+    },
+    {
+      "label": "closed_cycle_5",
+      "seconds": 28.203,
+      "worker": {
+        "event": "runtime_resources",
+        "pid": 4400,
+        "disk_free_bytes": 32439967744,
+        "memory_total_bytes": 17174360064,
+        "memory_available_bytes": 13672267776,
+        "commit_limit_bytes": 20261367808,
+        "commit_available_bytes": 17021820928,
+        "process_rss_bytes": 39231488,
+        "process_peak_rss_bytes": 40079360,
+        "process_private_bytes": 26587136,
+        "process_cpu_seconds": 1.046875,
+        "python_threads": 3
+      },
+      "media_lane": {
+        "completed": 20,
+        "busy": 0,
+        "active": 0,
+        "p50_ms": 78,
+        "p95_ms": 125,
+        "p99_ms": 125,
+        "worst_ms": 141
+      },
+      "active_leases": 0,
+      "browser_cdp_process_memory_sum": {
+        "rss_bytes": 687755264,
+        "private_bytes": 348831744
+      },
+      "browser_cdp_process_count": 9,
+      "shelf_js_heap": {
+        "usedSize": 6531536,
+        "totalSize": 9576448,
+        "embedderHeapUsedSize": 23356984,
+        "backingStorageSize": 257369
+      }
+    },
+    {
+      "label": "closed_cycle_6",
+      "seconds": 28.89,
+      "worker": {
+        "event": "runtime_resources",
+        "pid": 4400,
+        "disk_free_bytes": 32439967744,
+        "memory_total_bytes": 17174360064,
+        "memory_available_bytes": 13661609984,
+        "commit_limit_bytes": 20261367808,
+        "commit_available_bytes": 17009905664,
+        "process_rss_bytes": 39235584,
+        "process_peak_rss_bytes": 40079360,
+        "process_private_bytes": 26587136,
+        "process_cpu_seconds": 1.15625,
+        "python_threads": 3
+      },
+      "media_lane": {
+        "completed": 22,
+        "busy": 0,
+        "active": 0,
+        "p50_ms": 78,
+        "p95_ms": 125,
+        "p99_ms": 125,
+        "worst_ms": 141
+      },
+      "active_leases": 0,
+      "browser_cdp_process_memory_sum": {
+        "rss_bytes": 695320576,
+        "private_bytes": 356487168
+      },
+      "browser_cdp_process_count": 9,
+      "shelf_js_heap": {
+        "usedSize": 5902932,
+        "totalSize": 10362880,
+        "embedderHeapUsedSize": 25769024,
+        "backingStorageSize": 264167
+      }
+    },
+    {
+      "label": "closed_cycle_7",
+      "seconds": 29.531,
+      "worker": {
+        "event": "runtime_resources",
+        "pid": 4400,
+        "disk_free_bytes": 32439963648,
+        "memory_total_bytes": 17174360064,
+        "memory_available_bytes": 13654020096,
+        "commit_limit_bytes": 20261367808,
+        "commit_available_bytes": 17004019712,
+        "process_rss_bytes": 39235584,
+        "process_peak_rss_bytes": 40079360,
+        "process_private_bytes": 26583040,
+        "process_cpu_seconds": 1.234375,
+        "python_threads": 3
+      },
+      "media_lane": {
+        "completed": 24,
+        "busy": 0,
+        "active": 0,
+        "p50_ms": 79,
+        "p95_ms": 125,
+        "p99_ms": 125,
+        "worst_ms": 141
+      },
+      "active_leases": 0,
+      "browser_cdp_process_memory_sum": {
+        "rss_bytes": 701816832,
+        "private_bytes": 363372544
+      },
+      "browser_cdp_process_count": 9,
+      "shelf_js_heap": {
+        "usedSize": 6919060,
+        "totalSize": 10887168,
+        "embedderHeapUsedSize": 28324736,
+        "backingStorageSize": 272641
+      }
+    },
+    {
+      "label": "closed_cycle_8",
+      "seconds": 30.218,
+      "worker": {
+        "event": "runtime_resources",
+        "pid": 4400,
+        "disk_free_bytes": 32439963648,
+        "memory_total_bytes": 17174360064,
+        "memory_available_bytes": 13649596416,
+        "commit_limit_bytes": 20261367808,
+        "commit_available_bytes": 16999473152,
+        "process_rss_bytes": 39243776,
+        "process_peak_rss_bytes": 40079360,
+        "process_private_bytes": 26583040,
+        "process_cpu_seconds": 1.328125,
+        "python_threads": 3
+      },
+      "media_lane": {
+        "completed": 26,
+        "busy": 0,
+        "active": 0,
+        "p50_ms": 79,
+        "p95_ms": 125,
+        "p99_ms": 125,
+        "worst_ms": 141
+      },
+      "active_leases": 0,
+      "browser_cdp_process_memory_sum": {
+        "rss_bytes": 707584000,
+        "private_bytes": 369786880
+      },
+      "browser_cdp_process_count": 9,
+      "shelf_js_heap": {
+        "usedSize": 6383688,
+        "totalSize": 11673600,
+        "embedderHeapUsedSize": 30812960,
+        "backingStorageSize": 281406
+      }
+    },
+    {
+      "label": "closed_cycle_9",
+      "seconds": 30.937,
+      "worker": {
+        "event": "runtime_resources",
+        "pid": 4400,
+        "disk_free_bytes": 32437866496,
+        "memory_total_bytes": 17174360064,
+        "memory_available_bytes": 13639733248,
+        "commit_limit_bytes": 20261367808,
+        "commit_available_bytes": 16990228480,
+        "process_rss_bytes": 39247872,
+        "process_peak_rss_bytes": 40079360,
+        "process_private_bytes": 26587136,
+        "process_cpu_seconds": 1.421875,
+        "python_threads": 3
+      },
+      "media_lane": {
+        "completed": 28,
+        "busy": 0,
+        "active": 0,
+        "p50_ms": 79,
+        "p95_ms": 125,
+        "p99_ms": 125,
+        "worst_ms": 141
+      },
+      "active_leases": 0,
+      "browser_cdp_process_memory_sum": {
+        "rss_bytes": 715345920,
+        "private_bytes": 377933824
+      },
+      "browser_cdp_process_count": 9,
+      "shelf_js_heap": {
+        "usedSize": 7497768,
+        "totalSize": 11673600,
+        "embedderHeapUsedSize": 33202856,
+        "backingStorageSize": 290463
+      }
+    },
+    {
+      "label": "closed_cycle_10",
+      "seconds": 31.609,
+      "worker": {
+        "event": "runtime_resources",
+        "pid": 4400,
+        "disk_free_bytes": 32437866496,
+        "memory_total_bytes": 17174360064,
+        "memory_available_bytes": 13634752512,
+        "commit_limit_bytes": 20261367808,
+        "commit_available_bytes": 16983404544,
+        "process_rss_bytes": 39247872,
+        "process_peak_rss_bytes": 40079360,
+        "process_private_bytes": 26587136,
+        "process_cpu_seconds": 1.5,
+        "python_threads": 3
+      },
+      "media_lane": {
+        "completed": 30,
+        "busy": 0,
+        "active": 0,
+        "p50_ms": 79,
+        "p95_ms": 125,
+        "p99_ms": 125,
+        "worst_ms": 141
+      },
+      "active_leases": 0,
+      "browser_cdp_process_memory_sum": {
+        "rss_bytes": 724987904,
+        "private_bytes": 386506752
+      },
+      "browser_cdp_process_count": 9,
+      "shelf_js_heap": {
+        "usedSize": 4208788,
+        "totalSize": 11411456,
+        "embedderHeapUsedSize": 5172848,
+        "backingStorageSize": 203805
+      }
+    },
+    {
+      "label": "closed_cycle_11",
+      "seconds": 32.187,
+      "worker": {
+        "event": "runtime_resources",
+        "pid": 4400,
+        "disk_free_bytes": 32437866496,
+        "memory_total_bytes": 17174360064,
+        "memory_available_bytes": 13630095360,
+        "commit_limit_bytes": 20261367808,
+        "commit_available_bytes": 16979263488,
+        "process_rss_bytes": 39243776,
+        "process_peak_rss_bytes": 40079360,
+        "process_private_bytes": 26583040,
+        "process_cpu_seconds": 1.59375,
+        "python_threads": 3
+      },
+      "media_lane": {
+        "completed": 32,
+        "busy": 0,
+        "active": 0,
+        "p50_ms": 79,
+        "p95_ms": 125,
+        "p99_ms": 125,
+        "worst_ms": 141
+      },
+      "active_leases": 0,
+      "browser_cdp_process_memory_sum": {
+        "rss_bytes": 728248320,
+        "private_bytes": 389689344
+      },
+      "browser_cdp_process_count": 9,
+      "shelf_js_heap": {
+        "usedSize": 4417472,
+        "totalSize": 10625024,
+        "embedderHeapUsedSize": 4591912,
+        "backingStorageSize": 204092
+      }
+    },
+    {
+      "label": "closed_cycle_12",
+      "seconds": 32.875,
+      "worker": {
+        "event": "runtime_resources",
+        "pid": 4400,
+        "disk_free_bytes": 32437866496,
+        "memory_total_bytes": 17174360064,
+        "memory_available_bytes": 13624356864,
+        "commit_limit_bytes": 20261367808,
+        "commit_available_bytes": 16973611008,
+        "process_rss_bytes": 39247872,
+        "process_peak_rss_bytes": 40079360,
+        "process_private_bytes": 26583040,
+        "process_cpu_seconds": 1.640625,
+        "python_threads": 3
+      },
+      "media_lane": {
+        "completed": 34,
+        "busy": 0,
+        "active": 0,
+        "p50_ms": 79,
+        "p95_ms": 125,
+        "p99_ms": 125,
+        "worst_ms": 141
+      },
+      "active_leases": 0,
+      "browser_cdp_process_memory_sum": {
+        "rss_bytes": 732975104,
+        "private_bytes": 394838016
+      },
+      "browser_cdp_process_count": 9,
+      "shelf_js_heap": {
+        "usedSize": 4650836,
+        "totalSize": 10625024,
+        "embedderHeapUsedSize": 4595040,
+        "backingStorageSize": 205765
+      }
+    },
+    {
+      "label": "idle_start",
+      "seconds": 41.984,
+      "worker": {
+        "event": "runtime_resources",
+        "pid": 4400,
+        "disk_free_bytes": 32490618880,
+        "memory_total_bytes": 17174360064,
+        "memory_available_bytes": 13622714368,
+        "commit_limit_bytes": 20261367808,
+        "commit_available_bytes": 16970928128,
+        "process_rss_bytes": 39436288,
+        "process_peak_rss_bytes": 40079360,
+        "process_private_bytes": 26767360,
+        "process_cpu_seconds": 1.796875,
+        "python_threads": 3
+      },
+      "media_lane": {
+        "completed": 49,
+        "busy": 0,
+        "active": 0,
+        "p50_ms": 78,
+        "p95_ms": 125,
+        "p99_ms": 125,
+        "worst_ms": 141
+      },
+      "active_leases": 0,
+      "browser_cdp_process_memory_sum": {
+        "rss_bytes": 753999872,
+        "private_bytes": 417046528
+      },
+      "browser_cdp_process_count": 9,
+      "shelf_js_heap": {
+        "usedSize": 5657264,
+        "totalSize": 7217152,
+        "embedderHeapUsedSize": 5166656,
+        "backingStorageSize": 240394
+      }
+    },
+    {
+      "label": "idle",
+      "seconds": 52.047,
+      "worker": {
+        "event": "runtime_resources",
+        "pid": 4400,
+        "disk_free_bytes": 32495583232,
+        "memory_total_bytes": 17174360064,
+        "memory_available_bytes": 13717970944,
+        "commit_limit_bytes": 20261367808,
+        "commit_available_bytes": 17070325760,
+        "process_rss_bytes": 39440384,
+        "process_peak_rss_bytes": 40079360,
+        "process_private_bytes": 26771456,
+        "process_cpu_seconds": 1.796875,
+        "python_threads": 3
+      },
+      "media_lane": {
+        "completed": 49,
+        "busy": 0,
+        "active": 0,
+        "p50_ms": 78,
+        "p95_ms": 125,
+        "p99_ms": 125,
+        "worst_ms": 141
+      },
+      "active_leases": 0,
+      "browser_cdp_process_memory_sum": {
+        "rss_bytes": 673099776,
+        "private_bytes": 339804160
+      },
+      "browser_cdp_process_count": 9,
+      "shelf_js_heap": {
+        "usedSize": 4523684,
+        "totalSize": 5382144,
+        "embedderHeapUsedSize": 2482552,
+        "backingStorageSize": 235473
+      }
+    },
+    {
+      "label": "idle",
+      "seconds": 62.093,
+      "worker": {
+        "event": "runtime_resources",
+        "pid": 4400,
+        "disk_free_bytes": 32495550464,
+        "memory_total_bytes": 17174360064,
+        "memory_available_bytes": 13732106240,
+        "commit_limit_bytes": 20261367808,
+        "commit_available_bytes": 17068945408,
+        "process_rss_bytes": 39387136,
+        "process_peak_rss_bytes": 40079360,
+        "process_private_bytes": 26669056,
+        "process_cpu_seconds": 1.828125,
+        "python_threads": 3
+      },
+      "media_lane": {
+        "completed": 49,
+        "busy": 0,
+        "active": 0,
+        "p50_ms": 78,
+        "p95_ms": 125,
+        "p99_ms": 125,
+        "worst_ms": 141
+      },
+      "active_leases": 0,
+      "browser_cdp_process_memory_sum": {
+        "rss_bytes": 671711232,
+        "private_bytes": 338591744
+      },
+      "browser_cdp_process_count": 9,
+      "shelf_js_heap": {
+        "usedSize": 4134944,
+        "totalSize": 5120000,
+        "embedderHeapUsedSize": 2482552,
+        "backingStorageSize": 238241
+      }
+    },
+    {
+      "label": "idle",
+      "seconds": 72.031,
+      "worker": {
+        "event": "runtime_resources",
+        "pid": 4400,
+        "disk_free_bytes": 32495050752,
+        "memory_total_bytes": 17174360064,
+        "memory_available_bytes": 13732024320,
+        "commit_limit_bytes": 20261367808,
+        "commit_available_bytes": 17070755840,
+        "process_rss_bytes": 39370752,
+        "process_peak_rss_bytes": 40079360,
+        "process_private_bytes": 26673152,
+        "process_cpu_seconds": 1.84375,
+        "python_threads": 3
+      },
+      "media_lane": {
+        "completed": 49,
+        "busy": 0,
+        "active": 0,
+        "p50_ms": 78,
+        "p95_ms": 125,
+        "p99_ms": 125,
+        "worst_ms": 141
+      },
+      "active_leases": 0,
+      "browser_cdp_process_memory_sum": {
+        "rss_bytes": 671125504,
+        "private_bytes": 338493440
+      },
+      "browser_cdp_process_count": 9,
+      "shelf_js_heap": {
+        "usedSize": 4611660,
+        "totalSize": 5644288,
+        "embedderHeapUsedSize": 2553536,
+        "backingStorageSize": 241010
+      }
+    },
+    {
+      "label": "replayed_and_browsed_after_idle",
+      "seconds": 72.656,
+      "worker": {
+        "event": "runtime_resources",
+        "pid": 4400,
+        "disk_free_bytes": 32495001600,
+        "memory_total_bytes": 17174360064,
+        "memory_available_bytes": 13687504896,
+        "commit_limit_bytes": 20261367808,
+        "commit_available_bytes": 17022111744,
+        "process_rss_bytes": 39440384,
+        "process_peak_rss_bytes": 40079360,
+        "process_private_bytes": 26787840,
+        "process_cpu_seconds": 1.890625,
+        "python_threads": 5
+      },
+      "media_lane": {
+        "completed": 50,
+        "busy": 0,
+        "active": 0,
+        "p50_ms": 78,
+        "p95_ms": 125,
+        "p99_ms": 125,
+        "worst_ms": 141
+      },
+      "active_leases": 0,
+      "browser_cdp_process_memory_sum": {
+        "rss_bytes": 715714560,
+        "private_bytes": 377016320
+      },
+      "browser_cdp_process_count": 9,
+      "shelf_js_heap": {
+        "usedSize": 4527928,
+        "totalSize": 6430720,
+        "embedderHeapUsedSize": 3815424,
+        "backingStorageSize": 239391
+      }
+    }
+  ],
+  "scope": "Actual packaged Windows worker, Chrome extension, native messaging; disposable preapproved synthetic folder, not owner machine or picker acceptance",
+  "mp4_bytes": 31180283,
+  "installed_pair": {
+    "installer_sha256": "3f0b155ec22012c8629feef28d494d3fcfaefe8d255505a31a485c608ee865ed",
+    "installed_worker_sha256": "3f0b155ec22012c8629feef28d494d3fcfaefe8d255505a31a485c608ee865ed",
+    "native_helper_sha256": "65aa63a3d2cea5602b084a97d2b16f5c21a9e31d16eb2218b8cb5617f02e703b",
+    "consent": "DPAPI provisioned synthetic approved root; Shell picker not tested",
+    "native_messaging": "genuine Chrome/native-host/worker"
+  },
+  "browser": "156.0.8078.80",
+  "idle_wall_seconds": 30.047,
+  "page_errors": [],
+  "duration_seconds": 72.672,
+  "memory_scope": "Worker is a separate packaged process only for installed transport. Browser memory sums CDP-visible processes; RSS can double count shared pages. Windows private bytes are separately reported. No forced garbage collection or working-set trimming.",
+  "source_commit": "07cd88d143ec32d53bc65dec44b1d400e4736f15"
+}
