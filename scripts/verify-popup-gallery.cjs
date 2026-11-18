@@ -48,15 +48,25 @@ class Element {
   const dial=new Element(),label=new Element(),size=new Element(),status=new Element(),grid=new Element(),body=new Element();
   dial.value="0";size.value="half";
   const mapped={"#gallery-density":dial,"#gallery-density-value":label,"#shelf-viewer-size":size,"#status":status,"#files":grid,"#chutey-popup-gallery":new Element(),".topbar .actions":new Element()};
-  const rows=[],settingWrites=[],sessionWrites=[],created=[];let opened=0,closed=0;
+  const rows=[],settingWrites=[],sessionWrites=[],created=[],copyCalls=[];let opened=0,closed=0,clipboardOk=true;
   const document={body,querySelector:key=>mapped[key]||null,
     querySelectorAll:()=>rows,addEventListener(){},
     createElement(){const node=new Element();created.push(node);return node;}};
   const chrome={storage:{sync:{get:async()=>({chutePopupGridStep:0,chuteShelfViewerSize:"half"}),set:async x=>settingWrites.push(x)},
     session:{set:async x=>sessionWrites.push(x)},onChanged:{addListener(){}}},
     tabs:{query:async()=>[{windowId:19}]},sidePanel:{open:async()=>{opened++;}}};
-  const context={document,chrome,location:{pathname:"/popup.html"},
-    window:{close(){closed++;},addEventListener(){}},queueMicrotask,
+  const context={document,chrome,location:{pathname:"/popup.html"},innerWidth:390,innerHeight:590,
+    window:{close(){closed++;},addEventListener(){},ChuteyExplorerAPI:{
+      nativeSession:async()=>({ok:true}),
+      command:async(command,args)=>{
+        copyCalls.push({command,args});
+        if(command==="locate_saved")return {handle:"signed-saved-handle",identity:"unchanged-image-identity"};
+        if(command==="clipboard_copy_image")return clipboardOk
+          ? {state:"COPIED",kind:"windows_image_pixels",verified:true}
+          : {state:"FAILED",kind:"windows_image_pixels",verified:false};
+        throw Error("Unexpected clipboard command: "+command);
+      }
+    }},queueMicrotask,
     getComputedStyle:()=>({paddingLeft:"0",paddingRight:"0",columnGap:"6"}),
     MutationObserver:class{observe(){}},selectedDay:"",currentPage:0,
     fileUrl:file=>"http://127.0.0.1:17891/api/files/"+file.id,
@@ -81,6 +91,39 @@ class Element {
 
   const lightbox=created[0];assert.equal(lightbox.hidden,false);
   assert.equal(opened,0,"Picture opens the local preview only");
+  // Popup tile and expanded preview must both copy original image pixels to the
+  // verified Windows clipboard without deleting the file or closing the preview.
+  const menu=created.find(node=>node.className==="chutey-popup-menu");
+  assert(menu,"Popup action menu must exist");
+  const copyButton=menu.querySelector('[data-action="copy-image"]');
+  const trashButton=menu.querySelector('[data-action="trash"]');
+  assert(trashButton,"Trash It! remains a separate action");
+  const rightClick={clientX:25,clientY:35,target:row,preventDefault(){},stopPropagation(){}};
+  row.handlers.contextmenu(rightClick);
+  assert.equal(menu.hidden,false,"Right-click tile opens menu");
+  assert.equal(copyButton.hidden,false,"Copy Image is visible for saved images");
+  await copyButton.handlers.click();
+  assert.equal(copyCalls[0].command,"locate_saved");
+  assert.equal(copyCalls[0].args.id,file.id);
+  assert.equal(copyCalls[1].command,"clipboard_copy_image");
+  assert.equal(copyCalls[1].args.user_gesture,true);
+  assert.equal(copyCalls[1].args.handle,"signed-saved-handle");
+  assert.equal(copyCalls[1].args.identity,"unchanged-image-identity");
+  assert.match(menu.querySelector("small").textContent,/copied/i);
+  assert.equal(lightbox.hidden,false,"Copy does not close preview");
+  assert.equal(trashButton.disabled,false,"Trash button remains usable after copy");
+  lightbox.handlers.contextmenu({...rightClick,target:lightbox.querySelector(".chutey-lightbox-image")});
+  await copyButton.handlers.click();
+  assert.equal(copyCalls.filter(call=>call.command==="clipboard_copy_image").length,2,
+    "Expanded popup uses same verified copy API");
+  assert.equal(lightbox.hidden,false,"Expanded Copy leaves preview open");
+  clipboardOk=false;
+  row.handlers.contextmenu(rightClick);
+  await copyButton.handlers.click();
+  assert.match(menu.querySelector("small").textContent,/did not verify/i);
+  assert.doesNotMatch(menu.querySelector("small").textContent,/pixels copied/i,
+    "Unverified clipboard operation cannot claim success");
+  clipboardOk=true;
   assert.equal(lightbox.querySelector(".chutey-lightbox-image").src,context.fileUrl(file));
   await lightbox.querySelector(".chutey-lightbox-shelf").handlers.click();
   assert.equal(opened,1);assert.equal(closed,1);assert.equal(sessionWrites.length,1);
