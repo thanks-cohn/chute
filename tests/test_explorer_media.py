@@ -156,6 +156,42 @@ class MediaAPITests(unittest.TestCase):
         self.assertTrue(handler.close_connection)
         if before is not None:self.assertEqual(len(os.listdir('/proc/self/fd')),before)
 
+    def test_media_partial_sends_preserve_bytes_across_timeout(self):
+        from types import SimpleNamespace
+        writes=[];timeouts=[];calls=[]
+        source={'revoked':False,'expires':float('inf')}
+        def send(data):
+            calls.append(True)
+            if len(calls)==2:raise socket.timeout('Backpressure')
+            count=3 if len(calls)==1 else len(data)
+            writes.append(bytes(data[:count]))
+            if len(calls)==3:source['revoked']=True
+            return count
+        connection=SimpleNamespace(settimeout=timeouts.append,send=send)
+        handler=SimpleNamespace(command='GET',headers={'Origin':ORIGIN},connection=connection,
+                                send_response=lambda *a:None,send_header=lambda *a:None,
+                                end_headers=lambda:None,wfile=None,close_connection=False)
+        self.adapter.content(handler,{key:self.row[key] for key in ('handle','identity')},media=source)
+        self.assertEqual(b''.join(writes),b'0123456789'+b'\0'*(262144-10))
+        self.assertEqual(len(calls),3)
+        self.assertIn(.2,timeouts)
+        self.assertTrue(handler.close_connection)
+        self.assertFalse(source['connections'])
+
+    def test_media_sender_retains_fifteen_second_no_progress_deadline(self):
+        from types import SimpleNamespace
+        from unittest.mock import patch
+        clock=[0.0];calls=[]
+        def send(data):
+            calls.append(True);clock[0]+=8
+            raise socket.timeout('Backpressure')
+        handler=SimpleNamespace(headers={'Origin':ORIGIN},close_connection=False,
+                                connection=SimpleNamespace(settimeout=lambda _:None,send=send))
+        with patch('chute.explorer.api.time.monotonic',side_effect=lambda:clock[0]):
+            with self.assertRaises(socket.timeout):
+                self.adapter._write_media_chunk(handler,{'revoked':False,'expires':float('inf')},b'unchanged')
+        self.assertEqual(len(calls),2)
+
     def blocked_media_reader(self,source):
         """An authorized browser that receives headers, then stops consuming."""
         client=socket.socket()

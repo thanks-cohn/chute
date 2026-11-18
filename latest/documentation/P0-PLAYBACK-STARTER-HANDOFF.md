@@ -18,6 +18,11 @@ and memory defects; it does not implement its deferred UI redesign.
 * Explicit release/revocation shuts down active media sockets. Previously a
   non-reading client could hold both media admission slots until a blocked send's
   15-second timeout, even after release acknowledged. A fresh video then got BUSY.
+  The first Windows CI gate demonstrated that shutdown alone does not reliably
+  wake Winsock's blocked sendall. Media body writes now use single partial sends
+  with 200 ms cancellation checks and a 15-second no-progress deadline; only
+  acknowledged bytes advance the buffer. This keeps backpressure bounded and
+  avoids resending a partial chunk after a timeout.
   File descriptors and admission counters still close through their existing
   finally blocks. Limits, authentication, file identities and folder consent are
   preserved.

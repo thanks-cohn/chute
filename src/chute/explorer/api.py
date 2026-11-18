@@ -87,6 +87,34 @@ class ExplorerAPI:
             with self.media_lock:
                 media['connections'].pop(id(connection),None)
 
+    def _media_stopped(self,handler,media):
+        if media['revoked'] or self.media_context['revoked'] or time.monotonic()>=media['expires']:
+            revoked=media['revoked'] or self.media_context['revoked']
+            media['last_get']={'status':403 if revoked else 400,
+                               'code':'UNAUTHORIZED' if revoked else 'STREAM_EXPIRED',
+                               'origin_present':bool(handler.headers.get('Origin'))}
+            handler.close_connection=True
+            return True
+        return False
+
+    def _write_media_chunk(self,handler,media,data):
+        # SocketWriter.write uses sendall, which can remain blocked after a
+        # cross-thread shutdown on Windows. Single sends expose partial progress
+        # and permit cancellation between bounded waits without resending bytes.
+        handler.connection.settimeout(.2)
+        pending=memoryview(data)
+        deadline=time.monotonic()+15
+        while pending:
+            if self._media_stopped(handler,media):return False
+            try:sent=handler.connection.send(pending)
+            except socket.timeout:
+                if time.monotonic()>=deadline:raise
+                continue
+            if not sent:raise ConnectionResetError('Media connection stopped accepting bytes.')
+            pending=pending[sent:]
+            deadline=time.monotonic()+15
+        return True
+
     def _performance(self,handler):
         with handler.server.performance_lock:
             if not hasattr(handler.server,'performance'):
@@ -508,14 +536,13 @@ class ExplorerAPI:
             os.lseek(fd, start, os.SEEK_SET)
             remaining = end - start
             while remaining:
-                if media and (media["revoked"] or self.media_context["revoked"] or time.monotonic() >= media["expires"]):
-                    media['last_get']={'status':403 if media['revoked'] or self.media_context['revoked'] else 400,'code':'UNAUTHORIZED' if media['revoked'] or self.media_context['revoked'] else 'STREAM_EXPIRED','origin_present':bool(handler.headers.get('Origin'))}
-                    handler.close_connection = True
-                    return
+                if media and self._media_stopped(handler,media):return
                 if not media:self.session.authorize(handler.headers.get("Origin", ""), authorization or handler.headers.get("Authorization", ""))
                 data = os.read(fd, min(262144, remaining))
                 if not data:
                     handler.close_connection=True
                     raise ExplorerError("FILE_CHANGED","Media ended before the promised byte count.")
-                handler.wfile.write(data)
+                if media and hasattr(handler.connection,'send'):
+                    if not self._write_media_chunk(handler,media,data):return
+                else:handler.wfile.write(data)
                 remaining -= len(data)
