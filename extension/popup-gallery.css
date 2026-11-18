@@ -290,3 +290,6 @@ html:has(.chutey-lightbox-open) { overflow:hidden; }
 .chutey-lightbox-player video,.chutey-lightbox-player audio { width:100%; max-height:420px; }
 #chutey-popup-gallery[hidden] { display:none; }
 .chutey-lightbox-player { width:100%; }
+
+/* Identifiable, experimental Copy Image build. Other installed Chutey editions retain their colors. */
+.chutey-gallery-popup .chutey-copy-test-mark { color:#bba0ff; font-weight:700; letter-spacing:.025em; }
