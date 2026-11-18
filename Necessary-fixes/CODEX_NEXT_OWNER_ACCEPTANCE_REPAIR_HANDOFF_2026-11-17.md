@@ -56,20 +56,20 @@
 - Three independent UI surfaces: **Extension popup image click** = preserve enlargement; **Shelf File Explorer image click** = expand internal preview pane; **Shelf History Open BUTTON** = reveal Windows local saved location by default, subject to Shelf-specific Settings. Shelf History image clicks remain unchanged. Do not mix these with popup Copy Image.
 - Reference: Necessary-fixes/POPUP_SHELF_COPY_IMAGE_AND_SHELF_OPEN_DEFAULT_2026-11-17.md
 
-## Workstream P1-B — Simple independent TOP-LAYER preview resize + click-to-navigate (OWNER'S FINAL RULE)
+## Workstream P1-B — Bottom-anchored STACKED PREVIEW SHEETS: drag TOP edges, collapse/restore, X-only close + focused arrows (LATEST OWNER CLARIFICATION)
 
-**No shared image/video splitter, no complex layout choreography.** Image/document preview and pinned video preview are just TWO independently sized **TOP-LAYER overlays** in Shelf File Explorer, each with its own visible draggable edge/divider. Either overlay can take up **the ENTIRE Shelf height**, beyond ordinary toolbar/file-list/workspace limitations. Each edge moves from compact to 100% height without resizing the other pane. Remember both custom sizes. Provide a straightforward way to retract a panel and access the Shelf beneath; avoid hidden grips, click-through, and arbitrary fixed height clamps.
+**Geometry:** The File Explorer is the base layer, **image/document preview** is a **bottom-anchored sheet** over it, and **pinned video** is a **bottom-anchored sheet** over the image. Each sheet has its own **TOP horizontal draggable handle** and independent height (0–100% of entire Shelf). They are NOT a coupled split screen or a system of two top-anchored panels. No arbitrary fixed height cap at toolbar/file list/workspace boundaries.
 
-**Keyboard behavior is controlled by one click on the preview pane itself:**
-- Click IMAGE/DOCUMENT preview → Left/Right goes through only **non-video previewable** files in the currently browsed directory, respecting display ordering/filter/pagination. SKIP videos.
-- Click VIDEO preview → Left/Right goes through only **video** files in the currently browsed directory, respecting display ordering/filter/pagination. SKIP images/documents.
-- Only last-focused pane's gallery navigates. Ordinary file list/search/menu keyboard controls and focused native media seek/volume must remain functional.
+- Pull **video TOP handle UP** → video grows over image to full Shelf. Pull video TOP handle DOWN to BOTTOM → video collapses and reveals the image underneath. **The collapsed video's handle remains at the bottom; drag it UP again to restore the SAME player and playback state.**
+- Pull **image TOP handle UP** → image grows over File Explorer to full Shelf, provided video is collapsed. Pull image TOP handle DOWN to BOTTOM → image collapses and reveals File Explorer. Keep its handle available for dragging back up; same image state remains.
+- **Dragging/collapsing does not CLOSE anything. ONLY the individual panel's X button closes it.** Video X closes and releases its stream/ticket; mere video collapse preserves the current player, lease, playback position and stream. Image X closes its preview. An explicit Stop command, if present, stops playback rather than being silently triggered by resizing.
+- Heights are independently remembered. The video is simply the topmost sheet, image below, Explorer at base—do not invent elaborate front/back choreography. Leave grab handles accessible even at 0% and ensure users can retract overlays to use underlying Explorer.
+- Click IMAGE sheet then Left/Right → navigate **non-video** previewable files in the CURRENT folder, skipping videos; click VIDEO sheet then Left/Right → navigate **video** files only, skipping images/documents. Use sorted/filtered/paged folder listing. Do not hijack keyboard arrows from focused native video seek/volume controls.
+- Resize and gallery navigation must not spawn duplicate player/ticket instances, restart video on image changes, mutate grants or launch Windows Explorer from a Chutey File Explorer click.
 
-Resizing, focusing or changing an image must not restart or destroy video playback. Keep one pinned player/ticket, release superseded ticket on video switching, preserve separate image state, maintain approved-folder boundaries. Clicking file rows opens internal preview, never Windows Explorer automatically.
+**Exact acceptance scenario:** image top handle at Shelf TOP, video top handle at Shelf BOTTOM = **image owns 100% of Shelf**. Drag the video handle upward again = video slides back over the image, without fresh open/seek reset. Drag it down again = image is visible, video is still not CLOSED. Only video X closes/releases its ticket. Independently collapse/restore image to access the File Explorer underneath.
 
-**Acceptance:** Drag either preview grip from small to FULL Shelf height, without automatically changing the other size. Click top preview then arrows navigate JPG→PNG→PDF; click bottom video then arrows navigate MP4→WebM. Video keeps playing while image pane resizes, overlays return to Explorer with an obvious retract action.
-
-**References:** https://github.com/thanks-cohn/chute/issues/30 and Necessary-fixes/FOCUSED_PREVIEW_NAVIGATION_TOP_NONVIDEO_BOTTOM_VIDEO_LEFT_RIGHT_2026-11-17.md. This rule supersedes all earlier instructions describing a common splitter, forced 50/50, or special pane-stacking animations.
+**Reference:** https://github.com/thanks-cohn/chute/issues/30 and Necessary-fixes/FOCUSED_PREVIEW_NAVIGATION_TOP_NONVIDEO_BOTTOM_VIDEO_LEFT_RIGHT_2026-11-17.md. This overrides all previous vague "top-layer" or shared split-divider instructions.
 
 ## Workstream P1-C — Compact More menu instead of clipboard row
 - Remove full permanent six-button Copy toolbar, its divider and consumed height at every window size.
