@@ -42,7 +42,7 @@ class Element {
   querySelectorAll(){return [];}
   setAttribute(k,v){this.attributes[k]=v;}
   removeAttribute(k){delete this.attributes[k];}
-  remove(){} append(){} before(){} prepend(){} replaceChildren(){} focus(){} getBoundingClientRect(){return {bottom:150};}
+  remove(){} append(){} before(){} prepend(){} replaceChildren(){} focus(){} contains(node){return node===this;} getBoundingClientRect(){return {bottom:150};}
 }
 (async()=>{
   const dial=new Element(),label=new Element(),size=new Element(),status=new Element(),grid=new Element(),body=new Element();
@@ -56,7 +56,7 @@ class Element {
     session:{set:async x=>sessionWrites.push(x)},onChanged:{addListener(){}}},
     tabs:{query:async()=>[{windowId:19}]},sidePanel:{open:async()=>{opened++;}}};
   const context={document,chrome,location:{pathname:"/popup.html"},innerWidth:390,innerHeight:590,
-    window:{close(){closed++;},addEventListener(){},ChuteyExplorerAPI:{
+    clearTimeout,setTimeout,window:{close(){closed++;},addEventListener(){},ChuteyExplorerAPI:{
       nativeSession:async()=>({ok:true}),
       command:async(command,args)=>{
         copyCalls.push({command,args});
