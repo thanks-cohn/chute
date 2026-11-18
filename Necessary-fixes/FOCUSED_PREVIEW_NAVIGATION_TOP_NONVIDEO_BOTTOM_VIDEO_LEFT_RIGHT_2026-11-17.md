@@ -8,7 +8,7 @@
 
 > "the bottom video panel, when clicked should be able to go left and right as well BUT it does this for the videos inside the directory, the top one simply does regular iteration and skips over video, to go thru the videos in a directory you just click the bottom video panel once and then use the left and right arrow keys"
 
-The TWO preview panels are **bottom-anchored STACKED SHEETS** over File Explorer: image/document sheet below, video sheet above. Each sheet has its OWN **draggable TOP-edge handle** and can expand to 100% of the Shelf height. Dragging that TOP edge DOWN to the Shelf bottom **COLLAPSES BUT DOES NOT CLOSE** the panel; the grabber remains accessible, and dragging UP re-expands the SAME panel. **Only X closes**; collapsing video must retain playback, position and media ticket. Do not build a shared 50/50 splitter. Each sheet has **independent, click-to-focus keyboard gallery navigation**. The user should never need to move the mouse to each file or open Windows Explorer just to advance within a category.
+The two previews are arranged **IMAGE/DOCUMENT ON TOP and VIDEO ON BOTTOM**, each a separate overlay/panel in Shelf File Explorer. **Both TOP and BOTTOM edges of EACH preview can be independently dragged** for any custom size, up to full Shelf height. Do NOT stack video above the image, anchor both at Shelf bottom, or couple them as a fixed 50/50 splitter. Dragging a preview down to zero visible height **COLLAPSES but does not close** it: its grabber remains accessible, and resizing back restores the SAME panel. **Only X closes**; collapsing video preserves playback, position and ticket. Each panel has **independent, click-to-focus keyboard gallery navigation**. The user should never need to move the mouse to each file or open Windows Explorer just to advance within a category.
 
 | Where user clicks to activate | ArrowLeft | ArrowRight | Which files count |
 |---|---|---|---|
@@ -28,7 +28,7 @@ The TWO preview panels are **bottom-anchored STACKED SHEETS** over File Explorer
 8. Typing in search, editing names, menu use, keyboard-focused splitter, native media controls, or another UI surface must keep their normal key meanings. Do not hijack Ctrl/Shift/Alt combinations unexpectedly.
 9. The top pane should skip video files even when they're present in the same sorted directory; it can preview ordinary non-video image/text/PDF types as supported. Do not silently introduce a new policy for audio files without examining existing behavior; the requested video gallery is video-only.
 10. If the current directory changes while a video remains pinned, its existing video can keep playing as already designed. Left/Right gallery navigation should use an explicitly defined directory scope (the current directory) and never silently jump into another directory or create arbitrary grants. If the current playing file is not in the current directory, choose a predictable first eligible video in the displayed order and show the behavior. No cross-directory traversal.
-11. Works whether sheets are compact, half-size, overlapping or expanded to **full Shelf height**. Each **BOTTOM-ANCHORED** sheet's **TOP edge** is dragged independently. Video top edge at Shelf bottom = video collapsed, image visible. Drag video grabber UP again = same video restored. Image top edge at Shelf top + collapsed video = full-height image. Dragging never closes either; ONLY the individual X closes. Preserve active video playback and ticket across collapse/restore.
+11. Works whether panels are compact, half-size, overlapping or each expanded to **full Shelf height**. The **IMAGE panel is ABOVE and VIDEO panel BELOW**. Both the TOP and BOTTOM edges of each can be dragged to set size independently; no shared splitter. With video collapsed and image enlarged, image can fill Shelf. Restore video by dragging its still-visible edge: the same playback survives. Dragging never closes; ONLY an individual X closes. Keep handles accessible at extremes.
 
 12. Maintain keyboard accessibility; show visible Previous/Next arrow actions in the pinned player as an alternative to shortcuts, plus a status (e.g. Video 2 of 6), with disabled boundaries. Top preview controls have their own separate state.
 
@@ -50,7 +50,7 @@ The TWO preview panels are **bottom-anchored STACKED SHEETS** over File Explorer
 
 ## Related required work
 
-- Issue #30 — **two bottom-anchored stacked sheets**, each with its own **top-edge** grabber from 0–100% Shelf height; dragging to bottom collapses but doesn't close; drag up restores; only X closes; click pane and Left/Right navigates its file category.
+- Issue #30 — top IMAGE/document preview, bottom VIDEO preview; EACH has draggable top/bottom edges, can independently occupy the full Shelf, and can collapse/re-expand without closing; only X closes; click panel and Left/Right navigates its file category.
 - Necessary-fixes/FILE_EXPLORER_CLICK_PREVIEWS_HISTORY_CLICK_REVEALS_LOCATION_2026-11-17.md.
 - Necessary-fixes/EXPLORER_PREVIEW_GENERIC_UNSUPPORTED_OR_OVERSIZE_ERRORS_2026-11-17.md.
 - P0 owner-stalled 10-second MP4 and memory/resource growth investigation.
