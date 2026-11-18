@@ -236,30 +236,79 @@
   const menu = document.createElement("div");
   menu.className = "chutey-popup-menu"; menu.hidden = true;
   menu.setAttribute("role","menu"); menu.setAttribute("aria-label","Item actions");
-  menu.innerHTML = '<button type="button" role="menuitem"><span aria-hidden="true">♜</span> Trash It!</button><small></small>';
-  menu.querySelector("span").textContent = "🗑";
+  menu.innerHTML = '<button type="button" role="menuitem" data-action="copy-image">🖼 Copy Image</button>' +
+    '<button type="button" role="menuitem" data-action="trash">🗑 Trash It!</button>' +
+    '<small role="status" aria-live="polite"></small>';
   document.body.append(menu);
+  const copyImage = menu.querySelector('[data-action="copy-image"]');
+  const trashItem = menu.querySelector('[data-action="trash"]');
+  const menuStatus = menu.querySelector("small");
   let menuFile = null, menuReturn = null;
-  function dismissMenu() { menu.hidden = true; if (menuReturn?.isConnected) menuReturn.focus({preventScroll:true}); }
+  function dismissMenu() {
+    menu.hidden = true;
+    if (menuReturn?.isConnected) menuReturn.focus({preventScroll:true});
+  }
   function openMenu(event,file,row) {
     event.preventDefault(); event.stopPropagation();
-    menuFile = file; menuReturn = row; menu.hidden = false;
-    menu.querySelector("small").textContent = file.active ? "Live only · kept in dated History" : "Hide here only · History unchanged";
+    menuFile = file; menuReturn = lightbox.hidden ? row : lightbox; menu.hidden = false;
+    copyImage.hidden = !isPreviewableImage(file) || Boolean(file.__local);
+    copyImage.textContent = "🖼 Copy Image";
+    menuStatus.textContent = file.active ? "Live only · kept in dated History" : "Hide here only · History unchanged";
     const box = row.getBoundingClientRect();
     menu.style.left = Math.max(4,Math.min(innerWidth-226,event.clientX || box.left)) + "px";
-    menu.style.top = Math.max(4,Math.min(innerHeight-95,event.clientY || box.top)) + "px";
-    menu.querySelector("button").focus();
+    menu.style.top = Math.max(4,Math.min(innerHeight-(copyImage.hidden?95:133),event.clientY || box.top)) + "px";
+    (copyImage.hidden ? trashItem : copyImage).focus();
   }
   lightbox.addEventListener("contextmenu",event => {
     if(reader.contains(event.target))return;
     const file = activeFile(), row = imageTiles().find(tile => tile.__galleryFile.id === activeId);
-    if (file && row && !file.__local) openMenu(event,file,row);
+    if (file && row && !file.__local) openMenu(event,file,lightbox);
+  });
+  lightbox.addEventListener("keydown",event => {
+    if (event.key !== "ContextMenu" && !(event.shiftKey && event.key === "F10")) return;
+    const file = activeFile();
+    if (file && !file.__local) openMenu(event,file,lightbox);
   });
   document.addEventListener("pointerdown",event => { if (!menu.hidden && !menu.contains(event.target)) dismissMenu(); },true);
   document.addEventListener("keydown",event => { if (event.key === "Escape" && !menu.hidden) { event.preventDefault(); event.stopImmediatePropagation(); dismissMenu(); } },true);
-  menu.querySelector("button").addEventListener("click",async () => {
+
+  // A real Windows clipboard pixel copy, not a URL, path or thumbnail.
+  // Reuse the authenticated, guarded native clipboard API and require its verified receipt.
+  copyImage.addEventListener("click",async () => {
+    const file = menuFile;
+    if (!file || file.__local || !isPreviewableImage(file)) return;
+    copyImage.disabled = true; trashItem.disabled = true;
+    menuStatus.textContent = "Copying original image pixels…";
+    try {
+      const transport = window.ChuteyExplorerAPI;
+      if (!transport) throw Error("Copy Image needs the matching Windows companion.");
+      await transport.nativeSession(false);
+      const row = await transport.command("locate_saved",{id:file.id});
+      if (typeof row?.handle !== "string" || typeof row?.identity !== "string")
+        throw Error("The saved image could not be located. Refresh History and retry.");
+      const receipt = await transport.command("clipboard_copy_image",{
+        handle:row.handle,identity:row.identity,user_gesture:true
+      });
+      if (receipt?.state !== "COPIED" || receipt.kind !== "windows_image_pixels" || receipt.verified !== true)
+        throw Error("Windows did not verify the image clipboard write. Please retry.");
+      if (menuFile === file) {
+        copyImage.textContent = "✓ Copied Image";
+        menuStatus.textContent = "Original image pixels copied. Paste into Paint or another app.";
+        if (popupStatus) popupStatus.textContent = "Copied Image to Windows clipboard.";
+      }
+    } catch (error) {
+      if (menuFile === file) {
+        copyImage.textContent = "🖼 Copy Image";
+        menuStatus.textContent = error?.message || "Could not copy image pixels. Retry.";
+      }
+    } finally {
+      copyImage.disabled = false; trashItem.disabled = false;
+    }
+  });
+
+  trashItem.addEventListener("click",async () => {
     const file = menuFile; if (!file) return;
-    const button = menu.querySelector("button"); button.disabled = true;
+    trashItem.disabled = true;
     try {
       if (file.active) {
         await api("/api/files/"+encodeURIComponent(file.id),{method:"DELETE"});
@@ -268,8 +317,8 @@
       dismissMenu(); closePreview();
       await resetHistory();
       imageTiles()[0]?.focus({preventScroll:true});
-    } catch (error) { menu.querySelector("small").textContent = error.message || "Could not remove. Retry."; }
-    finally { button.disabled = false; }
+    } catch (error) { menuStatus.textContent = error.message || "Could not remove. Retry."; }
+    finally { trashItem.disabled = false; }
   });
 
   // Explicit local browsing is scoped by the same native enrollment and grants
