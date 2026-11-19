@@ -11,8 +11,10 @@
 
 1. **Popup Copy Image is much too slow:** Chutey shows `Copying original image pixels…` for far longer than Chrome's native right-click `Copy image`. It does eventually copy, but the owner expects near-native speed, not a noticeable Python/worker pipeline delay.
 2. **Two draggable preview boundaries are missing:** The upper image/document pane and bottom video pane must form ONE bounded vertical stack in the Shelf File Explorer. BOTH edges must move to the **absolute top and absolute bottom of the entire available Shelf preview area**, without old 90/120/220px or toolbar/workspace caps; no overlays or independent overlapping rectangles.
-3. **Single-click image should open in Chutey:** Clicking an image file in the Shelf File Explorer currently just selects it when the preview is closed. A single click must show that image in **the internal upper preview pane**, not launch the operating-system file viewer.
+3. **Opening semantics — latest owner correction:** **Double-click** an image/video/file in Chutey File Explorer opens the supported media **inside Chutey's preview**. **Right-click → Open Native** launches the file in the Windows-associated native application. Single-click may select/focus the file; it is **not** the command for native Open. Keep **Reveal / GO TO** as a separate file-location action.
 4. **Selecting a folder automatically enables media playback:** Once the user has explicitly selected/authorized a folder in Chutey, that authorized folder should immediately be usable for image, audio and video browsing/preview/playback without a **second approval/prompt/picker** just for playback. **Automatic media-ready folder behavior is the default ON**, with a Settings toggle so the user can turn it OFF. Do not silently enlarge access to non-selected folders or grant write access.
+
+5. **New crash report, Nov 18 (P0):** The owner reports that this very Chutey TEST version crashed today. Root cause and exact failing process remain unknown. Treat as an urgent investigation requiring diagnostics, controlled reproduction and regression coverage; see [Issue #32](https://github.com/thanks-cohn/chute/issues/32).
 
 ## A. Fast native-feeling Copy Image — small Chrome extension popup
 
@@ -61,18 +63,23 @@ There are two independent effective horizontal draggable coordinates:
 
 **Acceptance:** Full-Shelf 0..H drag travel; video grip DOWN -> collapse -> drag UP -> same playing video restored; image grip UP to top, video grip DOWN to bottom -> full-image coverage; reverse; test narrow ~300-400px Shelf, full screen, touch/pointer and keyboard. With both panels open they never visually overlap, both are usable; only X closes. Use real Chrome DOM/screenshots, not CSS-only snapshots.
 
-## C. One-click image preview inside Chutey File Explorer
+## C. Double-click inside Chutey; right-click → Open Native (owner correction, November 18)
 
-**Current defect in `extension/explorer-view.js`, row click handler:** `node.onclick` always calls `select(row,event)`, but calls `showPreview(row)` **only if `!preview.hidden`**. Thus the first image click when the preview is closed merely selects the file; the second action or explicit Preview menu is required. `node.ondblclick` instead invokes configurable `fileAction(row,'open')`, which may launch the Windows-associated application.
+**This newer instruction supersedes the earlier assumption that one click must open the preview.** Owner clarification: "the opening inside Chutey is true for double clicks but if they right click and click Open Native, it will open the native interface."
 
-**Required behavior**
-- **Single click on an image file in the Shelf File Explorer immediately opens/previews it in the UPPER internal IMAGE/DOCUMENT pane**, regardless of whether a preview was already visible. No additional click and no external Windows viewer for this action.
-- Keep Explorer folder click and selection semantics distinct: clicking a directory should select it (double-click/Enter navigates as currently appropriate); do not preview directories as images. Ctrl/Shift range/multi-select operations should not unexpectedly open/change the preview; define sensible modifier exclusions. Keyboard accessible equivalent.
-- Clicking a new image replaces the upper image preview while **retaining the bottom video's current playback** and preserving the user's pane geometry. Repeated clicks and rapid switching must cancel stale content requests without leaking object URLs.
-- On unsupported formats, missing grant, decode error or oversize: show the real error **inside the same upper preview**, never a fake success or blank frozen pane. Preserve prior file and History.
-- Do not conflate this with **small Chrome popup** image tile behavior, Shelf History Open button, or Windows Explorer default open action.
+**Current code conflict:** `extension/explorer-view.js` binds `node.ondblclick` to configurable `fileAction(row,"open")`, which can invoke the Windows-associated application when the saved Open target is `system`. It also opens on single click only when the upper preview was already visible. The context menu currently has generic `Open` and `Preview` actions but lacks a clearly separate `Open Native` command.
 
-**Acceptance:** With no preview shown, one click JPG/PNG/WebP/GIF -> internal preview visible and decodes; clicking another image swaps upper preview; lower video remains uninterrupted; directory selection doesn't open an image; double-click/Open preference continues its distinct behavior.
+**Required behaviors and UI labels**
+- **Single-click an image/file** — selects/focuses its row. If the owner later decides to keep a one-click preview shortcut, make that distinct from and not a replacement for the mandatory double-click behavior; do **not** launch the native OS viewer on single-click.
+- **Double-click image/document** — opens/previews **inside Chutey**, in the UPPER image/document pane. This works when the preview pane was previously hidden as well as when it is visible, does not open Windows Photo Viewer/Paint/browser file handler, and does not touch History.
+- **Double-click supported video/audio** — opens in Chutey's LOWER pinned media player, without silently replacing the upper image pane or launching native media apps.
+- **Right-click a file → Open Native** — intentionally opens the **original authorized file** in its Windows-associated application through existing safe native file-open protocol. Use the explicit visible text **Open Native**, not generic `Open`. Do not route this action through internal Chutey preview. A missing/changed grant or missing native handler shows an actionable error rather than silently switching behavior.
+- **Right-click → Preview in Chutey** — optional explicit internal preview command, separate from **Open Native**. **Reveal / GO TO** remains a **third** action that reveals the saved file in Windows Explorer, not necessarily opens the file itself.
+- **Double-click directory** retains navigation into the directory, not media preview or native Open. Ctrl/Shift multi-selection should not accidentally start media. Keyboard Enter on a focused file should have clearly documented consistent behavior (prefer internal Chutey preview, with Open Native as an explicit separate command).
+- A new image replaces only the upper preview and keeps the currently playing lower video alive, preserving existing pane geometry. Rapid switching must cancel stale requests and release old image object URLs. Supported-media failure should be shown inside the intended pane, not by launching native apps.
+- Keep the separate small Chrome popup image behavior and Shelf History Open setting untouched by this File Explorer repair.
+
+**Acceptance matrix:** Single click JPG selects without native app; **double-click JPG/PNG from closed preview** opens upper image in Chutey; **double-click MP4** opens bottom player in Chutey; right-click JPG → **Open Native** opens Windows' associated image application; right-click MP4 → **Open Native** opens associated media player; **Reveal / GO TO** opens file location rather than same as Open Native; double-click folder enters folder. User-defined generic Open preferences must not override this explicit double-click vs Open Native contract.
 
 ## D. Folder selection automatically grants media-readiness (DEFAULT ON)
 
@@ -88,7 +95,24 @@ There are two independent effective horizontal draggable coordinates:
 
 **Acceptance:** 1) Fresh Chrome/Windows session -> select a folder once -> browse its images and click MP4 -> play within Chutey without another consent. 2) Toggle OFF -> select folder -> no proactive prep/autoplay; explicit playback still works under granted read access. 3) Toggle ON again -> future approved folders media-ready. 4) Restart worker/Chrome -> valid existing authorization reused without repeated prompts; revoked grant requires explicit reapproval. 5) Low memory ~200-300 MiB free, 4 GiB physical -> bounded resource behavior and honest failures.
 
-## E. Definition of Done / engineering handoff
+## E. New P0 crash of current Chutey TEST build — November 18, 2026
+
+**User-observed failure:** The owner reports that the Chutey version currently being tested **crashed today**. This is a new P0 bug; no evidence yet proves whether it was the extension, the popup/side panel, Chrome's renderer, native Chute.exe/NativeHost or an external OS termination. **Do not diagnose the crash as Python, a memory leak, Copy Image, or media streaming without logs.**
+
+**Tracked bug:** [GitHub Issue #32 — Current Chutey TEST build crashed](https://github.com/thanks-cohn/chute/issues/32).
+
+**Environment/context:** Windows 11 10.0.22000.1219, ~4 GB physical RAM, low free memory observed in earlier tests; Chrome unpacked extension `2.6.1.1`, TEST branch `fix/chutey-p0-playback-starter`, initial checkout `5e42457` (PR #31 merged). The Windows worker is installed separately; latest code checkout/extension does not itself establish a newly installed worker. Exact crash time, steps, logs and exit reason are **not yet known**.
+
+**Mandatory investigation**
+- Preserve owner files, History, current extension build, installed worker, native host and archival GOLD version. Capture paired extension id/version/commit and worker/native host executable SHA-256 before repairs.
+- First identify **which process or component actually failed**, with timestamp, crash code/stack and last action; distinguish Windows Event Viewer Application Error, Windows Error Reporting, Chutey diagnostic log, Chrome extension error, renderer crash, Chrome MV3 service worker ordinary inactivity, worker HTTP hang and deliberate user closure.
+- Reproduce across popup Copy Image, large images, Shelf Explorer image preview, dual video/image panels, video media tickets/retries and memory pressure **only as hypotheses**; measure memory, handle growth, queue/busy responses and crash telemetry with bounded diagnostics.
+- Check restart/recovery, no lost saved content, no false receipts, queue preservation, no duplicate worker launches and no needless consent prompts. Use smallest evidence-backed fix, regression tests and extended low-RAM Windows owner acceptance.
+- Never advise disabling Defender, killing Explorer, wiping saved content or overwriting the archived worker to mask the failure. Mark fixed **only after** root cause, controlled reproduction or solid fault evidence, tests, and real owner acceptance.
+
+**Status:** Bug recorded and investigation requested; no crash fix or root cause has been established.
+
+## F. Definition of Done / engineering handoff
 
 - Begin with `fix/chutey-p0-playback-starter` but make code changes on a **separate new branch**, preserving owner-installed binaries, saved files, History, local data, the GOLD worker backup, and `Chutey-Worker-ARCHIVE`. Do not alter main or issue #30's agreed geometry.
 - Implement/review minimal safe changes in `extension/popup-gallery.js`, `extension/explorer-view.js`, `extension/explorer-view.css`, native clipboard/media adapter only where measured necessary, and Settings persistence/UI.
@@ -98,9 +122,10 @@ There are two independent effective horizontal draggable coordinates:
 - **Do not mark completed simply because a specification exists**. Leave merge/release pending user testing.
 
 **Related issues:**  
+- https://github.com/thanks-cohn/chute/issues/32 — NEW P0 user-reported crash of current Chutey version (2026-11-18)  
 - https://github.com/thanks-cohn/chute/issues/28 — streaming stability / 429 / RAM  
 - https://github.com/thanks-cohn/chute/issues/30 — exact dual-pane geometry  
 - `Necessary-fixes/POPUP_SHELF_COPY_IMAGE_AND_SHELF_OPEN_DEFAULT_2026-11-17.md` — popup Copy Image and distinct Shelf History Open behavior  
 - `Necessary-fixes/FOCUSED_PREVIEW_NAVIGATION_TOP_NONVIDEO_BOTTOM_VIDEO_LEFT_RIGHT_2026-11-17.md` — focused galleries
 
-**Owner summary:** *Copy an image as quickly as Chrome; click an image and see it inside Chutey; drag both preview boundaries all the way up or down; choose a folder once and have its supported media ready without a second authorization, with automatic preparation configurable in Settings.*
+**Owner summary (latest):** *Copy an image as quickly as Chrome; DOUBLE-CLICK a file to open it INSIDE Chutey; RIGHT-CLICK → Open Native to launch Windows' associated app; drag both preview boundaries all the way up or down; choose a folder once and have its supported media ready without a second authorization, with automatic preparation configurable in Settings; urgently investigate today's crash of the current TEST version.*
